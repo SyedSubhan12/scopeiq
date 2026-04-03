@@ -1,0 +1,24 @@
+%% ScopeIQ — Brief Scoring Pipeline (Data Flow)
+%% Novabots Engineering | v1.0 | 2026
+
+flowchart LR
+    A["Client Submits<br/>Brief Form"] --> B["Core API<br/>(Hono v4)"]
+    B --> C["Create Brief Record<br/>status: pending_score"]
+    C --> D["Dispatch BullMQ Job<br/>job_type: score_brief"]
+    D --> E["AI Worker<br/>(FastAPI)"]
+    E --> F["Fetch Brief Fields<br/>from PostgreSQL"]
+    F --> G["Claude API<br/>tool_use mode<br/>Structured JSON Output"]
+    G --> H{"Score >= <br/>Threshold?"}
+    H -->|"Yes (≥70)"| I["Update Brief<br/>status: scored"]
+    H -->|"No (<70)"| J["Update Brief<br/>status: clarification_needed"]
+    I --> K["Supabase Real-time<br/>Push to Dashboard"]
+    J --> L["Send Clarification Email<br/>via Resend<br/>Template: BRIEF-CLARIFY-01"]
+    J --> K
+    L --> M["Client Revises<br/>Flagged Fields"]
+    M --> A
+
+    style A fill:#E1F5EE,stroke:#0F6E56,color:#0D1B2A
+    style G fill:#EFF6FF,stroke:#2563EB,color:#0D1B2A
+    style H fill:#FEF9C3,stroke:#D97706,color:#0D1B2A
+    style I fill:#ECFDF5,stroke:#059669,color:#0D1B2A
+    style J fill:#FEF2F2,stroke:#DC2626,color:#0D1B2A

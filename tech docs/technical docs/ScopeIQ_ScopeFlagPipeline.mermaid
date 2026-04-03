@@ -1,0 +1,28 @@
+%% ScopeIQ — Scope Flag Detection Pipeline (Data Flow)
+%% Novabots Engineering | v1.0 | 2026
+
+flowchart LR
+    A["Client Message<br/>Portal / Email / Manual"] --> B["Message Ingestion<br/>Core API"]
+    B --> C["Store Message<br/>in PostgreSQL"]
+    C --> D["Dispatch BullMQ Job<br/>job_type: check_scope"]
+    D --> E["AI Worker<br/>(FastAPI)"]
+    E --> F["Fetch Active<br/>SOW Clauses"]
+    F --> G["Claude API<br/>Scope Analysis"]
+    G --> H{"In Scope?"}
+    H -->|"Yes"| I["No Flag Created<br/>Log Result"]
+    H -->|"No & Confidence > 0.6"| J["Create Scope Flag<br/>severity + confidence"]
+    J --> K["Real-time Push<br/>Agency Dashboard"]
+    K --> L{"Agency Action"}
+    L -->|"Confirm"| M["Generate<br/>Change Order"]
+    L -->|"Dismiss"| N["Mark In-Scope<br/>Train AI"]
+    L -->|"Snooze"| O["Defer 24h<br/>Re-surface"]
+    M --> P["Send Change Order<br/>to Client Portal"]
+    P --> Q{"Client Decision"}
+    Q -->|"Accept"| R["Update SOW Scope<br/>Queue Invoice"]
+    Q -->|"Decline"| S["Notify Agency<br/>Flag for Discussion"]
+
+    style A fill:#E1F5EE,stroke:#0F6E56,color:#0D1B2A
+    style G fill:#EFF6FF,stroke:#2563EB,color:#0D1B2A
+    style J fill:#FEF2F2,stroke:#DC2626,color:#0D1B2A
+    style M fill:#FEF9C3,stroke:#D97706,color:#0D1B2A
+    style R fill:#ECFDF5,stroke:#059669,color:#0D1B2A

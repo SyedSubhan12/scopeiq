@@ -1,0 +1,48 @@
+%% ScopeIQ — System Architecture
+%% Novabots Engineering | v1.0 | 2026
+
+flowchart TB
+    subgraph Presentation["Presentation Tier (Vercel)"]
+        WEB["Agency Dashboard<br/>Next.js 14 / RSC"]
+        PORTAL["Client Portal<br/>Next.js / White-label"]
+    end
+
+    subgraph Application["Application Tier (Railway)"]
+        API["Core API<br/>Node.js / Hono v4<br/>Auth · CRUD · Webhooks"]
+        AI["AI Gateway<br/>Python / FastAPI<br/>Scoring · Flagging · Generation"]
+        QUEUE["BullMQ<br/>Job Queue"]
+    end
+
+    subgraph Data["Data Tier"]
+        DB["PostgreSQL<br/>Supabase<br/>RLS · Real-time"]
+        R2["Cloudflare R2<br/>File Storage<br/>Deliverables · SOWs"]
+        REDIS["Redis<br/>Upstash<br/>Cache · Rate Limits"]
+    end
+
+    subgraph External["External Services"]
+        CLAUDE["Anthropic Claude API"]
+        STRIPE["Stripe Billing"]
+        RESEND["Resend Email"]
+        CF["Cloudflare DNS/CDN"]
+    end
+
+    WEB -->|"HTTPS / REST"| API
+    PORTAL -->|"HTTPS / REST"| API
+    API --> DB
+    API --> R2
+    API -->|"Dispatch Jobs"| QUEUE
+    QUEUE -->|"Process Jobs"| AI
+    AI --> CLAUDE
+    AI --> DB
+    API --> STRIPE
+    API --> RESEND
+    PORTAL --> CF
+    WEB -->|"Real-time Subs"| DB
+    QUEUE --> REDIS
+
+    style WEB fill:#E1F5EE,stroke:#0F6E56,color:#0D1B2A
+    style PORTAL fill:#E1F5EE,stroke:#0F6E56,color:#0D1B2A
+    style API fill:#EFF6FF,stroke:#2563EB,color:#0D1B2A
+    style AI fill:#EFF6FF,stroke:#2563EB,color:#0D1B2A
+    style DB fill:#F1F5F9,stroke:#4B5563,color:#0D1B2A
+    style CLAUDE fill:#FEF9C3,stroke:#D97706,color:#0D1B2A

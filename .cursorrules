@@ -1,0 +1,81 @@
+# ScopeIQ — Cursor AI Agent Rules
+# Novabots Engineering | Place this file at the monorepo root
+
+## IDENTITY
+You are building ScopeIQ, a B2B SaaS platform by Novabots that protects creative agency revenue through AI-powered scope enforcement. Turborepo monorepo with apps/web (Next.js 14), apps/api (Node.js/Hono), apps/ai (Python/FastAPI).
+
+## NON-NEGOTIABLE RULES
+
+1. **TypeScript strict mode** — `strict: true`, `noUncheckedIndexedAccess: true`. Never use `any`, `@ts-ignore`, or type assertions without detailed justification comments.
+
+2. **Database via Drizzle ORM only** — No raw SQL strings. ALL queries MUST include `workspaceId` in the WHERE clause for tenant isolation. Never rely on RLS alone.
+
+3. **AI calls via AI Gateway only** — Never import the Anthropic SDK in apps/web or apps/api. All AI operations dispatch BullMQ jobs to apps/ai (FastAPI). Exception: DEV_MODE test endpoint.
+
+4. **File uploads via presigned URLs only** — Never accept file content in API request bodies. Three-step flow: request presigned URL → upload directly to R2 → confirm upload.
+
+5. **No client-side secrets** — Only `NEXT_PUBLIC_` prefixed vars in apps/web. API keys, Stripe secrets, database URLs NEVER in client bundles.
+
+6. **Every mutation writes to audit_log** — Use `writeAuditLog()` helper from `packages/db/src/audit.ts` within the same database transaction as the mutation.
+
+7. **Tests for P0 features** — Vitest unit test + Playwright E2E for every P0 feature. 80% coverage target for packages/db and apps/api.
+
+## CODE PATTERNS
+
+### File Naming
+- React components: `PascalCase.tsx` → `ScopeFlagCard.tsx`
+- Utilities: `camelCase.ts` → `formatCurrency.ts`
+- API routes: `kebab-case.route.ts` → `scope-flags.route.ts`
+- DB schemas: `kebab-case.schema.ts` → `scope-flags.schema.ts`
+- Tests: `same-name.test.ts` → `ScopeFlagCard.test.ts`
+- Hooks: `useCamelCase.ts` → `useScopeFlags.ts`
+
+### Component File Structure (strict order)
+1. `'use client'` or `'use server'` directive
+2. External library imports
+3. Internal absolute imports (`@/components`, `@novabots/ui`)
+4. Internal relative imports
+5. Type definitions
+6. Constants
+7. Component function (default export)
+8. Named exports
+
+### Hono API Route Pattern
+```typescript
+const resource = new Hono()
+  .use('*', authMiddleware)
+  .get('/', async (c) => {
+    const workspaceId = c.get('workspaceId');
+    // ALWAYS use workspaceId in service calls
+    const data = await service.list(workspaceId);
+    return c.json({ data });
+  })
+  .post('/', zValidator('json', schema), async (c) => {
+    const body = c.req.valid('json');
+    // ...
+  });
+```
+
+### Database Query Pattern
+```typescript
+// ✅ CORRECT — always include workspaceId
+const result = await db.select().from(table)
+  .where(and(eq(table.id, id), eq(table.workspaceId, workspaceId)))
+  .limit(1);
+
+// ❌ WRONG — missing workspaceId
+const result = await db.select().from(table)
+  .where(eq(table.id, id));
+```
+
+## TECH STACK
+- Frontend: Next.js 14 (App Router + RSC), Tailwind CSS 3.4, Radix UI, Zustand, React Query v5, React Hook Form + Zod, DnD Kit, Framer Motion, Lucide React
+- Backend: Node.js 20 LTS, Hono v4, Zod validation, Drizzle ORM 0.30, BullMQ, Stripe SDK, Resend SDK
+- AI Service: Python 3.12, FastAPI 0.110, Anthropic SDK (claude-sonnet-4-6), BullMQ Python, Pydantic v2, PyMuPDF
+- Infrastructure: PostgreSQL 15 (Supabase), Redis (Upstash), Cloudflare R2, Vercel, Railway
+
+## OUTPUT RULES
+- Generate COMPLETE files, never partial snippets
+- NO TODOs, NO placeholders, NO "you would add X here"
+- Every file must be immediately runnable
+- Follow the 10-step feature implementation checklist from the Master Prompt Document

@@ -1,0 +1,30 @@
+%% ScopeIQ — Client Portal Journey (User Flow)
+%% Novabots Engineering | v1.0 | 2026
+
+flowchart LR
+    A["Client Gets Brief Link<br/>Email or Website"] --> B["Fill Intake Form<br/>Step-by-Step"]
+    B --> C["Submit Brief<br/>Public Endpoint"]
+    C --> D{"AI Score<br/>>= Threshold?"}
+    D -->|"Yes"| E["Brief Accepted<br/>Confirmation Screen"]
+    D -->|"No"| F["Clarification Request<br/>Email + Portal"]
+    F --> G["Client Revises<br/>Specific Fields"]
+    G --> C
+    E --> H["Receive Deliverable<br/>Notification Email"]
+    H --> I["Open Client Portal<br/>Branded Experience"]
+    I --> J["Review Deliverable<br/>Image / PDF / Figma"]
+    J --> K["Pin Annotations<br/>& Leave Feedback"]
+    K --> L{"Decision"}
+    L -->|"Approve"| M["Version Approved<br/>Agency Notified"]
+    L -->|"Request Changes"| N["Revision Counter<br/>Updated"]
+    N -->|"Within Limit"| O["Agency Revises<br/>Client Waits"]
+    N -->|"At Limit"| P["Additional Rounds<br/>Are Billable Modal"]
+    P --> Q["Change Order<br/>Sent for Approval"]
+    Q -->|"Accept"| R["SOW Updated<br/>Work Continues"]
+    Q -->|"Decline"| S["Agency Notified<br/>Scope Discussion"]
+    O --> H
+
+    style A fill:#E1F5EE,stroke:#0F6E56,color:#0D1B2A
+    style D fill:#FEF9C3,stroke:#D97706,color:#0D1B2A
+    style M fill:#ECFDF5,stroke:#059669,color:#0D1B2A
+    style P fill:#FEF2F2,stroke:#DC2626,color:#0D1B2A
+    style R fill:#ECFDF5,stroke:#059669,color:#0D1B2A

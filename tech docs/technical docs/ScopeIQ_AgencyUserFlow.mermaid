@@ -1,0 +1,25 @@
+%% ScopeIQ — Agency User Journey (User Flow)
+%% Novabots Engineering | v1.0 | 2026
+
+flowchart LR
+    A["Agency Signs Up<br/>Stripe Checkout"] --> B["Welcome Email<br/>+ Onboarding Checklist"]
+    B --> C["Upload Logo<br/>& Brand Color"]
+    C --> D["Create First Project<br/>& Add Client"]
+    D --> E["Build Brief Template<br/>Drag-and-Drop Fields"]
+    E --> F["Share Brief Link<br/>with Client"]
+    F --> G["Client Submits Brief<br/>via Portal"]
+    G --> H["AI Scores Brief<br/>Clarity 0-100"]
+    H --> I["Upload SOW<br/>AI Parses Clauses"]
+    I --> J["Review & Activate<br/>SOW Clauses"]
+    J --> K["Upload Deliverable<br/>for Client Review"]
+    K --> L["Client Reviews<br/>& Annotates"]
+    L --> M{"Client Action"}
+    M -->|"Approve"| N["Mark Approved<br/>Next Deliverable"]
+    M -->|"Request Changes"| O["Revision Round +1<br/>AI Summarizes Feedback"]
+    O --> P["Agency Revises<br/>& Re-uploads"]
+    P --> L
+
+    style A fill:#E1F5EE,stroke:#0F6E56,color:#0D1B2A
+    style H fill:#EFF6FF,stroke:#2563EB,color:#0D1B2A
+    style N fill:#ECFDF5,stroke:#059669,color:#0D1B2A
+    style O fill:#FEF9C3,stroke:#D97706,color:#0D1B2A
