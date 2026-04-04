@@ -5,6 +5,11 @@ const envSchema = z.object({
     REDIS_URL: z.string().url(),
     PORT: z.string().optional().default("4000"),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    SUPABASE_URL: z.string().url(),
+    SUPABASE_ANON_KEY: z.string().min(1),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+    RESEND_API_KEY: z.string().optional(),
+    APP_URL: z.string().url().optional(),
 });
 
 export const env = envSchema.parse(process.env);

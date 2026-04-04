@@ -3,7 +3,8 @@ version: "3.8"
 services:
   postgres:
     image: postgres:15
-    ports: ["5432:5432"]
+    ports: ["5433:5432"]
+    restart: always
     environment:
       POSTGRES_USER: scopeiq
       POSTGRES_PASSWORD: scopeiq_dev
@@ -17,7 +18,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["6372:6379"]
+    restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -25,6 +27,7 @@ services:
   minio:
     image: minio/minio
     ports: ["9000:9000", "9001:9001"]
+    restart: always
     environment:
       MINIO_ROOT_USER: scopeiq
       MINIO_ROOT_PASSWORD: scopeiq_dev

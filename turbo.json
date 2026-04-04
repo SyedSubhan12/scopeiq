@@ -1,7 +1,23 @@
 {
     "$schema": "https://turbo.build/schema.json",
     "globalDependencies": [
-        ".env.local"
+        ".env"
+    ],
+    "globalPassThroughEnv": [
+        "DATABASE_URL",
+        "REDIS_URL",
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_API_URL",
+        "ANTHROPIC_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "RESEND_API_KEY",
+        "SENTRY_DSN",
+        "NODE_ENV"
     ],
     "tasks": {
         "build": {

@@ -4,21 +4,40 @@
     "private": true,
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        },
+        "./schema/*.js": {
+            "import": "./dist/schema/*.js",
+            "types": "./dist/schema/*.d.ts"
+        },
+        "./schema/*": {
+            "import": "./dist/schema/*.js",
+            "types": "./dist/schema/*.d.ts"
+        }
+    },
     "scripts": {
-        "db:generate": "drizzle-kit generate",
-        "db:push": "drizzle-kit push",
-        "db:studio": "drizzle-kit studio",
+        "dev": "tsc -w",
+        "build": "tsc",
+        "db:generate": "dotenv -e ../../.env -- drizzle-kit generate:pg",
+        "db:push": "dotenv -e ../../.env -- drizzle-kit push:pg",
+        "db:studio": "dotenv -e ../../.env -- drizzle-kit studio",
+        "db:seed": "dotenv -e ../../.env -- tsx src/seed.ts",
         "typecheck": "tsc",
         "lint": "eslint ."
     },
     "dependencies": {
         "drizzle-orm": "^0.30.0",
+        "drizzle-zod": "^0.8.3",
         "pg": "^8.11.3"
     },
     "devDependencies": {
+        "@novabots/config": "workspace:*",
         "@types/pg": "^8.11.2",
         "drizzle-kit": "^0.20.14",
-        "typescript": "^5.3.3",
-        "@novabots/config": "workspace:*"
+        "tsx": "^4.7.1",
+        "typescript": "^5.3.3"
     }
 }

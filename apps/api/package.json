@@ -4,31 +4,39 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "tsx watch src/index.ts",
+        "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
         "build": "tsc",
         "start": "node dist/index.js",
         "typecheck": "tsc",
-        "lint": "eslint ."
+        "lint": "eslint .",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "hono": "^4.0.8",
+        "@aws-sdk/client-s3": "^3.1023.0",
+        "@aws-sdk/s3-request-presigner": "^3.1023.0",
         "@hono/node-server": "^1.8.2",
         "@hono/zod-validator": "^0.1.11",
-        "zod": "^3.22.4",
-        "drizzle-orm": "^0.30.0",
-        "pg": "^8.11.3",
-        "bullmq": "^5.1.9",
-        "stripe": "^14.19.0",
-        "@supabase/supabase-js": "^2.39.7",
-        "resend": "^3.2.0",
-        "@sentry/node": "^7.102.1",
         "@novabots/db": "workspace:*",
-        "@novabots/types": "workspace:*"
+        "@novabots/types": "workspace:*",
+        "@sentry/node": "^7.102.1",
+        "@supabase/supabase-js": "^2.39.7",
+        "bullmq": "^5.1.9",
+        "drizzle-orm": "^0.30.0",
+        "hono": "^4.0.8",
+        "ioredis": "^5.10.1",
+        "pg": "^8.11.3",
+        "resend": "^3.2.0",
+        "stripe": "^14.19.0",
+        "zod": "^3.22.4"
     },
     "devDependencies": {
+        "@novabots/config": "workspace:*",
         "@types/node": "^20.11.19",
+        "@vitest/coverage-v8": "^4.1.2",
         "tsx": "^4.7.1",
         "typescript": "^5.3.3",
-        "@novabots/config": "workspace:*"
+        "vitest": "^4.1.2"
     }
 }

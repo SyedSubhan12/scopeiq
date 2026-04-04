@@ -1,5 +1,5 @@
-import { ErrorHandler } from "hono";
-import { AppError, ApiErrorResponse } from "@novabots/types";
+import type { ErrorHandler } from "hono";
+import { AppError, type ApiErrorResponse } from "@novabots/types";
 
 export const errorHandler: ErrorHandler = async (err, c) => {
     console.error(err);
@@ -7,12 +7,12 @@ export const errorHandler: ErrorHandler = async (err, c) => {
     if (err instanceof AppError) {
         const errorResponse: ApiErrorResponse = {
             error: {
-                code: (err as any).code || "APP_ERROR",
+                code: err.code,
                 message: err.message,
-                details: (err as any).details,
+                details: err.details,
             },
         };
-        return c.json(errorResponse, (err as any).statusCode || 500);
+        return c.json(errorResponse, err.statusCode as Parameters<typeof c.json>[1]);
     }
 
     // Handle generic errors
