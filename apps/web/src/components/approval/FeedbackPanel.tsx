@@ -10,6 +10,14 @@ interface FeedbackPanelProps {
   pins: FeedbackItem[];
   activePinId?: string | null;
   onClose: () => void;
+  createMutation: {
+    mutateAsync: (data: { body: string; annotationJson?: FeedbackItem["annotationJson"] }) => Promise<any>;
+    isPending: boolean;
+  };
+  resolveMutation: {
+    mutateAsync: (feedbackId: string) => Promise<any>;
+    isPending: boolean;
+  };
 }
 
 export function FeedbackPanel({
@@ -17,23 +25,28 @@ export function FeedbackPanel({
   pins,
   activePinId,
   onClose,
+  createMutation,
+  resolveMutation,
 }: FeedbackPanelProps) {
   const { toast } = useToast();
-  const createFeedback = useCreateFeedback(deliverableId);
-  const resolveFeedback = useResolveFeedback(deliverableId);
-
   const [newComment, setNewComment] = useState("");
 
-  const sortedPins = [...pins].sort((a, b) => a.pin_number - b.pin_number);
+  const sortedPins = [...pins].sort((a, b) => {
+    const aNum = a.annotationJson?.pinNumber ?? 999;
+    const bNum = b.annotationJson?.pinNumber ?? 999;
+    return aNum - bNum;
+  });
 
   const handleSubmitGeneral = async () => {
     if (!newComment.trim()) return;
     try {
-      await createFeedback.mutateAsync({
-        x_pos: 0,
-        y_pos: 0,
-        content: newComment.trim(),
-        author_type: "agency",
+      await createMutation.mutateAsync({
+        body: newComment.trim(),
+        annotationJson: {
+          xPos: 0,
+          yPos: 0,
+          pinNumber: pins.length + 1,
+        },
       });
       setNewComment("");
       toast("success", "Feedback added");
@@ -44,7 +57,7 @@ export function FeedbackPanel({
 
   const handleResolve = async (feedbackId: string) => {
     try {
-      await resolveFeedback.mutateAsync(feedbackId);
+      await resolveMutation.mutateAsync(feedbackId);
       toast("success", "Pin resolved");
     } catch {
       toast("error", "Failed to resolve");
@@ -80,48 +93,51 @@ export function FeedbackPanel({
           </div>
         ) : (
           <div className="divide-y divide-[rgb(var(--border-default))]">
-            {sortedPins.map((pin) => (
-              <div
-                key={pin.id}
-                className={`p-3 transition-colors ${
-                  activePinId === pin.id ? "bg-primary/5" : "hover:bg-[rgb(var(--surface-subtle))]"
-                } ${pin.is_resolved ? "opacity-60" : ""}`}
-              >
-                <div className="mb-1.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                        pin.is_resolved
+            {sortedPins.map((pin) => {
+              const annotation = pin.annotationJson;
+              const isResolved = !!pin.resolvedAt;
+
+              return (
+                <div
+                  key={pin.id}
+                  className={`p-3 transition-colors ${activePinId === pin.id ? "bg-primary/5" : "hover:bg-[rgb(var(--surface-subtle))]"
+                    } ${isResolved ? "opacity-60" : ""}`}
+                >
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${isResolved
                           ? "bg-gray-200 text-gray-500"
                           : "bg-primary text-white"
-                      }`}
-                    >
-                      {pin.pin_number}
-                    </span>
-                    <span className="text-xs capitalize text-[rgb(var(--text-muted))]">
-                      {pin.author_type}
-                    </span>
+                          }`}
+                      >
+                        {annotation?.pinNumber ?? "!"}
+                      </span>
+                      <span className="text-xs font-medium text-[rgb(var(--text-muted))]">
+                        {pin.authorName || "User"}
+                      </span>
+                    </div>
+                    {!isResolved && (
+                      <button
+                        onClick={() => void handleResolve(pin.id)}
+                        disabled={resolveMutation.isPending}
+                        className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-green-600 hover:bg-green-50"
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        Resolve
+                      </button>
+                    )}
+                    {isResolved && (
+                      <span className="text-xs text-green-600">Resolved</span>
+                    )}
                   </div>
-                  {!pin.is_resolved && (
-                    <button
-                      onClick={() => void handleResolve(pin.id)}
-                      disabled={resolveFeedback.isPending}
-                      className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-green-600 hover:bg-green-50"
-                    >
-                      <CheckCircle2 className="h-3 w-3" />
-                      Resolve
-                    </button>
-                  )}
-                  {pin.is_resolved && (
-                    <span className="text-xs text-green-600">Resolved</span>
-                  )}
+                  <p className="text-sm text-[rgb(var(--text-primary))]">{pin.body}</p>
+                  <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
+                    {new Date(pin.createdAt).toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-sm text-[rgb(var(--text-primary))]">{pin.content}</p>
-                <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
-                  {new Date(pin.created_at).toLocaleString()}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -139,7 +155,7 @@ export function FeedbackPanel({
           <Button
             size="sm"
             onClick={() => void handleSubmitGeneral()}
-            disabled={!newComment.trim() || createFeedback.isPending}
+            disabled={!newComment.trim() || createMutation.isPending}
           >
             <Send className="h-3.5 w-3.5" />
           </Button>

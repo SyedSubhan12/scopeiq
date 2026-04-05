@@ -35,8 +35,8 @@ export default function ProjectsPage() {
       await createProject.mutateAsync({
         name: name.trim(),
         clientId,
-        description: description.trim() || undefined,
-        budget: budget ? parseInt(budget) : undefined,
+        ...(description.trim() ? { description: description.trim() } : {}),
+        ...(budget ? { budget: parseInt(budget) } : {}),
       });
       toast("success", "Project created");
       setShowCreate(false);

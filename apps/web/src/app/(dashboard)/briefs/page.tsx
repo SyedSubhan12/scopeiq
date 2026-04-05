@@ -28,7 +28,7 @@ export default function BriefsPage() {
     try {
       await createTemplate.mutateAsync({
         name: name.trim(),
-        description: description.trim() || undefined,
+        ...(description.trim() ? { description: description.trim() } : {}),
       });
       toast("success", "Template created");
       setShowCreate(false);

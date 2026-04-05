@@ -1,18 +1,14 @@
 import { Hono } from "hono";
 import { portalAuthMiddleware } from "../middleware/portal-auth.js";
-import { db, projects, workspaces, clients, deliverables, eq, and, isNull } from "@novabots/db";
+import { db, projects, workspaces, clients, deliverables, briefs, briefFields, changeOrders, eq, and, isNull, asc, inArray } from "@novabots/db";
 import { NotFoundError } from "@novabots/types";
+import { analyticsService } from "../services/analytics.service.js";
 
 export const portalSessionRouter = new Hono();
 
 portalSessionRouter.use("*", portalAuthMiddleware);
 
-/**
- * GET /portal/session
- * Returns the client's view of their project: workspace branding, project info,
- * and deliverable statuses. Used by the portal app on initial load.
- */
-portalSessionRouter.get("/", async (c) => {
+portalSessionRouter.get("", async (c) => {
   const projectId = c.get("portalProjectId");
   const workspaceId = c.get("portalWorkspaceId");
 
@@ -50,13 +46,38 @@ portalSessionRouter.get("/", async (c) => {
     .where(eq(clients.id, project.clientId))
     .limit(1);
 
+  // Fetch pending brief (not submitted)
+  const [pendingBrief] = await db
+    .select()
+    .from(briefs)
+    .where(
+      and(
+        eq(briefs.projectId, projectId),
+        isNull(briefs.submittedAt),
+        isNull(briefs.deletedAt)
+      )
+    )
+    .limit(1);
+
+  let fields: any[] = [];
+  if (pendingBrief) {
+    fields = await db
+      .select()
+      .from(briefFields)
+      .where(eq(briefFields.briefId, pendingBrief.id))
+      .orderBy(asc(briefFields.sortOrder));
+  }
+
+  // Fetch health stats
+  const health = await analyticsService.getProjectHealth(workspaceId, projectId);
+
   // Fetch deliverables for the project
   const projectDeliverables = await db
     .select({
       id: deliverables.id,
       name: deliverables.name,
       status: deliverables.status,
-      revisionCount: deliverables.revisionCount,
+      revisionRound: deliverables.revisionRound,
       maxRevisions: deliverables.maxRevisions,
       fileUrl: deliverables.fileUrl,
       mimeType: deliverables.mimeType,
@@ -68,6 +89,25 @@ portalSessionRouter.get("/", async (c) => {
       and(
         eq(deliverables.projectId, projectId),
         isNull(deliverables.deletedAt),
+      ),
+    );
+
+  // Fetch sent change orders for the portal
+  const sentChangeOrders = await db
+    .select({
+      id: changeOrders.id,
+      title: changeOrders.title,
+      description: changeOrders.description,
+      amount: changeOrders.amount,
+      status: changeOrders.status,
+      sentAt: changeOrders.sentAt,
+      respondedAt: changeOrders.respondedAt,
+    })
+    .from(changeOrders)
+    .where(
+      and(
+        eq(changeOrders.projectId, projectId),
+        eq(changeOrders.status, "sent"),
       ),
     );
 
@@ -85,8 +125,15 @@ portalSessionRouter.get("/", async (c) => {
         name: workspace!.name,
         logoUrl: workspace!.logoUrl,
         brandColor: workspace!.brandColor ?? "#0F6E56",
+        plan: (workspace as any).plan ?? "solo",
       },
       deliverables: projectDeliverables,
+      health,
+      pendingBrief: pendingBrief ? {
+        ...pendingBrief,
+        fields
+      } : null,
+      pendingChangeOrders: sentChangeOrders,
     },
   });
 });

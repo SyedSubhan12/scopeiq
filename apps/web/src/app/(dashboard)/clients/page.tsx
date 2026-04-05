@@ -119,9 +119,9 @@ export default function ClientsPage() {
     try {
       await createClient.mutateAsync({
         name: name.trim(),
-        contactName: contactName.trim() || undefined,
-        contactEmail: contactEmail.trim() || undefined,
-        notes: notes.trim() || undefined,
+        ...(contactName.trim() ? { contactName: contactName.trim() } : {}),
+        ...(contactEmail.trim() ? { contactEmail: contactEmail.trim() } : {}),
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
       });
       toast("success", "Client created");
       setShowCreate(false);

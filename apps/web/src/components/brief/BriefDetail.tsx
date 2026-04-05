@@ -127,8 +127,8 @@ export function BriefDetail({
               <BriefFlagCard
                 key={flag.id}
                 flag={flag}
-                onOverride={onOverrideFlag}
-                overriding={overriding}
+                {...(onOverrideFlag ? { onOverride: onOverrideFlag } : {})}
+                {...(overriding !== undefined ? { overriding } : {})}
               />
             ))}
           </div>

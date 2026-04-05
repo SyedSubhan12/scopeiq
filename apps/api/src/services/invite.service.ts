@@ -61,7 +61,7 @@ export const inviteService = {
       to: data.email,
       token: String(invitation.token),
       workspaceName: workspace?.name ?? "your workspace",
-      inviterName: inviter?.fullName ?? undefined,
+      inviterName: inviter?.fullName ?? "your team member",
       role: data.role,
     }).catch((err) => {
       console.error("[Invite] Failed to send email:", err);

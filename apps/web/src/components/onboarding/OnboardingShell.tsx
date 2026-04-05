@@ -25,7 +25,7 @@ export function OnboardingShell({
             <div className="mb-8">
                 <div className="flex items-center justify-between">
                     {steps.map((label, idx) => {
-                        const isCompleted = completedSteps.includes(stepKeys[idx]);
+                        const isCompleted = completedSteps.includes(stepKeys[idx]!);
                         const isCurrent = idx === currentStep;
 
                         return (
@@ -63,7 +63,7 @@ export function OnboardingShell({
                                     <div
                                         className={cn(
                                             "mx-2 h-0.5 flex-1",
-                                            completedSteps.includes(stepKeys[idx])
+                                            completedSteps.includes(stepKeys[idx]!)
                                                 ? "bg-primary"
                                                 : "bg-[rgb(var(--border-default))]",
                                         )}

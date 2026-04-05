@@ -17,10 +17,10 @@ export const briefStatusEnum = pgEnum("brief_status_enum", [
 ]);
 
 export const deliverableStatusEnum = pgEnum("deliverable_status_enum", [
-  "not_started",
-  "in_progress",
+  "draft",
+  "delivered",
   "in_review",
-  "revision_requested",
+  "changes_requested",
   "approved",
 ]);
 
@@ -43,6 +43,8 @@ export const flagStatusEnum = pgEnum("flag_status_enum", [
   "confirmed",
   "dismissed",
   "snoozed",
+  "change_order_sent",
+  "resolved",
 ]);
 
 export const changeOrderStatusEnum = pgEnum("change_order_status_enum", [

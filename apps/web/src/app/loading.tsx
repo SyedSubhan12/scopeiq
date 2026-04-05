@@ -1,0 +1,14 @@
+import { PageLoadingAnimation } from "@/components/shared/PageLoadingAnimation";
+
+export default function Loading() {
+  return (
+    <div
+      className="flex min-h-screen items-center justify-center bg-[rgb(var(--surface-subtle))]"
+      aria-busy={true}
+      aria-live="polite"
+      aria-label="Loading page"
+    >
+      <PageLoadingAnimation />
+    </div>
+  );
+}

@@ -8,12 +8,37 @@ interface Deliverable {
     id: string;
     name: string;
     status: string;
-    revisionCount: number;
+    revisionRound: number;
     maxRevisions: number;
     fileUrl: string | null;
     mimeType: string | null;
     externalUrl: string | null;
     type: string;
+}
+
+interface BriefField {
+    id: string;
+    fieldKey: string;
+    fieldLabel: string;
+    fieldType: string;
+    value: string | null;
+    sortOrder: number;
+}
+
+interface PendingBrief {
+    id: string;
+    title: string;
+    fields: BriefField[];
+}
+
+interface ChangeOrderSummary {
+    id: string;
+    title: string;
+    description: string | null;
+    amount: number | null;
+    status: string;
+    sentAt: string | null;
+    respondedAt: string | null;
 }
 
 interface PortalSession {
@@ -30,8 +55,17 @@ interface PortalSession {
         name: string;
         logoUrl: string | null;
         brandColor: string;
+        plan: string;
     };
     deliverables: Deliverable[];
+    health: {
+        healthScore: number;
+        pendingFlags: number;
+        avgBriefScore: number;
+        status: string;
+    } | null;
+    pendingBrief: PendingBrief | null;
+    pendingChangeOrders: ChangeOrderSummary[];
     loading: boolean;
     error: string | null;
 }
@@ -39,8 +73,11 @@ interface PortalSession {
 const defaultSession: PortalSession = {
     token: "",
     project: { id: "", name: "", description: null, status: "", clientName: null },
-    workspace: { id: "", name: "", logoUrl: null, brandColor: "#0F6E56" },
+    workspace: { id: "", name: "", logoUrl: null, brandColor: "#0F6E56", plan: "solo" },
     deliverables: [],
+    health: null,
+    pendingBrief: null,
+    pendingChangeOrders: [],
     loading: true,
     error: null,
 };
@@ -84,6 +121,9 @@ export function PortalSessionProvider({
                     project: data.project,
                     workspace: data.workspace,
                     deliverables: data.deliverables,
+                    health: data.health,
+                    pendingBrief: data.pendingBrief,
+                    pendingChangeOrders: data.pendingChangeOrders ?? [],
                     loading: false,
                     error: null,
                 });

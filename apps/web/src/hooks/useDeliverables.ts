@@ -3,20 +3,24 @@ import { fetchWithAuth } from "@/lib/api";
 
 export interface Deliverable {
   id: string;
-  project_id: string;
+  projectId: string;
+  workspaceId: string;
   name: string;
-  description?: string | null;
-  status: "not_started" | "in_progress" | "in_review" | "revision_requested" | "approved";
-  file_url?: string | null;
-  file_type?: string | null;
-  file_name?: string | null;
-  file_size?: number | null;
-  object_key?: string | null;
-  revision_round: number;
-  revision_limit: number;
-  due_date?: string | null;
-  created_at: string;
-  updated_at: string;
+  description: string | null;
+  type: "file" | "figma" | "loom" | "youtube" | "link";
+  status: "draft" | "delivered" | "in_review" | "changes_requested" | "approved";
+  fileUrl: string | null;
+  fileKey: string | null;
+  fileSizeBytes: number | null;
+  mimeType: string | null;
+  originalName: string | null;
+  externalUrl: string | null;
+  metadata: Record<string, any> | null;
+  revisionRound: number;
+  maxRevisions: number;
+  dueDate: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UploadUrlResponse {
@@ -25,17 +29,17 @@ export interface UploadUrlResponse {
 }
 
 export function useDeliverables(projectId: string) {
-  return useQuery({
+  return useQuery<{ data: Deliverable[] }>({
     queryKey: ["deliverables", projectId],
-    queryFn: () => fetchWithAuth(`/v1/projects/${projectId}/deliverables`),
+    queryFn: () => fetchWithAuth(`/v1/projects/${projectId}/deliverables`) as Promise<{ data: Deliverable[] }>,
     enabled: !!projectId,
   });
 }
 
 export function useDeliverable(id: string) {
-  return useQuery({
+  return useQuery<{ data: Deliverable }>({
     queryKey: ["deliverable", id],
-    queryFn: () => fetchWithAuth(`/v1/deliverables/${id}`),
+    queryFn: () => fetchWithAuth(`/v1/deliverables/${id}`) as Promise<{ data: Deliverable }>,
     enabled: !!id,
   });
 }
@@ -46,8 +50,11 @@ export function useCreateDeliverable(projectId: string) {
     mutationFn: (data: {
       name: string;
       description?: string;
-      revision_limit?: number;
-      due_date?: string;
+      type?: Deliverable["type"];
+      externalUrl?: string;
+      metadata?: Record<string, any>;
+      maxRevisions?: number;
+      dueDate?: string;
     }) =>
       fetchWithAuth(`/v1/projects/${projectId}/deliverables`, {
         method: "POST",
@@ -66,8 +73,9 @@ export function useUpdateDeliverable(id: string, projectId: string) {
       name?: string;
       description?: string;
       status?: Deliverable["status"];
-      revision_limit?: number;
-      due_date?: string;
+      metadata?: Record<string, any>;
+      maxRevisions?: number;
+      dueDate?: string;
     }) =>
       fetchWithAuth(`/v1/deliverables/${id}`, {
         method: "PATCH",
@@ -95,18 +103,18 @@ export function useGetUploadUrl() {
   return useMutation({
     mutationFn: ({
       deliverableId,
-      file_name,
-      content_type,
-      file_size,
+      fileName,
+      contentType,
+      fileSize,
     }: {
       deliverableId: string;
-      file_name: string;
-      content_type: string;
-      file_size: number;
+      fileName: string;
+      contentType: string;
+      fileSize: number;
     }) =>
       fetchWithAuth(`/v1/deliverables/${deliverableId}/upload-url`, {
         method: "POST",
-        body: JSON.stringify({ file_name, content_type, file_size }),
+        body: JSON.stringify({ fileName, contentType, fileSize }),
       }) as Promise<{ data: UploadUrlResponse }>,
   });
 }
@@ -114,10 +122,10 @@ export function useGetUploadUrl() {
 export function useConfirmUpload(deliverableId: string, projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ object_key }: { object_key: string }) =>
+    mutationFn: ({ objectKey, originalName }: { objectKey: string; originalName?: string }) =>
       fetchWithAuth(`/v1/deliverables/${deliverableId}/confirm-upload`, {
         method: "POST",
-        body: JSON.stringify({ object_key }),
+        body: JSON.stringify({ objectKey, originalName }),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["deliverables", projectId] });
@@ -130,7 +138,7 @@ export function useConfirmUpload(deliverableId: string, projectId: string) {
  * Orchestrates the 3-step presigned URL upload:
  * 1. Get upload URL from API
  * 2. Upload file directly to R2 via PUT
- * 3. Confirm upload with object_key
+ * 3. Confirm upload with objectKey
  */
 export async function uploadDeliverableFile(
   deliverableId: string,
@@ -141,9 +149,9 @@ export async function uploadDeliverableFile(
   const urlResponse = await fetchWithAuth(`/v1/deliverables/${deliverableId}/upload-url`, {
     method: "POST",
     body: JSON.stringify({
-      file_name: file.name,
-      content_type: file.type,
-      file_size: file.size,
+      fileName: file.name,
+      contentType: file.type,
+      fileSize: file.size,
     }),
   }) as { data: UploadUrlResponse };
 
@@ -178,7 +186,7 @@ export async function uploadDeliverableFile(
   // Step 3: Confirm upload
   await fetchWithAuth(`/v1/deliverables/${deliverableId}/confirm-upload`, {
     method: "POST",
-    body: JSON.stringify({ object_key }),
+    body: JSON.stringify({ objectKey: object_key, originalName: file.name }),
   });
 
   return { upload_url, object_key };

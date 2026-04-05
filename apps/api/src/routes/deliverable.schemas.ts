@@ -15,6 +15,7 @@ export const createDeliverableSchema = z.object({
   description: z.string().max(2000).optional(),
   type: z.enum(["file", "figma", "loom", "youtube", "link"]).default("file"),
   externalUrl: z.string().url().optional(),
+  metadata: z.record(z.any()).optional(),
   maxRevisions: z.number().int().min(1).optional(),
   dueDate: z.string().datetime().optional(),
 });
@@ -26,6 +27,7 @@ export const updateDeliverableSchema = z.object({
     .enum(["not_started", "in_progress", "in_review", "revision_requested", "approved"])
     .optional(),
   externalUrl: z.string().url().optional(),
+  metadata: z.record(z.any()).optional(),
   maxRevisions: z.number().int().min(1).optional(),
   dueDate: z.string().datetime().optional(),
 });
@@ -38,4 +40,6 @@ export const uploadUrlSchema = z.object({
 
 export const confirmUploadSchema = z.object({
   objectKey: z.string().min(1),
+  originalName: z.string().min(1).max(255).optional(),
+  notes: z.string().max(2000).optional(),
 });

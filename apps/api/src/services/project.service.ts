@@ -1,9 +1,9 @@
 import { projectRepository } from "../repositories/project.repository.js";
-import { writeAuditLog } from "@novabots/db";
-import { db } from "@novabots/db";
-import { generatePortalToken } from "@novabots/db";
+import { writeAuditLog, db, generatePortalToken, statementsOfWork, sowClauses, eq, and, isNull } from "@novabots/db";
 import { NotFoundError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
+import { briefService } from "./brief.service.js";
+import { deliverableService } from "./deliverable.service.js";
 
 export const projectService = {
   async listProjects(
@@ -96,5 +96,43 @@ export const projectService = {
     });
 
     return project;
+  },
+
+  async getProjectSOW(workspaceId: string, projectId: string) {
+    const project = await this.getProject(workspaceId, projectId);
+    if (!project.sowId) return null;
+
+    const [sow] = await db
+      .select()
+      .from(statementsOfWork)
+      .where(and(eq(statementsOfWork.id, project.sowId), isNull(statementsOfWork.deletedAt)))
+      .limit(1);
+
+    if (!sow) return null;
+
+    const clauses = await db
+      .select()
+      .from(sowClauses)
+      .where(eq(sowClauses.sowId, sow.id));
+
+    return {
+      ...sow,
+      clauses
+    };
+  },
+
+  async getProjectBriefs(workspaceId: string, projectId: string) {
+    const project = await this.getProject(workspaceId, projectId);
+    return briefService.listBriefs(workspaceId, { projectId });
+  },
+
+  async getProjectDeliverables(workspaceId: string, projectId: string) {
+    const project = await this.getProject(workspaceId, projectId);
+    return deliverableService.list(workspaceId, { projectId });
+  },
+
+  async createProjectDeliverable(workspaceId: string, projectId: string, actorId: string, data: any) {
+    const project = await this.getProject(workspaceId, projectId);
+    return deliverableService.create(workspaceId, actorId, { ...data, projectId });
   },
 };

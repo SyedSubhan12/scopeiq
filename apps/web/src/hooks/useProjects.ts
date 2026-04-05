@@ -9,16 +9,16 @@ export function useProjects(options?: { status?: string | undefined; clientId?: 
   if (options?.limit) params.set("limit", String(options.limit));
   const qs = params.toString();
 
-  return useQuery({
+  return useQuery<{ data: any[] }>({
     queryKey: ["projects", options],
-    queryFn: () => fetchWithAuth(`/v1/projects${qs ? `?${qs}` : ""}`),
+    queryFn: () => fetchWithAuth(`/v1/projects${qs ? `?${qs}` : ""}`) as Promise<{ data: any[] }>,
   });
 }
 
 export function useProject(id: string) {
-  return useQuery({
+  return useQuery<{ data: any }>({
     queryKey: ["project", id],
-    queryFn: () => fetchWithAuth(`/v1/projects/${id}`),
+    queryFn: () => fetchWithAuth(`/v1/projects/${id}`) as Promise<{ data: any }>,
     enabled: !!id,
   });
 }

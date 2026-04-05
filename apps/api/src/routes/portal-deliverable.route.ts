@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { portalAuthMiddleware } from "../middleware/portal-auth.js";
 import { deliverableService } from "../services/deliverable.service.js";
+import { deliverableRevisionRepository } from "../repositories/deliverable-revision.repository.js";
 import { feedbackService } from "../services/feedback.service.js";
 import { submitFeedbackSchema } from "./feedback.schemas.js";
 import { z } from "zod";
@@ -18,7 +19,7 @@ export const portalDeliverableRouter = new Hono();
 
 portalDeliverableRouter.use("*", portalAuthMiddleware);
 
-portalDeliverableRouter.get("/", async (c) => {
+portalDeliverableRouter.get("", async (c) => {
   const workspaceId = c.get("portalWorkspaceId");
   const projectId = c.get("portalProjectId");
   const result = await deliverableService.list(workspaceId, { projectId });
@@ -30,6 +31,12 @@ portalDeliverableRouter.get("/:id", async (c) => {
   const id = c.req.param("id");
   const deliverable = await deliverableService.getById(workspaceId, id);
   return c.json({ data: deliverable });
+});
+
+portalDeliverableRouter.get("/:id/revisions", async (c) => {
+  const id = c.req.param("id");
+  const revisions = await deliverableRevisionRepository.listByDeliverable(id);
+  return c.json({ data: revisions });
 });
 
 portalDeliverableRouter.post(

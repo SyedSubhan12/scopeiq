@@ -26,16 +26,16 @@ export interface BriefTemplate {
 }
 
 export function useBriefTemplates() {
-  return useQuery({
+  return useQuery<{ data: any[] }>({
     queryKey: ["brief-templates"],
-    queryFn: () => fetchWithAuth("/v1/brief-templates"),
+    queryFn: () => fetchWithAuth("/v1/brief-templates") as Promise<{ data: any[] }>,
   });
 }
 
 export function useBriefTemplate(id: string) {
-  return useQuery({
+  return useQuery<{ data: any }>({
     queryKey: ["brief-template", id],
-    queryFn: () => fetchWithAuth(`/v1/brief-templates/${id}`),
+    queryFn: () => fetchWithAuth(`/v1/brief-templates/${id}`) as Promise<{ data: any }>,
     enabled: !!id,
   });
 }

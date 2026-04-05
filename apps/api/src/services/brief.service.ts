@@ -9,7 +9,7 @@ import { dispatchScoreBriefJob } from "../jobs/score-brief.job.js";
 export const briefService = {
   async listBriefs(
     workspaceId: string,
-    options: { projectId?: string; status?: string },
+    options: { projectId?: string | undefined; status?: string | undefined },
   ) {
     const clean = stripUndefined(options) as { projectId?: string; status?: string };
     return briefRepository.list(workspaceId, clean);
@@ -53,8 +53,8 @@ export const briefService = {
     projectId: string;
     responses: Record<string, unknown>;
     workspaceId: string;
-    submittedBy?: string;
-    title?: string;
+    submittedBy?: string | undefined;
+    title?: string | undefined;
   }) {
     const { templateId, projectId, responses, workspaceId, submittedBy, title } = data;
 

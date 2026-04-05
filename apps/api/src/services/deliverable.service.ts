@@ -1,4 +1,5 @@
 import { deliverableRepository } from "../repositories/deliverable.repository.js";
+import { deliverableRevisionRepository } from "../repositories/deliverable-revision.repository.js";
 import { approvalEventRepository } from "../repositories/approval-event.repository.js";
 import { writeAuditLog } from "@novabots/db";
 import { db } from "@novabots/db";
@@ -9,7 +10,7 @@ import { getUploadUrl, getDownloadUrl } from "../lib/storage.js";
 export const deliverableService = {
   async list(
     workspaceId: string,
-    options: { projectId?: string; status?: string; cursor?: string; limit?: number },
+    options: { projectId?: string | undefined; status?: string | undefined; cursor?: string | undefined; limit?: number | undefined },
   ) {
     return deliverableRepository.list(workspaceId, stripUndefined(options) as typeof options);
   },
@@ -28,11 +29,12 @@ export const deliverableService = {
     data: {
       projectId: string;
       name: string;
-      description?: string;
-      type?: string;
-      externalUrl?: string;
-      maxRevisions?: number;
-      dueDate?: string;
+      description?: string | undefined;
+      type?: string | undefined;
+      externalUrl?: string | undefined;
+      metadata?: Record<string, any> | undefined;
+      maxRevisions?: number | undefined;
+      dueDate?: string | undefined;
     },
   ) {
     const deliverable = await deliverableRepository.create({
@@ -42,8 +44,10 @@ export const deliverableService = {
       description: data.description ?? null,
       type: (data.type as "file" | "figma" | "loom" | "youtube" | "link") ?? "file",
       externalUrl: data.externalUrl ?? null,
-      maxRevisions: data.maxRevisions ?? null,
+      metadata: data.metadata ?? null,
+      maxRevisions: data.maxRevisions ?? 3,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      revisionRound: 0,
     });
 
     await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
@@ -129,22 +133,33 @@ export const deliverableService = {
     workspaceId: string,
     deliverableId: string,
     actorId: string,
-    data: { objectKey: string },
+    data: { objectKey: string; originalName?: string; notes?: string },
   ) {
     const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
     if (!deliverable) {
       throw new NotFoundError("Deliverable", deliverableId);
     }
 
-    // Generate a signed download URL (1-hour expiry); store the key separately
     const fileUrl = await getDownloadUrl(data.objectKey);
+
+    // Create new revision
+    const nextVersion = (deliverable.revisionRound ?? 0) + 1;
+    const revision = await deliverableRevisionRepository.create({
+      deliverableId,
+      versionNumber: nextVersion,
+      fileUrl,
+      notes: data.notes ?? null,
+      createdBy: actorId,
+    });
 
     const updated = await deliverableRepository.update(workspaceId, deliverableId, {
       fileKey: data.objectKey,
       fileUrl,
-      status: "in_review",
+      originalName: data.originalName ?? null,
+      status: "delivered",
       uploadedBy: actorId,
       reviewStartedAt: new Date(),
+      currentRevisionId: revision.id,
     });
 
     await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
@@ -153,7 +168,7 @@ export const deliverableService = {
       entityType: "deliverable",
       entityId: deliverableId,
       action: "update",
-      metadata: { action: "confirm_upload", fileKey: data.objectKey },
+      metadata: { action: "confirm_upload", version: nextVersion, fileKey: data.objectKey },
     });
 
     return updated;
@@ -208,23 +223,23 @@ export const deliverableService = {
       throw new NotFoundError("Deliverable", deliverableId);
     }
 
-    const currentRevisions = deliverable.revisionCount ?? 0;
-    if (deliverable.maxRevisions !== null && currentRevisions >= deliverable.maxRevisions) {
+    const currentRound = deliverable.revisionRound ?? 0;
+    if (deliverable.maxRevisions !== null && currentRound >= deliverable.maxRevisions) {
       throw new ValidationError(
         `Revision limit reached (${deliverable.maxRevisions}/${deliverable.maxRevisions}). Contact your agency to discuss further changes.`,
       );
     }
 
     await deliverableRepository.update(workspaceId, deliverableId, {
-      status: "revision_requested",
-      revisionCount: currentRevisions + 1,
+      status: "changes_requested",
+      revisionRound: currentRound + 1,
     });
 
     const event = await approvalEventRepository.create({
       deliverableId,
       actorId,
       actorName,
-      action: "revision_requested",
+      action: "changes_requested",
       comment: comment ?? null,
     });
 

@@ -2,7 +2,7 @@ import { db, briefs, briefFields, eq, and, isNull, desc } from "@novabots/db";
 import type { NewBrief, NewBriefField } from "@novabots/db";
 
 export const briefRepository = {
-  async list(workspaceId: string, options: { projectId?: string; status?: string }) {
+  async list(workspaceId: string, options: { projectId?: string | undefined; status?: string | undefined }) {
     const conditions = [
       eq(briefs.workspaceId, workspaceId),
       isNull(briefs.deletedAt),
