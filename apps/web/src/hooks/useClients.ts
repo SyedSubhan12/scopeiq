@@ -7,9 +7,9 @@ export function useClients(options?: { cursor?: string; limit?: number }) {
   if (options?.limit) params.set("limit", String(options.limit));
   const qs = params.toString();
 
-  return useQuery({
+  return useQuery<{ data: any[] }>({
     queryKey: ["clients", options],
-    queryFn: () => fetchWithAuth(`/v1/clients${qs ? `?${qs}` : ""}`),
+    queryFn: () => fetchWithAuth(`/v1/clients${qs ? `?${qs}` : ""}`) as Promise<{ data: any[] }>,
   });
 }
 

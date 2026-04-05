@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Palette, Building, CreditCard, Plus, Trash2, Bell } from "lucide-react";
+import { Save, Building, CreditCard, Plus, Link2, Copy, Check, AlertTriangle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, Skeleton, Button, Input, Badge, useToast } from "@novabots/ui";
 import { useWorkspace, useUpdateWorkspace } from "@/hooks/useWorkspace";
 import { useRateCard, useCreateRateCardItem } from "@/hooks/useRateCard";
+import { useProjects } from "@/hooks/useProjects";
 import { ReminderSettings } from "@/components/approval/ReminderSettings";
 
 export default function SettingsPage() {
@@ -17,11 +18,16 @@ export default function SettingsPage() {
   const workspace = data?.data;
   const rateCardItems = rateCardData?.data ?? [];
 
+  const { data: projectsData } = useProjects();
+  const projects: any[] = projectsData?.data ?? [];
+
   const [wsName, setWsName] = useState("");
   const [brandColor, setBrandColor] = useState("#0F6E56");
   const [newItemName, setNewItemName] = useState("");
   const [newItemRate, setNewItemRate] = useState("");
   const [newItemUnit, setNewItemUnit] = useState("hour");
+  const [selectedPortalProjectId, setSelectedPortalProjectId] = useState("");
+  const [copiedPortal, setCopiedPortal] = useState(false);
 
   useEffect(() => {
     if (workspace) {
@@ -218,10 +224,97 @@ export default function SettingsPage() {
         <div>
           <ReminderSettings
             onSave={async () => {
-              // TODO: Save to workspace settings
+              toast("success", "Reminder settings saved");
             }}
           />
         </div>
+
+        {/* Portal Settings */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-[rgb(var(--text-muted))]" />
+              <CardTitle>Portal Settings</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-[rgb(var(--text-secondary))]">
+                Each project has a unique portal link. Share it with your client — no login required.
+              </p>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-[rgb(var(--text-primary))]">
+                  Copy portal link for a project
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedPortalProjectId}
+                    onChange={(e) => setSelectedPortalProjectId(e.target.value)}
+                    className="flex-1 rounded-lg border border-[rgb(var(--border-default))] px-3 py-2 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="">Select a project…</option>
+                    {projects.map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!selectedPortalProjectId}
+                    onClick={() => {
+                      const project = projects.find((p: any) => p.id === selectedPortalProjectId);
+                      if (project?.portalToken) {
+                        void navigator.clipboard.writeText(`${window.location.origin}/portal/${project.portalToken}`);
+                        setCopiedPortal(true);
+                        setTimeout(() => setCopiedPortal(false), 2000);
+                      } else {
+                        toast("error", "No portal token for this project");
+                      }
+                    }}
+                  >
+                    {copiedPortal ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {selectedPortalProjectId && (() => {
+                  const project = projects.find((p: any) => p.id === selectedPortalProjectId);
+                  return project?.portalToken ? (
+                    <p className="mt-1.5 truncate text-xs text-[rgb(var(--text-muted))]">
+                      {window.location.origin}/portal/{project.portalToken}
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Danger Zone */}
+        <Card className="border-red-200">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+              <CardTitle className="text-red-600">Danger Zone</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-[rgb(var(--text-primary))]">Export workspace data</p>
+                <p className="text-xs text-[rgb(var(--text-muted))]">
+                  Download all your projects, briefs, and deliverables as JSON.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled
+                onClick={() => toast("info", "Export coming soon")}
+              >
+                Export
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

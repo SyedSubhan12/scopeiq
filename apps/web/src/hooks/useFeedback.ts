@@ -3,22 +3,26 @@ import { fetchWithAuth } from "@/lib/api";
 
 export interface FeedbackItem {
   id: string;
-  deliverable_id: string;
-  x_pos: number;
-  y_pos: number;
-  page_number?: number | null;
-  pin_number: number;
-  content: string;
-  author_type: "client" | "agency";
-  is_resolved: boolean;
-  created_at: string;
-  updated_at: string;
+  deliverableId: string;
+  authorId: string | null;
+  authorName: string | null;
+  source: "portal" | "email_forward" | "manual_input";
+  body: string;
+  annotationJson: {
+    xPos: number;
+    yPos: number;
+    pageNumber?: number | null;
+    pinNumber: number;
+    [key: string]: any;
+  } | null;
+  resolvedAt: string | null;
+  createdAt: string;
 }
 
 export function useFeedback(deliverableId: string) {
-  return useQuery({
+  return useQuery<{ data: FeedbackItem[] }>({
     queryKey: ["feedback", deliverableId],
-    queryFn: () => fetchWithAuth(`/v1/deliverables/${deliverableId}/feedback`),
+    queryFn: () => fetchWithAuth(`/v1/deliverables/${deliverableId}/feedback`) as Promise<{ data: FeedbackItem[] }>,
     enabled: !!deliverableId,
   });
 }
@@ -27,11 +31,8 @@ export function useCreateFeedback(deliverableId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: {
-      x_pos: number;
-      y_pos: number;
-      page_number?: number;
-      content: string;
-      author_type: "client" | "agency";
+      body: string;
+      annotationJson?: FeedbackItem["annotationJson"];
     }) =>
       fetchWithAuth(`/v1/deliverables/${deliverableId}/feedback`, {
         method: "POST",
@@ -51,7 +52,7 @@ export function useUpdateFeedback(deliverableId: string) {
       data,
     }: {
       feedbackId: string;
-      data: { content?: string; is_resolved?: boolean };
+      data: { body?: string; resolvedAt?: string | null };
     }) =>
       fetchWithAuth(`/v1/feedback/${feedbackId}`, {
         method: "PATCH",
@@ -80,7 +81,7 @@ export function useResolveFeedback(deliverableId: string) {
     mutationFn: (feedbackId: string) =>
       fetchWithAuth(`/v1/feedback/${feedbackId}`, {
         method: "PATCH",
-        body: JSON.stringify({ is_resolved: true }),
+        body: JSON.stringify({ resolvedAt: new Date().toISOString() }),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["feedback", deliverableId] });

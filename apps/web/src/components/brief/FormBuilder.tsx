@@ -44,7 +44,7 @@ function createField(type: BriefField["type"], order: number): BriefField {
     type,
     label: config?.label ?? type,
     required: false,
-    options: type === "single_choice" || type === "multi_choice" ? ["Option 1"] : undefined,
+    ...(type === "single_choice" || type === "multi_choice" ? { options: ["Option 1"] } : {}),
     conditions: [],
     order,
   };
@@ -238,7 +238,7 @@ export function FormBuilder({ fields, templateName, onChange }: FormBuilderProps
             onClose={() => setSelectedKey(null)}
           />
         ) : (
-          <FormPreview fields={fields} templateName={templateName} />
+          <FormPreview fields={fields} {...(templateName ? { templateName } : {})} />
         )}
       </div>
     </DndContext>

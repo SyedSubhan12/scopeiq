@@ -2,9 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
 export function useRateCard() {
-  return useQuery({
+  return useQuery<{ data: any }>({
     queryKey: ["rate-card"],
-    queryFn: () => fetchWithAuth("/v1/rate-card"),
+    queryFn: () => fetchWithAuth("/v1/rate-card") as Promise<{ data: any }>,
   });
 }
 

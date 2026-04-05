@@ -12,7 +12,7 @@ import type { NewDeliverable } from "@novabots/db";
 export const deliverableRepository = {
   async list(
     workspaceId: string,
-    options: { projectId?: string; status?: string; cursor?: string; limit?: number },
+    options: { projectId?: string | undefined; status?: string | undefined; cursor?: string | undefined; limit?: number | undefined },
   ) {
     const limit = options.limit ?? 20;
     const conditions = [

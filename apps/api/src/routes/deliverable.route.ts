@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { authMiddleware } from "../middleware/auth.js";
 import { deliverableService } from "../services/deliverable.service.js";
+import { feedbackService } from "../services/feedback.service.js";
+import { deliverableRevisionRepository } from "../repositories/deliverable-revision.repository.js";
 import {
   listDeliverablesQuerySchema,
   createDeliverableSchema,
@@ -30,6 +32,13 @@ deliverableRouter.get("/:id", async (c) => {
   const id = c.req.param("id");
   const deliverable = await deliverableService.getById(workspaceId, id);
   return c.json({ data: deliverable });
+});
+
+deliverableRouter.get("/:id/revisions", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const id = c.req.param("id");
+  const revisions = await deliverableRevisionRepository.listByDeliverable(id);
+  return c.json({ data: revisions });
 });
 
 deliverableRouter.post(
@@ -97,8 +106,32 @@ deliverableRouter.post(
       workspaceId,
       id,
       userId,
-      body,
+      {
+        objectKey: body.objectKey,
+        ...(body.originalName !== undefined && { originalName: body.originalName }),
+        ...(body.notes !== undefined && { notes: body.notes }),
+      },
     );
     return c.json({ data: deliverable });
   },
 );
+
+deliverableRouter.get("/:id/feedback", async (c) => {
+  const deliverableId = c.req.param("id");
+  const items = await feedbackService.listByDeliverable(deliverableId);
+  return c.json({ data: items });
+});
+
+deliverableRouter.post("/:id/feedback", async (c) => {
+  const userId = c.get("userId");
+  const deliverableId = c.req.param("id");
+  const body = await c.req.json();
+  const item = await feedbackService.submit({
+    deliverableId,
+    body: body.body,
+    annotationJson: body.annotationJson,
+    authorId: userId,
+    source: "manual_input",
+  });
+  return c.json({ data: item }, 201);
+});

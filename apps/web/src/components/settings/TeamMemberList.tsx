@@ -78,7 +78,7 @@ export function TeamMemberList() {
                                 {isAccepted ? (
                                     <Badge status="active">Accepted</Badge>
                                 ) : isExpired ? (
-                                    <Badge status="inactive">Expired</Badge>
+                                    <Badge status="draft">Expired</Badge>
                                 ) : (
                                     <>
                                         <Badge status="pending">Pending</Badge>

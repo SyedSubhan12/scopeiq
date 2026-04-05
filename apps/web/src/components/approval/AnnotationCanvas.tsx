@@ -35,27 +35,31 @@ export function AnnotationCanvas({
       className={`absolute inset-0 ${placingPin ? "cursor-crosshair" : ""}`}
       onClick={handleClick}
     >
-      {pins.map((pin) => (
-        <button
-          key={pin.id}
-          className={`absolute flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold shadow-md transition-all hover:scale-110 ${
-            pin.is_resolved
-              ? "bg-gray-300 text-gray-600 opacity-50"
-              : "bg-primary text-white"
-          }`}
-          style={{
-            left: `${pin.x_pos}%`,
-            top: `${pin.y_pos}%`,
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onPinClick(pin);
-          }}
-          title={pin.content}
-        >
-          {pin.pin_number}
-        </button>
-      ))}
+      {pins.map((pin) => {
+        const annotation = pin.annotationJson;
+        if (!annotation) return null;
+
+        return (
+          <button
+            key={pin.id}
+            className={`absolute flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold shadow-md transition-all hover:scale-110 ${pin.resolvedAt
+                ? "bg-gray-300 text-gray-600 opacity-50"
+                : "bg-primary text-white"
+              }`}
+            style={{
+              left: `${annotation.xPos}%`,
+              top: `${annotation.yPos}%`,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPinClick(pin);
+            }}
+            title={pin.body}
+          >
+            {annotation.pinNumber}
+          </button>
+        );
+      })}
     </div>
   );
 }

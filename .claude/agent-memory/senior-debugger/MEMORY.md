@@ -1,0 +1,1 @@
+- [MinIO + AWS SDK v3 CRC32 checksum bug](project_minio_sdk_checksum.md) — SDK v3 >= ~3.600 bakes CRC32 params into presigned URLs; MinIO returns 404

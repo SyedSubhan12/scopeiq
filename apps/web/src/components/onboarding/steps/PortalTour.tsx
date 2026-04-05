@@ -104,12 +104,12 @@ export function PortalTour() {
                 <code className="flex-1 truncate text-xs text-[rgb(var(--text-muted))]">
                     {portalUrl ?? `${typeof window !== "undefined" ? window.location.origin : ""}/portal/<your-token>`}
                 </code>
-                <Button size="sm" variant="outline" onClick={handleCopy}>
+                <Button size="sm" variant="secondary" onClick={handleCopy}>
                     {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
                 </Button>
                 {portalUrl && (
                     <a href={portalUrl} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="secondary">
                             <ExternalLink className="h-3.5 w-3.5" />
                         </Button>
                     </a>

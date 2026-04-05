@@ -29,7 +29,9 @@ feedbackRouter.post(
     const userId = c.get("userId");
     const body = c.req.valid("json");
     const item = await feedbackService.submit({
-      ...body,
+      deliverableId: body.deliverableId,
+      body: body.body,
+      annotationJson: body.annotationJson ?? undefined,
       authorId: userId,
       source: "manual_input",
     });

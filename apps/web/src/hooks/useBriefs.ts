@@ -27,17 +27,17 @@ export interface Brief {
 }
 
 export function useBriefs(projectId: string) {
-  return useQuery({
+  return useQuery<{ data: any[] }>({
     queryKey: ["briefs", projectId],
-    queryFn: () => fetchWithAuth(`/v1/projects/${projectId}/briefs`),
+    queryFn: () => fetchWithAuth(`/v1/projects/${projectId}/briefs`) as Promise<{ data: any[] }>,
     enabled: !!projectId,
   });
 }
 
 export function useBrief(projectId: string, briefId: string) {
-  return useQuery({
+  return useQuery<{ data: any }>({
     queryKey: ["brief", projectId, briefId],
-    queryFn: () => fetchWithAuth(`/v1/projects/${projectId}/briefs/${briefId}`),
+    queryFn: () => fetchWithAuth(`/v1/projects/${projectId}/briefs/${briefId}`) as Promise<{ data: any }>,
     enabled: !!projectId && !!briefId,
   });
 }

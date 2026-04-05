@@ -17,9 +17,17 @@ import { deliverableRouter } from "./routes/deliverable.route.js";
 import { feedbackRouter } from "./routes/feedback.route.js";
 import { portalDeliverableRouter } from "./routes/portal-deliverable.route.js";
 import { portalSessionRouter } from "./routes/portal-session.route.js";
+import { portalChangeOrderRouter } from "./routes/portal-change-order.route.js";
+import { sowRouter } from "./routes/sow.route.js";
 import { inviteRouter } from "./routes/invite.route.js";
+import { scopeFlagRouter } from "./routes/scope-flag.route.js";
+import { changeOrderRouter } from "./routes/change-order.route.js";
+import { notificationRouter } from "./routes/notification.route.js";
+import { analyticsRouter } from "./routes/analytics.route.js";
+import { aiRouter } from "./routes/ai.route.js";
 import { env } from "./lib/env.js";
 import { scheduleHourlyReminders } from "./jobs/send-reminder.job.js";
+import { ensureBucketExists } from "./lib/storage.js";
 
 const app = new Hono();
 
@@ -44,6 +52,12 @@ v1.route("/briefs", briefRouter);
 v1.route("/deliverables", deliverableRouter);
 v1.route("/feedback", feedbackRouter);
 v1.route("/invites", inviteRouter);
+v1.route("/scope-flags", scopeFlagRouter);
+v1.route("/change-orders", changeOrderRouter);
+v1.route("/notifications", notificationRouter);
+v1.route("/analytics", analyticsRouter);
+v1.route("/ai", aiRouter);
+v1.route("/sow", sowRouter);
 
 app.route("/v1", v1);
 
@@ -53,6 +67,7 @@ app.route("/briefs/submit", briefSubmitRouter);
 // Portal routes (token-authenticated)
 app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/session", portalSessionRouter);
+app.route("/portal/change-orders", portalChangeOrderRouter);
 
 // Public invite acceptance (outside /v1)
 app.route("/invites", inviteRouter);
@@ -63,6 +78,11 @@ console.log(`Server is running on port ${port}`);
 serve({
     fetch: app.fetch,
     port,
+});
+
+// Ensure MinIO bucket exists (no-op if already present; creates on a fresh volume)
+ensureBucketExists().catch((err) => {
+    console.error("[Startup] Failed to ensure storage bucket exists:", err);
 });
 
 // Register hourly reminder cron after server starts

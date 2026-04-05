@@ -11,7 +11,7 @@ import { FeedbackPanel } from "@/components/approval/FeedbackPanel";
 import { RevisionCounter } from "@/components/approval/RevisionCounter";
 import { FeedbackSummary } from "@/components/approval/FeedbackSummary";
 import { useDeliverables, type Deliverable } from "@/hooks/useDeliverables";
-import { useFeedback, useCreateFeedback, type FeedbackItem } from "@/hooks/useFeedback";
+import { useFeedback, useCreateFeedback, useResolveFeedback, type FeedbackItem } from "@/hooks/useFeedback";
 
 export default function ProjectDeliverablesPage() {
   const params = useParams();
@@ -26,6 +26,7 @@ export default function ProjectDeliverablesPage() {
 
   const { data: feedbackData } = useFeedback(selected?.id ?? "");
   const createFeedback = useCreateFeedback(selected?.id ?? "");
+  const resolveFeedback = useResolveFeedback(selected?.id ?? "");
   const pins: FeedbackItem[] = feedbackData?.data ?? [];
 
   const handlePlacePin = async (x: number, y: number) => {
@@ -33,16 +34,18 @@ export default function ProjectDeliverablesPage() {
     const pinNumber = pins.length + 1;
     try {
       await createFeedback.mutateAsync({
-        x_pos: x,
-        y_pos: y,
-        pin_number: pinNumber,
-        content: `Feedback point #${pinNumber}`,
-        author_type: "agency",
+        body: `Feedback point #${pinNumber}`,
+        annotationJson: {
+          xPos: x,
+          yPos: y,
+          pinNumber: pinNumber,
+        },
       });
       setPlacingPin(false);
       setShowFeedback(true);
       toast("success", "Pin placed");
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast("error", "Failed to place pin");
     }
   };
@@ -68,8 +71,8 @@ export default function ProjectDeliverablesPage() {
             {/* Toolbar */}
             <div className="flex items-center justify-between">
               <RevisionCounter
-                current={selected.revision_round}
-                limit={selected.revision_limit}
+                current={selected.revisionRound}
+                limit={selected.maxRevisions}
                 className="w-48"
               />
               <div className="flex items-center gap-2">
@@ -94,8 +97,8 @@ export default function ProjectDeliverablesPage() {
             {/* Viewer */}
             <div className="flex-1 overflow-hidden">
               <DeliverableViewer
-                fileUrl={selected.file_url ?? ""}
-                fileType={selected.file_type}
+                fileUrl={selected.fileUrl ?? ""}
+                fileType={selected.mimeType}
                 pins={pins}
                 onPinClick={(pin) => {
                   setActivePinId(pin.id);
@@ -128,6 +131,8 @@ export default function ProjectDeliverablesPage() {
             setShowFeedback(false);
             setActivePinId(null);
           }}
+          createMutation={createFeedback}
+          resolveMutation={resolveFeedback}
         />
       )}
 

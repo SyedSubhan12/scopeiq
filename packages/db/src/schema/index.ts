@@ -7,6 +7,7 @@ export * from "./brief-templates.schema";
 export * from "./briefs.schema";
 export * from "./brief-fields.schema";
 export * from "./deliverables.schema";
+export * from "./deliverable-revisions.schema";
 export * from "./feedback-items.schema";
 export * from "./approval-events.schema";
 export * from "./reminder-logs.schema";

@@ -9,6 +9,7 @@ import {
   Calendar,
   Upload,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { BriefField } from "@/hooks/useBriefTemplates";
 
 export type FieldType = BriefField["type"];
@@ -17,7 +18,7 @@ interface FieldTypeConfig {
   type: FieldType;
   label: string;
   description: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  Icon: LucideIcon;
 }
 
 export const FIELD_TYPES: FieldTypeConfig[] = [
