@@ -12,7 +12,6 @@ export function NotFoundAnimation() {
       className="h-auto w-full max-h-[280px] object-contain"
       loop
       speed={1}
-      aria-label="Not found illustration"
       decorative
       reducedMotionFallback={
         <AlertCircle

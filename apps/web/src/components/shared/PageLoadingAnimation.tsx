@@ -13,11 +13,11 @@ export function PageLoadingAnimation() {
         className="h-auto w-full max-h-[240px] object-contain"
         loop
         speed={1}
-        aria-label="Loading"
+        decorative
         reducedMotionFallback={
           <Loader2
             className="h-10 w-10 animate-spin text-[rgb(var(--primary))]"
-            aria-label="Loading"
+            aria-hidden
           />
         }
       />

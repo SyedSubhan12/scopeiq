@@ -11,7 +11,8 @@ type LottieFromPublicProps = {
   containerClassName?: string;
   loop?: boolean;
   speed?: number;
-  "aria-label": string;
+  /** Required unless `decorative` is true (then it is ignored). */
+  "aria-label"?: string;
   /** Shown when `prefers-reduced-motion: reduce`, fetch fails, or JSON is invalid. */
   reducedMotionFallback: React.ReactNode;
   /** When true, hides the animation from assistive tech (use if copy elsewhere describes the state). */
@@ -24,10 +25,11 @@ export function LottieFromPublic({
   containerClassName,
   loop = true,
   speed = 1,
-  "aria-label": ariaLabel,
+  "aria-label": ariaLabelProp,
   reducedMotionFallback,
   decorative = false,
 }: LottieFromPublicProps) {
+  const ariaLabel = ariaLabelProp ?? (decorative ? undefined : "Animation");
   const [animationData, setAnimationData] = useState<unknown>(null);
   const [failed, setFailed] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -68,8 +70,8 @@ export function LottieFromPublic({
     return (
       <div
         className={cn("flex items-center justify-center", containerClassName)}
-        aria-busy="true"
-        aria-label={ariaLabel}
+        aria-busy={decorative ? undefined : true}
+        aria-label={decorative ? undefined : ariaLabel}
       >
         <Loader2
           className="h-8 w-8 animate-spin text-[rgb(var(--text-muted))]"
