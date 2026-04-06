@@ -1,0 +1,5 @@
+interface:
+  display_name: "ScopeIQ Dev"
+  short_description: "Project-wide ScopeIQ coding guidance"
+  default_prompt: "Use $scopeiq-dev to work within the ScopeIQ monorepo conventions and non-negotiable rules."
+

@@ -18,13 +18,18 @@ import { feedbackRouter } from "./routes/feedback.route.js";
 import { portalDeliverableRouter } from "./routes/portal-deliverable.route.js";
 import { portalSessionRouter } from "./routes/portal-session.route.js";
 import { portalChangeOrderRouter } from "./routes/portal-change-order.route.js";
+import { portalRouter } from "./routes/portal.route.js";
 import { sowRouter } from "./routes/sow.route.js";
 import { inviteRouter } from "./routes/invite.route.js";
 import { scopeFlagRouter } from "./routes/scope-flag.route.js";
 import { changeOrderRouter } from "./routes/change-order.route.js";
+import { messageIngestRouter } from "./routes/message-ingest.route.js";
 import { notificationRouter } from "./routes/notification.route.js";
 import { analyticsRouter } from "./routes/analytics.route.js";
 import { aiRouter } from "./routes/ai.route.js";
+import { billingRouter } from "./routes/billing.route.js";
+import { dashboardRouter } from "./routes/dashboard.route.js";
+import webhookStripe from "./routes/webhook-stripe.route.js";
 import { env } from "./lib/env.js";
 import { scheduleHourlyReminders } from "./jobs/send-reminder.job.js";
 import { ensureBucketExists } from "./lib/storage.js";
@@ -54,17 +59,24 @@ v1.route("/feedback", feedbackRouter);
 v1.route("/invites", inviteRouter);
 v1.route("/scope-flags", scopeFlagRouter);
 v1.route("/change-orders", changeOrderRouter);
+v1.route("/messages", messageIngestRouter);
 v1.route("/notifications", notificationRouter);
 v1.route("/analytics", analyticsRouter);
 v1.route("/ai", aiRouter);
+v1.route("/billing", billingRouter);
+v1.route("/dashboard", dashboardRouter);
 v1.route("/sow", sowRouter);
 
 app.route("/v1", v1);
+
+// Public Stripe webhook (outside /v1, no auth)
+app.route("/webhooks/stripe", webhookStripe);
 
 // Public routes (outside /v1)
 app.route("/briefs/submit", briefSubmitRouter);
 
 // Portal routes (token-authenticated)
+app.route("/portal", portalRouter);
 app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/session", portalSessionRouter);
 app.route("/portal/change-orders", portalChangeOrderRouter);

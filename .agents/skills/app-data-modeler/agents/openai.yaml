@@ -1,0 +1,5 @@
+interface:
+  display_name: "App Data Modeler"
+  short_description: "Designs schemas and persistence rules"
+  default_prompt: "Use $app-data-modeler to design the data model and migration path for this app feature."
+

@@ -2,3 +2,113 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.625rem;
+    --background: rgb(var(--surface-subtle));
+    --foreground: rgb(var(--text-primary));
+    --card: rgb(255 255 255);
+    --card-foreground: rgb(var(--text-primary));
+    --popover: rgb(255 255 255);
+    --popover-foreground: rgb(var(--text-primary));
+    --secondary: rgb(var(--surface-subtle));
+    --secondary-foreground: rgb(var(--text-primary));
+    --muted: rgb(var(--surface-subtle));
+    --muted-foreground: rgb(var(--text-muted));
+    --accent: rgb(var(--primary-light));
+    --accent-foreground: rgb(var(--primary-dark));
+    --destructive: rgb(var(--status-red));
+    --border: rgb(var(--border-subtle));
+    --input: rgb(var(--border-default));
+    --ring: rgb(var(--primary));
+    --sidebar: rgb(255 255 255);
+    --sidebar-foreground: rgb(var(--text-primary));
+    --sidebar-primary: rgb(var(--primary-dark));
+    --sidebar-primary-foreground: rgb(255 255 255);
+    --sidebar-accent: rgb(var(--primary-light));
+    --sidebar-accent-foreground: rgb(var(--primary-dark));
+    --sidebar-border: rgb(var(--border-subtle));
+    --sidebar-ring: rgb(var(--primary));
+  }
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  html {
+    font-family: Inter, system-ui, sans-serif;
+    /* Fluid typography: scales smoothly between mobile and desktop */
+    font-size: clamp(14px, 0.875rem + 0.25vw, 16px);
+    /* Prevent horizontal scroll on mobile */
+    overflow-x: hidden;
+    /* Smooth scrolling for anchor links */
+    scroll-behavior: smooth;
+  }
+}
+
+@layer base {
+  /* Fluid typography scale using clamp() */
+  h1 {
+    font-size: clamp(2rem, 5vw + 0.5rem, 4rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  
+  h2 {
+    font-size: clamp(1.5rem, 3.5vw + 0.5rem, 3rem);
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+  
+  h3 {
+    font-size: clamp(1.25rem, 2.5vw + 0.5rem, 2.25rem);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  
+  h4 {
+    font-size: clamp(1.125rem, 1.5vw + 0.5rem, 1.75rem);
+    line-height: 1.4;
+  }
+  
+  h5 {
+    font-size: clamp(1rem, 1vw + 0.5rem, 1.5rem);
+    line-height: 1.4;
+  }
+  
+  h6 {
+    font-size: clamp(0.875rem, 0.75vw + 0.5rem, 1.25rem);
+    line-height: 1.5;
+  }
+  
+  p {
+    font-size: clamp(0.875rem, 0.5vw + 0.75rem, 1rem);
+    line-height: 1.6;
+  }
+  
+  small, .text-small {
+    font-size: clamp(0.75rem, 0.25vw + 0.625rem, 0.875rem);
+    line-height: 1.5;
+  }
+}
+
+@layer utilities {
+  /* Prevent text wrapping issues */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Prevent overflow on long words/URLs */
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  
+  /* Contain layout shifts */
+  .layout-contained {
+    contain: layout style;
+  }
+}

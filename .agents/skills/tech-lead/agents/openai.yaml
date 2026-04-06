@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tech Lead"
+  short_description: "Architecture and implementation planning"
+  default_prompt: "Use $tech-lead to plan this feature or review the architecture before implementation."

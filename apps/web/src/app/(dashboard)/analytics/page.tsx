@@ -4,6 +4,12 @@ import { useState } from "react";
 import { BarChart2, TrendingUp, ShieldAlert, FileText, FolderKanban, Package } from "lucide-react";
 import { Card, Skeleton, Badge } from "@novabots/ui";
 import { PortfolioHealth } from "@/components/analytics/PortfolioHealth";
+import { useAssetsReady } from "@/hooks/useAssetsReady";
+import { getChangeOrdersQueryOptions } from "@/hooks/useChangeOrders";
+import { getWorkspaceTimelineQueryOptions } from "@/hooks/useProjectHealth";
+import { getProjectsQueryOptions } from "@/hooks/useProjects";
+import { queryClient } from "@/lib/query-client";
+import { getScopeFlagsQueryOptions } from "@/hooks/useScopeFlags";
 import { useWorkspaceStore } from "@/stores/workspace.store";
 import { useProjects } from "@/hooks/useProjects";
 import { useScopeFlags } from "@/hooks/useScopeFlags";
@@ -39,6 +45,16 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 }
 
 export default function AnalyticsPage() {
+  useAssetsReady({
+    scopeId: "page:analytics",
+    tasks: [
+      () => queryClient.ensureQueryData(getProjectsQueryOptions()),
+      () => queryClient.ensureQueryData(getScopeFlagsQueryOptions()),
+      () => queryClient.ensureQueryData(getWorkspaceTimelineQueryOptions()),
+      () => queryClient.ensureQueryData(getChangeOrdersQueryOptions()),
+    ],
+  });
+
   const [range, setRange] = useState<Range>("30d");
   const workspaceId = useWorkspaceStore((s) => s.id);
   const { data: projectsData, isLoading: loadingProjects } = useProjects();
@@ -96,7 +112,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-[rgb(var(--text-primary))]">
             <BarChart2 className="h-6 w-6 text-primary" />
@@ -106,7 +122,8 @@ export default function AnalyticsPage() {
             Portfolio-level insights across all projects
           </p>
         </div>
-        <div className="flex rounded-xl border border-[rgb(var(--border-default))] bg-white p-1 gap-1">
+        <div className="-mx-1 overflow-x-auto pb-1">
+          <div className="flex min-w-max rounded-xl border border-[rgb(var(--border-default))] bg-white p-1 gap-1">
           {RANGE_LABELS.map(({ value, label }) => (
             <button
               key={value}
@@ -120,6 +137,7 @@ export default function AnalyticsPage() {
               {label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
@@ -141,7 +159,7 @@ export default function AnalyticsPage() {
             <div className="space-y-3">
               {["active", "draft", "paused", "completed"].map((status) => (
                 <div key={status} className="flex items-center gap-3">
-                  <span className="w-20 text-xs capitalize text-[rgb(var(--text-muted))]">{status}</span>
+                  <span className="w-16 shrink-0 text-xs capitalize text-[rgb(var(--text-muted))] sm:w-20">{status}</span>
                   <Bar
                     value={statusCounts[status] ?? 0}
                     max={projects.length || 1}
@@ -166,7 +184,7 @@ export default function AnalyticsPage() {
             <div className="space-y-3">
               {["pending", "sent", "accepted", "declined"].map((status) => (
                 <div key={status} className="flex items-center gap-3">
-                  <span className="w-20 text-xs capitalize text-[rgb(var(--text-muted))]">{status}</span>
+                  <span className="w-16 shrink-0 text-xs capitalize text-[rgb(var(--text-muted))] sm:w-20">{status}</span>
                   <Bar
                     value={coStatusCounts[status] ?? 0}
                     max={cos.length || 1}
@@ -196,14 +214,14 @@ export default function AnalyticsPage() {
           ) : (
             <div className="divide-y divide-[rgb(var(--border-subtle))]">
               {topRiskProjects.map((p) => (
-                <div key={p.id} className="flex items-center justify-between py-2.5">
-                  <div>
+                <div key={p.id} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-[rgb(var(--text-primary))]">{p.name}</p>
                     <p className="text-xs text-[rgb(var(--text-muted))]">
                       {p.budget ? `$${Number(p.budget).toLocaleString()}` : "No budget set"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Badge status="flagged">{p.flagCount} flag{p.flagCount !== 1 ? "s" : ""}</Badge>
                     <Badge status={p.status as any}>{p.status}</Badge>
                   </div>
@@ -227,7 +245,7 @@ export default function AnalyticsPage() {
             <div className="space-y-2">
               {["projects", "briefs", "deliverables", "flags"].map((metric) => (
                 <div key={metric} className="flex items-center gap-3">
-                  <span className="w-24 text-xs capitalize text-[rgb(var(--text-muted))]">{metric}</span>
+                  <span className="w-20 shrink-0 text-xs capitalize text-[rgb(var(--text-muted))] sm:w-24">{metric}</span>
                   <Bar
                     value={filteredWeeks.reduce((s, w) => s + (w as any)[metric], 0)}
                     max={maxWeekVal * filteredWeeks.length || 1}

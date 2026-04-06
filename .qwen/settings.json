@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm *)",
+      "Bash(rm *)"
+    ]
+  },
+  "$version": 3
+}

@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { History, FolderKanban, FileText, ShieldAlert, FileSignature, MessageSquare, Package, Filter } from "lucide-react";
 import { Card, Skeleton, Badge } from "@novabots/ui";
-import { useAuditLog } from "@/hooks/useNotifications";
 import { formatDistanceToNow } from "date-fns";
+import { useAssetsReady } from "@/hooks/useAssetsReady";
+import { getAuditLogQueryOptions, useAuditLog } from "@/hooks/useNotifications";
+import { queryClient } from "@/lib/query-client";
 
 const ENTITY_ICONS: Record<string, { icon: React.ElementType; color: string }> = {
   project: { icon: FolderKanban, color: "text-primary bg-primary/10" },
@@ -40,6 +42,11 @@ function actionLabel(action: string, entityType: string): string {
 }
 
 export default function ActivityPage() {
+  useAssetsReady({
+    scopeId: "page:activity",
+    tasks: [() => queryClient.ensureQueryData(getAuditLogQueryOptions({ limit: 50 }))],
+  });
+
   const [filter, setFilter] = useState("all");
   const { data, isLoading } = useAuditLog({ limit: 50 });
   const logs: any[] = data?.data ?? [];

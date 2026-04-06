@@ -1,0 +1,5 @@
+interface:
+  display_name: "Frontend Dev"
+  short_description: "Next.js UI and client-side features"
+  default_prompt: "Use $frontend-dev to build the frontend part of this ScopeIQ feature."
+

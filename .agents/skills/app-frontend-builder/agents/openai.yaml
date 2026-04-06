@@ -1,0 +1,5 @@
+interface:
+  display_name: "App Frontend Builder"
+  short_description: "Builds screens and interaction flows"
+  default_prompt: "Use $app-frontend-builder to implement the interface and client behavior for this app feature."
+

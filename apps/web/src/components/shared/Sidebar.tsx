@@ -1,35 +1,315 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import {
-  LayoutDashboard,
-  FolderKanban,
+  BarChart2,
+  ChevronLeft,
+  ChevronsRight,
+  FileSignature,
   FileText,
+  FolderKanban,
+  HelpCircle,
+  History,
+  Home,
+  LayoutDashboard,
+  LogOut,
+  PanelLeftClose,
+  Settings,
   ShieldAlert,
   Users,
-  FileSignature,
-  Settings,
-  UsersRound,
-  HelpCircle,
+  X,
   Zap,
-  BarChart2,
-  History,
-  CreditCard,
+  type LucideIcon,
 } from "lucide-react";
-import { NavItem } from "./NavItem";
-import { useUIStore } from "@/stores/ui.store";
-import { cn, Button, Badge } from "@novabots/ui";
-import { useScopeFlagCount } from "@/hooks/useScopeFlags";
+import { Badge, cn } from "@novabots/ui";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/providers/auth-provider";
+import { supabase } from "@/lib/supabase";
 import { useChangeOrderCount } from "@/hooks/useChangeOrders";
+import { useScopeFlagCount } from "@/hooks/useScopeFlags";
+import { useUIStore } from "@/stores/ui.store";
+import { useWorkspaceStore } from "@/stores/workspace.store";
+
+const COLLAPSED_WIDTH = "lg:w-[72px]";
+const EXPANDED_WIDTH = "lg:w-[264px]";
+
+type NavDef = {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  count?: number;
+  urgent?: boolean;
+};
+
+function SidebarSectionLabel({
+  children,
+  expanded,
+}: {
+  children: React.ReactNode;
+  expanded: boolean;
+}) {
+  if (!expanded) {
+    return <div className="h-3" aria-hidden />;
+  }
+
+  return (
+    <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[rgb(var(--text-muted))]">
+      {children}
+    </p>
+  );
+}
+
+function SidebarLink({
+  item,
+  pathname,
+  expanded,
+  onNavigate,
+}: {
+  item: NavDef;
+  pathname: string;
+  expanded: boolean;
+  onNavigate: (() => void) | undefined;
+}) {
+  const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+
+  return (
+    <Link
+      href={item.href}
+      aria-current={isActive ? "page" : undefined}
+      title={!expanded ? item.label : undefined}
+      {...(onNavigate ? { onClick: onNavigate } : {})}
+      className={cn(
+        "group flex items-center rounded-2xl border text-sm font-medium transition-all duration-200",
+        expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-3",
+        isActive
+          ? "border-primary/15 bg-primary-light text-[rgb(var(--primary-dark))] shadow-[0_10px_30px_-24px_rgba(15,110,86,0.9)]"
+          : "border-transparent text-[rgb(var(--text-secondary))] hover:border-[rgb(var(--border-subtle))] hover:bg-white hover:text-[rgb(var(--text-primary))]",
+      )}
+    >
+      <span className="relative inline-flex shrink-0 items-center justify-center">
+        <item.icon
+          className={cn(
+            "h-5 w-5 shrink-0 transition-transform duration-200",
+            isActive
+              ? "text-[rgb(var(--primary))]"
+              : "text-[rgb(var(--text-secondary))] group-hover:scale-105 group-hover:text-[rgb(var(--text-primary))]",
+          )}
+          aria-hidden
+        />
+        {!expanded && item.count !== undefined && item.count > 0 ? (
+          <span
+            className={cn(
+              "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none text-white",
+              item.urgent ? "bg-status-red" : "bg-primary",
+            )}
+          >
+            {item.count > 9 ? "9+" : item.count}
+          </span>
+        ) : null}
+      </span>
+      {expanded ? (
+        <>
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          {item.count !== undefined && item.count > 0 ? (
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
+                item.urgent
+                  ? "bg-status-red text-white"
+                  : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-secondary))]",
+              )}
+            >
+              {item.count}
+            </span>
+          ) : null}
+        </>
+      ) : null}
+    </Link>
+  );
+}
+
+function SidebarPanel({
+  pathname,
+  expanded,
+  workspaceName,
+  plan,
+  mainItems,
+  insightItems,
+  supportItems,
+  onNavigate,
+  onLogout,
+}: {
+  pathname: string;
+  expanded: boolean;
+  workspaceName: string;
+  plan: "solo" | "studio" | "agency";
+  mainItems: NavDef[];
+  insightItems: NavDef[];
+  supportItems: NavDef[];
+  onNavigate: (() => void) | undefined;
+  onLogout: () => Promise<void>;
+}) {
+  return (
+    <>
+      <div className="flex h-16 items-center border-b border-[rgb(var(--border-subtle))] px-3">
+        <Link
+          href="/dashboard"
+          {...(onNavigate ? { onClick: onNavigate } : {})}
+          className={cn(
+            "flex min-w-0 items-center rounded-2xl transition-colors hover:bg-[rgb(var(--surface-subtle))]",
+            expanded ? "gap-3 px-2 py-2" : "mx-auto h-11 w-11 justify-center",
+          )}
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] font-serif text-sm font-bold tracking-[0.18em] text-white shadow-[0_16px_30px_-20px_rgba(10,88,67,0.85)]">
+            SQ
+          </span>
+          {expanded ? (
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-[rgb(var(--text-primary))]">
+                {workspaceName}
+              </span>
+              <span className="block text-xs text-[rgb(var(--text-muted))]">
+                ScopeIQ workspace
+              </span>
+            </span>
+          ) : null}
+        </Link>
+      </div>
+
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-6 px-3 py-4">
+          <section className="space-y-2">
+            <SidebarSectionLabel expanded={expanded}>Workspace</SidebarSectionLabel>
+            <div className="space-y-1.5">
+              {mainItems.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  expanded={expanded}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <SidebarSectionLabel expanded={expanded}>Insights</SidebarSectionLabel>
+            <div className="space-y-1.5">
+              {insightItems.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  expanded={expanded}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <SidebarSectionLabel expanded={expanded}>Support</SidebarSectionLabel>
+            <div className="space-y-1.5">
+              {supportItems.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  expanded={expanded}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+          </section>
+        </div>
+      </ScrollArea>
+
+      <div className="border-t border-[rgb(var(--border-subtle))] p-3">
+        {expanded ? (
+          <div className="rounded-3xl border border-[rgb(var(--border-subtle))] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(248,250,252,1)_100%)] p-3 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.45)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
+                  Plan
+                </p>
+                <p className="mt-1 text-sm font-semibold capitalize text-[rgb(var(--text-primary))]">
+                  {plan}
+                </p>
+              </div>
+              <Badge status="active" className="border-none bg-primary-light text-primary-dark">
+                Live
+              </Badge>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-[rgb(var(--text-secondary))]">
+              Keep delivery, approvals, and analytics in one workspace shell.
+            </p>
+            <Link
+              href="/settings/billing"
+              {...(onNavigate ? { onClick: onNavigate } : {})}
+              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--primary-dark))] px-4 text-sm font-semibold text-white transition-colors hover:bg-[rgb(var(--primary))]"
+            >
+              <Zap className="h-4 w-4" aria-hidden />
+              Manage plan
+            </Link>
+          </div>
+        ) : (
+          <Link
+            href="/settings/billing"
+            title="Manage plan"
+            {...(onNavigate ? { onClick: onNavigate } : {})}
+            className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] text-white transition-colors hover:bg-[rgb(var(--primary))]"
+          >
+            <Zap className="h-4 w-4" aria-hidden />
+          </Link>
+        )}
+
+        <button
+          type="button"
+          onClick={() => void onLogout()}
+          className={cn(
+            "mt-3 flex w-full items-center rounded-2xl text-sm font-medium text-[rgb(var(--text-secondary))] transition-colors hover:bg-[rgb(var(--surface-subtle))] hover:text-[rgb(var(--text-primary))]",
+            expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-3",
+          )}
+          aria-label="Log out"
+          title={!expanded ? "Log out" : undefined}
+        >
+          <LogOut className="h-5 w-5 shrink-0" aria-hidden />
+          {expanded ? <span>Log out</span> : null}
+        </button>
+      </div>
+    </>
+  );
+}
 
 export function Sidebar() {
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const pathname = usePathname();
+  const router = useRouter();
+  const { session } = useAuth();
+  const sidebarPinned = useUIStore((state) => state.sidebarPinned);
+  const sidebarHoverOpen = useUIStore((state) => state.sidebarHoverOpen);
+  const setSidebarPinned = useUIStore((state) => state.setSidebarPinned);
+  const setSidebarHoverOpen = useUIStore((state) => state.setSidebarHoverOpen);
+  const mobileSidebarOpen = useUIStore((state) => state.mobileSidebarOpen);
+  const setMobileSidebarOpen = useUIStore((state) => state.setMobileSidebarOpen);
+  const workspaceName = useWorkspaceStore((state) => state.name) || "ScopeIQ";
+  const plan = useWorkspaceStore((state) => state.plan);
+
   const { data: flagCountData } = useScopeFlagCount();
-  const { data: coCountData } = useChangeOrderCount();
+  const { data: changeOrderCountData } = useChangeOrderCount();
 
   const flagCount = flagCountData?.data?.count ?? 0;
-  const coCount = coCountData?.data?.count ?? 0;
+  const changeOrderCount = changeOrderCountData?.data?.count ?? 0;
+  const expanded = sidebarPinned || sidebarHoverOpen;
 
-  const mainNav = [
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [pathname, setMobileSidebarOpen]);
+
+  const mainItems: NavDef[] = [
+    { href: "/", icon: Home, label: "Home" },
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/projects", icon: FolderKanban, label: "Projects" },
     { href: "/briefs", icon: FileText, label: "Briefs" },
@@ -45,65 +325,128 @@ export function Sidebar() {
       href: "/change-orders",
       icon: FileSignature,
       label: "Change Orders",
-      count: coCount,
+      count: changeOrderCount,
     },
+  ];
+
+  const insightItems: NavDef[] = [
     { href: "/analytics", icon: BarChart2, label: "Analytics" },
     { href: "/activity", icon: History, label: "Activity" },
   ];
 
-  const bottomNav = [
+  const supportItems: NavDef[] = [
     { href: "/help", icon: HelpCircle, label: "Help & Docs" },
-    { href: "/settings/billing", icon: CreditCard, label: "Billing" },
-    { href: "/settings/team", icon: UsersRound, label: "Team" },
     { href: "/settings", icon: Settings, label: "Settings" },
   ];
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
+
   return (
-    <aside
-      className={cn(
-        "fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-[rgb(var(--border-default))] bg-white transition-all duration-200",
-        sidebarOpen ? "w-[240px]" : "w-[60px]",
-      )}
-    >
-      <div className="flex h-14 items-center border-b border-[rgb(var(--border-subtle))] px-4">
-        <span className="text-lg font-bold text-primary">
-          {sidebarOpen ? "ScopeIQ" : "S"}
-        </span>
+    <>
+      <div
+        className="fixed inset-y-0 left-0 z-40 hidden lg:block"
+        onMouseEnter={() => setSidebarHoverOpen(true)}
+        onMouseLeave={() => {
+          if (!sidebarPinned) {
+            setSidebarHoverOpen(false);
+          }
+        }}
+      >
+        <aside
+          aria-label="Application sidebar"
+          className={cn(
+            "flex h-full flex-col border-r border-[rgb(var(--border-subtle))] bg-white/95 shadow-[16px_0_40px_-36px_rgba(15,23,42,0.5)] backdrop-blur-xl transition-[width] duration-200 ease-out",
+            COLLAPSED_WIDTH,
+            expanded && EXPANDED_WIDTH,
+          )}
+        >
+
+
+          <SidebarPanel
+            pathname={pathname}
+            expanded={expanded}
+            workspaceName={workspaceName}
+            plan={plan}
+            mainItems={mainItems}
+            insightItems={insightItems}
+            supportItems={supportItems}
+            onNavigate={undefined}
+            onLogout={handleLogout}
+          />
+        </aside>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {mainNav.map((item) => (
-          <NavItem key={item.href} {...item} />
-        ))}
-      </nav>
-
-      <div className="p-3">
-        {sidebarOpen && (
-          <div className="mb-4 rounded-xl bg-primary/5 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-[rgb(var(--text-secondary))]">
-                PLAN
-              </span>
-              <Badge status="active" className="bg-primary/10 text-primary border-none">
-                PRO
-              </Badge>
-            </div>
-            <p className="mb-3 text-[10px] leading-tight text-[rgb(var(--text-muted))]">
-              Unlock AI scope detection and unlimited projects.
-            </p>
-            <Button size="sm" className="w-full text-[10px]">
-              <Zap className="mr-1 h-3 w-3 fill-current" />
-              Upgrade
-            </Button>
-          </div>
+      <div
+        className={cn(
+          "fixed inset-0 z-50 lg:hidden",
+          mobileSidebarOpen ? "pointer-events-auto" : "pointer-events-none",
         )}
+        aria-hidden={!mobileSidebarOpen}
+      >
+        <button
+          type="button"
+          className={cn(
+            "absolute inset-0 bg-slate-950/38 backdrop-blur-sm transition-opacity",
+            mobileSidebarOpen ? "opacity-100" : "opacity-0",
+          )}
+          onClick={() => setMobileSidebarOpen(false)}
+          aria-label="Close navigation"
+        />
 
-        <div className="border-t border-[rgb(var(--border-subtle))] pt-3">
-          {bottomNav.map((item) => (
-            <NavItem key={item.href} {...item} />
-          ))}
-        </div>
+        <aside
+          aria-label="Mobile navigation"
+          className={cn(
+            "relative z-10 flex h-full w-[min(88vw,320px)] flex-col border-r border-[rgb(var(--border-subtle))] bg-white shadow-[16px_0_48px_-28px_rgba(15,23,42,0.55)] transition-transform duration-200 ease-out",
+            mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+        >
+          <div className="flex items-center justify-between border-b border-[rgb(var(--border-subtle))] px-3 py-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] font-serif text-sm font-bold tracking-[0.18em] text-white">
+                SQ
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">{workspaceName}</p>
+                <p className="text-xs text-[rgb(var(--text-muted))]">
+                  {session ? "Signed in" : "Workspace shell"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgb(var(--border-subtle))] text-[rgb(var(--text-secondary))] transition-colors hover:text-[rgb(var(--text-primary))]"
+              aria-label="Close navigation"
+            >
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+          </div>
+
+          <SidebarPanel
+            pathname={pathname}
+            expanded={true}
+            workspaceName={workspaceName}
+            plan={plan}
+            mainItems={mainItems}
+            insightItems={insightItems}
+            supportItems={supportItems}
+            onNavigate={() => setMobileSidebarOpen(false)}
+            onLogout={handleLogout}
+          />
+        </aside>
+
+        <button
+          type="button"
+          onClick={() => setMobileSidebarOpen(false)}
+          className="absolute bottom-5 right-5 flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--primary-dark))] text-white shadow-lg"
+          aria-label="Close navigation"
+        >
+          <PanelLeftClose className="h-5 w-5" aria-hidden />
+        </button>
       </div>
-    </aside>
+    </>
   );
 }

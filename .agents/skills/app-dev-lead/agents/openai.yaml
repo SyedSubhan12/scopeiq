@@ -1,0 +1,5 @@
+interface:
+  display_name: "App Dev Lead"
+  short_description: "Coordinates a multi-role app team"
+  default_prompt: "Use $app-dev-lead to break this app feature into coordinated specialist tracks."
+

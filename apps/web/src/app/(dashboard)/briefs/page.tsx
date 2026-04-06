@@ -5,12 +5,20 @@ import Link from "next/link";
 import { Plus, FileText, Calendar, MoreVertical, Trash2, Pencil } from "lucide-react";
 import { Button, Card, Skeleton, Dialog, Input, Textarea, DropdownMenu, DropdownItem, useToast } from "@novabots/ui";
 import {
+  getBriefTemplatesQueryOptions,
   useBriefTemplates,
   useCreateBriefTemplate,
   useDeleteBriefTemplate,
 } from "@/hooks/useBriefTemplates";
+import { useAssetsReady } from "@/hooks/useAssetsReady";
+import { queryClient } from "@/lib/query-client";
 
 export default function BriefsPage() {
+  useAssetsReady({
+    scopeId: "page:briefs",
+    tasks: [() => queryClient.ensureQueryData(getBriefTemplatesQueryOptions())],
+  });
+
   const { data, isLoading } = useBriefTemplates();
   const createTemplate = useCreateBriefTemplate();
   const deleteTemplate = useDeleteBriefTemplate();

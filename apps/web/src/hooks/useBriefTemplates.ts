@@ -25,11 +25,15 @@ export interface BriefTemplate {
   updatedAt: string;
 }
 
-export function useBriefTemplates() {
-  return useQuery<{ data: any[] }>({
+export function getBriefTemplatesQueryOptions() {
+  return {
     queryKey: ["brief-templates"],
     queryFn: () => fetchWithAuth("/v1/brief-templates") as Promise<{ data: any[] }>,
-  });
+  };
+}
+
+export function useBriefTemplates() {
+  return useQuery<{ data: any[] }>(getBriefTemplatesQueryOptions());
 }
 
 export function useBriefTemplate(id: string) {

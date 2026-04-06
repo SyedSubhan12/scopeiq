@@ -1,11 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
-export function useWorkspace() {
-  return useQuery<{ data: any }>({
+export function getWorkspaceQueryOptions() {
+  return {
     queryKey: ["workspace"],
     queryFn: () => fetchWithAuth("/v1/workspaces/me") as Promise<{ data: any }>,
-  });
+  };
+}
+
+export function useWorkspace() {
+  return useQuery<{ data: any }>(getWorkspaceQueryOptions());
 }
 
 export function useUpdateWorkspace() {

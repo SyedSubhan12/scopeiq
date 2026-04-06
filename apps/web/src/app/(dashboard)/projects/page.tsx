@@ -4,10 +4,20 @@ import { useState } from "react";
 import Link from "next/link";
 import { Plus, FolderKanban, Search } from "lucide-react";
 import { Button, Badge, Card, Skeleton, Dialog, Input, Select, Textarea, useToast } from "@novabots/ui";
-import { useProjects, useCreateProject } from "@/hooks/useProjects";
-import { useClients } from "@/hooks/useClients";
+import { useAssetsReady } from "@/hooks/useAssetsReady";
+import { getProjectsQueryOptions, useProjects, useCreateProject } from "@/hooks/useProjects";
+import { getClientsQueryOptions, useClients } from "@/hooks/useClients";
+import { queryClient } from "@/lib/query-client";
 
 export default function ProjectsPage() {
+  useAssetsReady({
+    scopeId: "page:projects",
+    tasks: [
+      () => queryClient.ensureQueryData(getProjectsQueryOptions()),
+      () => queryClient.ensureQueryData(getClientsQueryOptions()),
+    ],
+  });
+
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [search, setSearch] = useState("");
   const { data, isLoading } = useProjects({ status: statusFilter });

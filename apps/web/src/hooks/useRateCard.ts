@@ -1,11 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
-export function useRateCard() {
-  return useQuery<{ data: any }>({
+export function getRateCardQueryOptions() {
+  return {
     queryKey: ["rate-card"],
     queryFn: () => fetchWithAuth("/v1/rate-card") as Promise<{ data: any }>,
-  });
+  };
+}
+
+export function useRateCard() {
+  return useQuery<{ data: any }>(getRateCardQueryOptions());
 }
 
 export function useCreateRateCardItem() {

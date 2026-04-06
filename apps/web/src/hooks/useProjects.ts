@@ -1,7 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
-export function useProjects(options?: { status?: string | undefined; clientId?: string | undefined; cursor?: string | undefined; limit?: number | undefined }) {
+type ProjectsOptions = {
+  status?: string | undefined;
+  clientId?: string | undefined;
+  cursor?: string | undefined;
+  limit?: number | undefined;
+};
+
+export function getProjectsQueryOptions(options?: ProjectsOptions) {
   const params = new URLSearchParams();
   if (options?.status) params.set("status", options.status);
   if (options?.clientId) params.set("clientId", options.clientId);
@@ -9,10 +16,14 @@ export function useProjects(options?: { status?: string | undefined; clientId?: 
   if (options?.limit) params.set("limit", String(options.limit));
   const qs = params.toString();
 
-  return useQuery<{ data: any[] }>({
+  return {
     queryKey: ["projects", options],
     queryFn: () => fetchWithAuth(`/v1/projects${qs ? `?${qs}` : ""}`) as Promise<{ data: any[] }>,
-  });
+  };
+}
+
+export function useProjects(options?: ProjectsOptions) {
+  return useQuery<{ data: any[] }>(getProjectsQueryOptions(options));
 }
 
 export function useProject(id: string) {

@@ -69,13 +69,13 @@ export function PortfolioHealth({ workspaceId }: { workspaceId: string }) {
             </div>
 
             {/* Portfolio Risk Heatmap - Conceptual implementation */}
-            <Card className="p-6 overflow-hidden border-[rgb(var(--border-default))] bg-[rgb(var(--surface-subtle))]">
-                <div className="flex items-center justify-between mb-6">
+            <Card className="overflow-hidden border-[rgb(var(--border-default))] bg-[rgb(var(--surface-subtle))] p-4 sm:p-6">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 className="text-lg font-bold text-[rgb(var(--text-primary))]">Portfolio Risk Heatmap</h3>
                         <p className="text-sm text-[rgb(var(--text-muted))]">AI-weighted project status based on scope deviations and budget exposure.</p>
                     </div>
-                    <Badge status="active" className="tracking-widest">REAL-TIME</Badge>
+                    <Badge status="active" className="w-fit tracking-widest">REAL-TIME</Badge>
                 </div>
 
                 <div className="space-y-4">

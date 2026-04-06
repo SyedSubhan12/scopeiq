@@ -1,0 +1,5 @@
+interface:
+  display_name: "Backend Dev"
+  short_description: "Hono, Drizzle, and API implementation"
+  default_prompt: "Use $backend-dev to implement the server-side portion of this ScopeIQ change."
+
