@@ -1,0 +1,5 @@
+interface:
+  display_name: "Senior Debugging"
+  short_description: "Evidence-first bug investigation"
+  default_prompt: "Use $senior-debugging to reproduce, isolate, and fix the root cause of this bug."
+

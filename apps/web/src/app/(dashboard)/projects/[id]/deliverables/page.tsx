@@ -51,9 +51,9 @@ export default function ProjectDeliverablesPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] gap-4">
+    <div className="flex flex-col gap-4 xl:h-[calc(100vh-10rem)] xl:flex-row">
       {/* Left: List */}
-      <div className="w-80 shrink-0 overflow-y-auto">
+      <div className="max-h-[22rem] overflow-y-auto xl:max-h-none xl:w-80 xl:shrink-0">
         <DeliverableList
           projectId={projectId}
           onSelect={(d) => {
@@ -69,13 +69,13 @@ export default function ProjectDeliverablesPage() {
         {selected ? (
           <>
             {/* Toolbar */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <RevisionCounter
                 current={selected.revisionRound}
                 limit={selected.maxRevisions}
-                className="w-48"
+                className="w-full sm:w-48"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   onClick={() => setPlacingPin(!placingPin)}
@@ -95,7 +95,7 @@ export default function ProjectDeliverablesPage() {
             </div>
 
             {/* Viewer */}
-            <div className="flex-1 overflow-hidden">
+            <div className="min-h-[20rem] flex-1 overflow-hidden">
               <DeliverableViewer
                 fileUrl={selected.fileUrl ?? ""}
                 fileType={selected.mimeType}

@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Plus, Mail, User, Building2, Copy, Check, ExternalLink, ChevronDown, ChevronUp, FolderKanban } from "lucide-react";
 import { Button, Card, Skeleton, Dialog, Input, Textarea, useToast } from "@novabots/ui";
-import { useClients, useCreateClient } from "@/hooks/useClients";
+import { useAssetsReady } from "@/hooks/useAssetsReady";
+import { getClientsQueryOptions, useClients, useCreateClient } from "@/hooks/useClients";
+import { queryClient } from "@/lib/query-client";
 import { useProjects } from "@/hooks/useProjects";
 
 function ClientPortalLinks({ clientId }: { clientId: string }) {
@@ -102,6 +104,11 @@ function ClientCard({ client }: { client: { id: string; name: string; contactNam
 }
 
 export default function ClientsPage() {
+  useAssetsReady({
+    scopeId: "page:clients",
+    tasks: [() => queryClient.ensureQueryData(getClientsQueryOptions())],
+  });
+
   const { data, isLoading } = useClients();
   const createClient = useCreateClient();
   const { toast } = useToast();

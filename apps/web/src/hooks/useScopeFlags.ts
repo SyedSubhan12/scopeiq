@@ -1,11 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
-export function useScopeFlags(projectId?: string) {
-    return useQuery<{ data: any[] }>({
+export function getScopeFlagsQueryOptions(projectId?: string) {
+    return {
         queryKey: ["scope-flags", projectId],
         queryFn: () => fetchWithAuth(`/v1/scope-flags${projectId ? `?projectId=${projectId}` : ""}`) as Promise<{ data: any[] }>,
-    });
+    };
+}
+
+export function useScopeFlags(projectId?: string) {
+    return useQuery<{ data: any[] }>(getScopeFlagsQueryOptions(projectId));
 }
 
 export function useScopeFlagCount() {

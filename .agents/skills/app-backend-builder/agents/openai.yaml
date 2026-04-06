@@ -1,0 +1,5 @@
+interface:
+  display_name: "App Backend Builder"
+  short_description: "Implements APIs and business logic"
+  default_prompt: "Use $app-backend-builder to implement the backend contract and service logic for this app feature."
+

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "turbo dev",
+    "dev:clean": "rm -rf apps/web/.next apps/web/.turbo apps/api/.turbo .turbo && turbo dev",
     "build": "turbo build",
     "test": "turbo test",
     "lint": "turbo lint",

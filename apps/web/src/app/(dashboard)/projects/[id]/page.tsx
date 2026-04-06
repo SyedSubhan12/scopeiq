@@ -40,7 +40,7 @@ function HealthTab({ projectId }: { projectId: string }) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-40 w-full" />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28 w-full" />)}
         </div>
       </div>
@@ -63,7 +63,7 @@ function HealthTab({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-6">
       {/* Overall Score */}
-      <Card className="flex items-center gap-6 p-6">
+      <Card className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6">
         <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
           <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="40" fill="none" stroke="rgb(var(--border-subtle))" strokeWidth="10" />
@@ -88,7 +88,7 @@ function HealthTab({ projectId }: { projectId: string }) {
       </Card>
 
       {/* Health metrics grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Scope health */}
         <Card className="p-4">
           <div className="mb-3 flex items-center gap-2">
@@ -238,9 +238,9 @@ function DeliverablesTab({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="flex gap-4" style={{ height: "calc(100vh - 16rem)" }}>
+    <div className="flex flex-col gap-4 xl:flex-row xl:items-stretch" style={{ minHeight: "calc(100vh - 16rem)" }}>
       {/* List */}
-      <div className="w-72 shrink-0 overflow-y-auto">
+      <div className="max-h-[22rem] overflow-y-auto xl:max-h-none xl:w-72 xl:shrink-0">
         <DeliverableList
           projectId={projectId}
           onSelect={(d) => {
@@ -255,13 +255,13 @@ function DeliverablesTab({ projectId }: { projectId: string }) {
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         {selected ? (
           <>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <RevisionCounter
                 current={selected.revisionRound}
                 limit={selected.maxRevisions}
-                className="w-44"
+                className="w-full sm:w-44"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   onClick={() => setPlacingPin(!placingPin)}
@@ -279,7 +279,7 @@ function DeliverablesTab({ projectId }: { projectId: string }) {
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-hidden">
+            <div className="min-h-[20rem] flex-1 overflow-hidden">
               <DeliverableViewer
                 fileUrl={selected.fileUrl ?? ""}
                 fileType={selected.mimeType}
@@ -401,7 +401,7 @@ export default function ProjectDetailPage() {
     <div>
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => router.push("/projects")}
             className="rounded-md p-1 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface-subtle))]"
@@ -411,7 +411,7 @@ export default function ProjectDetailPage() {
           <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">{project.name}</h1>
           <Badge status={project.status}>{project.status}</Badge>
         </div>
-        <div className="ml-9 mt-2 flex flex-wrap items-center gap-4 text-sm text-[rgb(var(--text-muted))]">
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[rgb(var(--text-muted))] sm:ml-9 sm:mt-2 sm:gap-4">
           {project.description && (
             <p className="text-[rgb(var(--text-secondary))]">{project.description}</p>
           )}
@@ -432,24 +432,26 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-1 border-b border-[rgb(var(--border-default))]">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              "px-4 py-2.5 text-sm font-medium transition-colors relative",
-              activeTab === tab.key
-                ? "text-primary"
-                : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text-secondary))]",
-            )}
-          >
-            {tab.label}
-            {activeTab === tab.key && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-            )}
-          </button>
-        ))}
+      <div className="mb-6 -mx-1 overflow-x-auto border-b border-[rgb(var(--border-default))] px-1">
+        <div className="flex min-w-max gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "relative whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors",
+                activeTab === tab.key
+                  ? "text-primary"
+                  : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text-secondary))]",
+              )}
+            >
+              {tab.label}
+              {activeTab === tab.key && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tab content */}

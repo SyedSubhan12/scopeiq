@@ -1,11 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
-export function useChangeOrders(projectId?: string) {
-    return useQuery<{ data: any[] }>({
+export function getChangeOrdersQueryOptions(projectId?: string) {
+    return {
         queryKey: ["change-orders", projectId],
         queryFn: () => fetchWithAuth(`/v1/change-orders${projectId ? `?projectId=${projectId}` : ""}`) as Promise<{ data: any[] }>,
-    });
+    };
+}
+
+export function useChangeOrders(projectId?: string) {
+    return useQuery<{ data: any[] }>(getChangeOrdersQueryOptions(projectId));
 }
 
 export function useChangeOrderCount() {

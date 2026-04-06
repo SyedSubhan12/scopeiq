@@ -1,0 +1,5 @@
+interface:
+  display_name: "Senior Debugger"
+  short_description: "Code review focused on bugs"
+  default_prompt: "Use $senior-debugger to review this code for bugs, gaps, and concrete fixes."
+

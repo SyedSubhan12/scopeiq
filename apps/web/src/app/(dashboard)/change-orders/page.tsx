@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { FileSignature, Clock, CheckCircle2, XCircle, Send, DollarSign, Filter, FolderKanban } from "lucide-react";
 import { Card, Badge, Button, Skeleton, Dialog, Input, Textarea, useToast } from "@novabots/ui";
-import { useChangeOrders } from "@/hooks/useChangeOrders";
 import { fetchWithAuth } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
+import { useAssetsReady } from "@/hooks/useAssetsReady";
+import { getChangeOrdersQueryOptions, useChangeOrders } from "@/hooks/useChangeOrders";
+import { queryClient } from "@/lib/query-client";
 
 const STATUS_FILTERS = ["all", "pending", "sent", "accepted", "declined"];
 
@@ -66,6 +68,11 @@ function COCard({ co, onSend }: { co: any; onSend: (id: string) => void }) {
 }
 
 export default function ChangeOrdersPage() {
+  useAssetsReady({
+    scopeId: "page:change-orders",
+    tasks: [() => queryClient.ensureQueryData(getChangeOrdersQueryOptions())],
+  });
+
   const [statusFilter, setStatusFilter] = useState("all");
   const [sendingId, setSendingId] = useState<string | null>(null);
   const { data, isLoading, refetch } = useChangeOrders();

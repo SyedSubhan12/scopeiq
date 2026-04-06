@@ -1,0 +1,5 @@
+interface:
+  display_name: "App Product Architect"
+  short_description: "Turns app ideas into product flows"
+  default_prompt: "Use $app-product-architect to shape this app idea into clear user flows and implementation slices."
+

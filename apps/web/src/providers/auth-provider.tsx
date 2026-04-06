@@ -105,10 +105,20 @@ function syncSessionToCookie(session: Session | null) {
     const cookieValue = session.access_token;
     const maxAge = session.expires_in;
 
-    document.cookie = `${cookieName}=${cookieValue}; path=/; max-age=${maxAge}; SameSite=Lax; Secure`;
+    // `Secure` cookies are not persisted on http://localhost — omit so middleware
+    // can see the session in local dev over HTTP.
+    const secure =
+        typeof window !== "undefined" && window.location.protocol === "https:";
+    const secureAttr = secure ? "; Secure" : "";
+
+    document.cookie = `${cookieName}=${cookieValue}; path=/; max-age=${maxAge}; SameSite=Lax${secureAttr}`;
 }
 
 function clearAuthCookie() {
-    document.cookie = "sb-supabase-auth-token=; path=/; max-age=0; SameSite=Lax; Secure";
-    document.cookie = "x-onboarded=; path=/; max-age=0; SameSite=Lax; Secure";
+    const secure =
+        typeof window !== "undefined" && window.location.protocol === "https:";
+    const secureAttr = secure ? "; Secure" : "";
+
+    document.cookie = `sb-supabase-auth-token=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
+    document.cookie = `x-onboarded=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
 }

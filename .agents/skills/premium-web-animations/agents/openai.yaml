@@ -1,0 +1,5 @@
+interface:
+  display_name: "Premium Web Animations"
+  short_description: "Purposeful motion and Lottie UI work"
+  default_prompt: "Use $premium-web-animations to design and implement polished motion, Lottie, and Framer Motion UI."
+

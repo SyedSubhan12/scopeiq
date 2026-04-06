@@ -12,6 +12,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // 1b. Public static assets (e.g. Lottie JSON under public/lottie/)
+  if (pathname.startsWith("/lottie/")) {
+    return NextResponse.next();
+  }
+
   // 2. Portal routes — always public (client access via token, no Supabase auth)
   if (pathname.startsWith(portalPrefix)) {
     return NextResponse.next();
@@ -71,5 +76,8 @@ function checkSession(request: NextRequest): boolean {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
+  // Exclude the entire `/_next/*` tree (not only static/image). Otherwise dev-only
+  // routes like `/_next/webpack-hmr` run through auth and get redirected to /login,
+  // which breaks HMR, corrupts chunk loading, and surfaces as 404s on navigations.
+  matcher: ["/((?!_next|api|favicon.ico).*)"],
 };

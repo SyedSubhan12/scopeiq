@@ -1,0 +1,5 @@
+interface:
+  display_name: "QA Engineer"
+  short_description: "Vitest, Playwright, and edge cases"
+  default_prompt: "Use $qa-engineer to add or strengthen tests and quality checks for this change."
+

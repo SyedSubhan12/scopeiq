@@ -3,12 +3,23 @@
 import { useState, useEffect } from "react";
 import { Save, Building, CreditCard, Plus, Link2, Copy, Check, AlertTriangle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, Skeleton, Button, Input, Badge, useToast } from "@novabots/ui";
-import { useWorkspace, useUpdateWorkspace } from "@/hooks/useWorkspace";
-import { useRateCard, useCreateRateCardItem } from "@/hooks/useRateCard";
-import { useProjects } from "@/hooks/useProjects";
 import { ReminderSettings } from "@/components/approval/ReminderSettings";
+import { useAssetsReady } from "@/hooks/useAssetsReady";
+import { getProjectsQueryOptions, useProjects } from "@/hooks/useProjects";
+import { queryClient } from "@/lib/query-client";
+import { getRateCardQueryOptions, useRateCard, useCreateRateCardItem } from "@/hooks/useRateCard";
+import { getWorkspaceQueryOptions, useWorkspace, useUpdateWorkspace } from "@/hooks/useWorkspace";
 
 export default function SettingsPage() {
+  useAssetsReady({
+    scopeId: "page:settings",
+    tasks: [
+      () => queryClient.ensureQueryData(getWorkspaceQueryOptions()),
+      () => queryClient.ensureQueryData(getRateCardQueryOptions()),
+      () => queryClient.ensureQueryData(getProjectsQueryOptions()),
+    ],
+  });
+
   const { data, isLoading } = useWorkspace();
   const updateWorkspace = useUpdateWorkspace();
   const { data: rateCardData, isLoading: loadingRateCard } = useRateCard();
@@ -110,7 +121,7 @@ export default function SettingsPage() {
                 <label className="mb-1.5 block text-sm font-medium text-[rgb(var(--text-primary))]">
                   Brand Color
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <input
                     type="color"
                     value={brandColor}
@@ -120,20 +131,21 @@ export default function SettingsPage() {
                   <Input
                     value={brandColor}
                     onChange={(e) => setBrandColor(e.target.value)}
-                    className="w-32"
+                    className="w-full sm:w-32"
                     placeholder="#0F6E56"
                   />
                   <div
-                    className="h-10 flex-1 rounded-lg"
+                    className="h-10 w-full flex-1 rounded-lg sm:min-w-[8rem]"
                     style={{ backgroundColor: brandColor }}
                   />
                 </div>
               </div>
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end pt-2 max-sm:flex-col">
                 <Button
                   size="sm"
                   onClick={() => void handleSaveWorkspace()}
                   disabled={updateWorkspace.isPending}
+                  className="max-sm:w-full"
                 >
                   <Save className="mr-1.5 h-3.5 w-3.5" />
                   {updateWorkspace.isPending ? "Saving..." : "Save Changes"}
@@ -159,8 +171,8 @@ export default function SettingsPage() {
                 {rateCardItems.length > 0 && (
                   <div className="mb-4 divide-y divide-[rgb(var(--border-default))] rounded-lg border border-[rgb(var(--border-default))]">
                     {rateCardItems.map((item: { id: string; name: string; rateInCents: number; unit?: string }) => (
-                      <div key={item.id} className="flex items-center justify-between px-4 py-3">
-                        <div>
+                      <div key={item.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
                           <p className="text-sm font-medium text-[rgb(var(--text-primary))]">
                             {item.name}
                           </p>
@@ -176,8 +188,8 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_6rem_auto] sm:items-end">
+                  <div className="min-w-0">
                     <label className="mb-1 block text-xs text-[rgb(var(--text-muted))]">Service</label>
                     <Input
                       value={newItemName}
@@ -185,7 +197,7 @@ export default function SettingsPage() {
                       placeholder="e.g. UI Design"
                     />
                   </div>
-                  <div className="w-28">
+                  <div>
                     <label className="mb-1 block text-xs text-[rgb(var(--text-muted))]">Rate ($)</label>
                     <Input
                       type="number"
@@ -194,7 +206,7 @@ export default function SettingsPage() {
                       placeholder="150"
                     />
                   </div>
-                  <div className="w-24">
+                  <div>
                     <label className="mb-1 block text-xs text-[rgb(var(--text-muted))]">Unit</label>
                     <select
                       value={newItemUnit}
@@ -211,6 +223,7 @@ export default function SettingsPage() {
                     size="sm"
                     onClick={() => void handleAddRateItem()}
                     disabled={!newItemName.trim() || !newItemRate || createRateCardItem.isPending}
+                    className="max-sm:w-full"
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
@@ -246,7 +259,7 @@ export default function SettingsPage() {
                 <label className="mb-1.5 block text-sm font-medium text-[rgb(var(--text-primary))]">
                   Copy portal link for a project
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <select
                     value={selectedPortalProjectId}
                     onChange={(e) => setSelectedPortalProjectId(e.target.value)}
@@ -258,6 +271,7 @@ export default function SettingsPage() {
                     ))}
                   </select>
                   <Button
+                    className="max-sm:w-full"
                     size="sm"
                     variant="secondary"
                     disabled={!selectedPortalProjectId}
@@ -297,7 +311,7 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-[rgb(var(--text-primary))]">Export workspace data</p>
                 <p className="text-xs text-[rgb(var(--text-muted))]">
@@ -309,6 +323,7 @@ export default function SettingsPage() {
                 variant="secondary"
                 disabled
                 onClick={() => toast("info", "Export coming soon")}
+                className="max-sm:w-full"
               >
                 Export
               </Button>

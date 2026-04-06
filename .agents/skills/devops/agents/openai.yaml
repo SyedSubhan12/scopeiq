@@ -1,0 +1,5 @@
+interface:
+  display_name: "DevOps"
+  short_description: "Infra, env, CI, and deployment help"
+  default_prompt: "Use $devops to handle infrastructure, environment, migration, or deployment work for ScopeIQ."
+

@@ -6,19 +6,20 @@ import { useUIStore } from "@/stores/ui.store";
 import { cn } from "@novabots/ui";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const sidebarPinned = useUIStore((s) => s.sidebarPinned);
 
   return (
     <div className="min-h-screen bg-[rgb(var(--surface-subtle))]">
       <Sidebar />
       <div
         className={cn(
-          "transition-all duration-200",
-          sidebarOpen ? "ml-[240px]" : "ml-[60px]",
+          "transition-[margin] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]",
+          "lg:ml-[72px]",
+          sidebarPinned && "lg:ml-[264px]",
         )}
       >
         <TopBar />
-        <main className="p-6">{children}</main>
+        <main className="px-4 py-4 sm:px-5 sm:py-5 lg:p-6">{children}</main>
       </div>
     </div>
   );

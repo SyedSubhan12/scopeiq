@@ -39,12 +39,16 @@ export function useProjectHealth(projectId: string) {
   });
 }
 
-export function useWorkspaceTimeline() {
-  return useQuery<{ data: { weeks: { week: string; projects: number; briefs: number; deliverables: number; flags: number }[] } }>({
+export function getWorkspaceTimelineQueryOptions() {
+  return {
     queryKey: ["analytics", "timeline"],
     queryFn: () =>
       fetchWithAuth("/v1/analytics/workspace/timeline") as Promise<{
         data: { weeks: { week: string; projects: number; briefs: number; deliverables: number; flags: number }[] };
       }>,
-  });
+  };
+}
+
+export function useWorkspaceTimeline() {
+  return useQuery<{ data: { weeks: { week: string; projects: number; briefs: number; deliverables: number; flags: number }[] } }>(getWorkspaceTimelineQueryOptions());
 }

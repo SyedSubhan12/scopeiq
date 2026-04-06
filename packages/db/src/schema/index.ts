@@ -17,5 +17,6 @@ export * from "./scope-flags.schema";
 export * from "./change-orders.schema";
 export * from "./rate-card-items.schema";
 export * from "./audit-log.schema";
+export * from "./messages.schema";
 export * from "./invitations.schema";
 export * from "./relations";
