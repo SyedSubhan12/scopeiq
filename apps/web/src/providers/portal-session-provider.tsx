@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useEffect, useState, ReactNode } from "react";
+import { setPortalToken } from "@/lib/portal-auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -18,17 +19,62 @@ interface Deliverable {
 
 interface BriefField {
     id: string;
-    fieldKey: string;
-    fieldLabel: string;
-    fieldType: string;
+    key: string;
+    label: string;
+    type: string;
+    placeholder?: string;
+    description?: string;
+    required: boolean;
+    options?: string[];
+    conditions?: {
+        field_key: string;
+        operator: "equals" | "not_equals" | "contains";
+        value: string;
+    }[];
+    order: number;
     value: string | null;
-    sortOrder: number;
+    attachments: {
+        id: string;
+        originalName: string;
+        fileUrl: string;
+        mimeType: string | null;
+        sizeBytes: number | null;
+    }[];
 }
 
 interface PendingBrief {
     id: string;
     title: string;
+    status: string;
+    scopeScore: number | null;
+    submittedAt: string | null;
+    branding?: {
+        logoUrl?: string | null;
+        accentColor?: string | null;
+        introMessage?: string | null;
+        successMessage?: string | null;
+        supportEmail?: string | null;
+        source?: "workspace" | "template_override" | null;
+    } | null;
     fields: BriefField[];
+}
+
+interface ClarificationRequestItem {
+    id: string;
+    fieldKey: string;
+    fieldLabel: string;
+    prompt: string;
+    severity: "low" | "medium" | "high";
+    sourceFlagId: string | null;
+    sortOrder: number;
+}
+
+interface ClarificationRequest {
+    id: string;
+    status: string;
+    message: string | null;
+    requestedAt: string;
+    items: ClarificationRequestItem[];
 }
 
 interface ChangeOrderSummary {
@@ -65,6 +111,8 @@ interface PortalSession {
         status: string;
     } | null;
     pendingBrief: PendingBrief | null;
+    clarificationBrief: PendingBrief | null;
+    clarificationRequest: ClarificationRequest | null;
     pendingChangeOrders: ChangeOrderSummary[];
     loading: boolean;
     error: string | null;
@@ -77,6 +125,8 @@ const defaultSession: PortalSession = {
     deliverables: [],
     health: null,
     pendingBrief: null,
+    clarificationBrief: null,
+    clarificationRequest: null,
     pendingChangeOrders: [],
     loading: true,
     error: null,
@@ -102,8 +152,7 @@ export function PortalSessionProvider({
             return;
         }
 
-        // Store token in localStorage for subsequent requests
-        localStorage.setItem("portal_token", portalToken);
+        setPortalToken(portalToken);
 
         const fetchSession = async () => {
             try {
@@ -123,6 +172,8 @@ export function PortalSessionProvider({
                     deliverables: data.deliverables,
                     health: data.health,
                     pendingBrief: data.pendingBrief,
+                    clarificationBrief: data.clarificationBrief,
+                    clarificationRequest: data.clarificationRequest,
                     pendingChangeOrders: data.pendingChangeOrders ?? [],
                     loading: false,
                     error: null,
@@ -137,6 +188,10 @@ export function PortalSessionProvider({
         };
 
         void fetchSession();
+
+        return () => {
+            setPortalToken(null);
+        };
     }, [portalToken]);
 
     return (

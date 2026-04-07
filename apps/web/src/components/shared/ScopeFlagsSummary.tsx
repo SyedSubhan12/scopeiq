@@ -67,7 +67,7 @@ export function ScopeFlagsSummary({ flags }: ScopeFlagsSummaryProps) {
       </div>
       <div className="divide-y divide-[rgb(var(--border-subtle))]">
         {displayFlags.map((flag, index) => {
-          const colors: (typeof severityColors)[string] = severityColors[flag.severity] ?? severityColors.medium;
+          const colors = severityColors[flag.severity] ?? severityColors.medium!;
           return (
             <motion.div
               key={flag.id}

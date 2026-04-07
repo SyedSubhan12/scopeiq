@@ -1,4 +1,5 @@
 import json
+import time
 import anthropic
 import structlog
 from app.config import settings
@@ -10,24 +11,30 @@ from app.prompts.scope_guard_prompt import (
 
 logger = structlog.get_logger()
 
+# Performance SLA tracking
+SCOPE_ANALYSIS_SLA_MS = 5000
+
 class ScopeAnalyzerService:
     def __init__(self):
         self.client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
     async def analyze(self, input_data: ScopeAnalysisInput) -> ScopeAnalysisResult:
         """Analyze a text request against SOW clauses."""
+        start_time = time.monotonic()
         user_message = self._build_user_message(input_data)
 
         logger.info("analyzing_scope", project_id=input_data.project_id, clause_count=len(input_data.clauses))
 
         response = await self.client.messages.create(
-            model="claude-3-5-sonnet-20240620",
-            max_tokens=1024,
+            model="claude-sonnet-4-20250514",
+            max_tokens=2048,
             system=SCOPE_GUARD_SYSTEM_PROMPT,
             tools=[SCOPE_GUARD_TOOL],
             tool_choice={"type": "tool", "name": "analyze_scope"},
             messages=[{"role": "user", "content": user_message}],
         )
+
+        duration_ms = (time.monotonic() - start_time) * 1000
 
         for block in response.content:
             if block.type == "tool_use" and block.name == "analyze_scope":
@@ -36,7 +43,9 @@ class ScopeAnalyzerService:
                     "scope_analyzed",
                     project_id=input_data.project_id,
                     is_deviation=result.is_deviation,
-                    confidence=result.confidence
+                    confidence=result.confidence,
+                    duration_ms=round(duration_ms, 2),
+                    sla_met=duration_ms < SCOPE_ANALYSIS_SLA_MS,
                 )
                 return result
 
@@ -53,12 +62,12 @@ class ScopeAnalyzerService:
             f"{input_data.input_text}\n",
             "### PROJECT SOW CLAUSES:"
         ]
-        
+
         for clause in input_data.clauses:
             lines.append(f"- ID: {clause.id}")
             lines.append(f"  TYPE: {clause.clause_type}")
             if clause.summary:
                 lines.append(f"  SUMMARY: {clause.summary}")
             lines.append(f"  TEXT: {clause.original_text}\n")
-            
+
         return "\n".join(lines)

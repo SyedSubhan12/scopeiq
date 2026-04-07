@@ -36,7 +36,9 @@ export const scopeFlagRepository = {
             resolvedAt?: Date | null;
             snoozedUntil?: Date | null;
         },
+        trx?: unknown,
     ) {
+        const driver = trx ?? db;
         const setValues: Record<string, unknown> = {
             status: data.status,
             updatedAt: new Date(),
@@ -45,7 +47,7 @@ export const scopeFlagRepository = {
         if (data.resolvedAt !== undefined) setValues.resolvedAt = data.resolvedAt;
         if (data.snoozedUntil !== undefined) setValues.snoozedUntil = data.snoozedUntil;
 
-        const [updated] = await db
+        const [updated] = await (driver as typeof db)
             .update(scopeFlags)
             .set(setValues)
             .where(and(eq(scopeFlags.id, id), eq(scopeFlags.workspaceId, workspaceId)))

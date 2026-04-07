@@ -7,7 +7,7 @@ import {
   Filter, Plus, ChevronRight, AlertCircle
 } from "lucide-react";
 import { Card, Badge, Button, Skeleton } from "@novabots/ui";
-import { useChangeOrders } from "@/hooks/useChangeOrders";
+import { useChangeOrders } from "@/hooks/change-orders";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@novabots/ui";
 import { EmptyState } from "@/components/shared/EmptyState";

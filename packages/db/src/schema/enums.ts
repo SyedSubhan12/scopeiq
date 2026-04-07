@@ -2,10 +2,17 @@ import { pgEnum } from "drizzle-orm/pg-core";
 
 export const projectStatusEnum = pgEnum("project_status_enum", [
   "draft",
+  "awaiting_brief",
+  "clarification_needed",
+  "brief_scored",
   "active",
+  "in_progress",
+  "deliverable_in_review",
   "paused",
+  "on_hold",
   "completed",
   "archived",
+  "cancelled",
 ]);
 
 export const briefStatusEnum = pgEnum("brief_status_enum", [
@@ -14,6 +21,12 @@ export const briefStatusEnum = pgEnum("brief_status_enum", [
   "clarification_needed",
   "approved",
   "rejected",
+]);
+
+export const briefTemplateStatusEnum = pgEnum("brief_template_status_enum", [
+  "draft",
+  "published",
+  "archived",
 ]);
 
 export const deliverableStatusEnum = pgEnum("deliverable_status_enum", [
@@ -98,8 +111,15 @@ export const messageSourceEnum = pgEnum("message_source_enum", [
   "manual_input",
 ]);
 
+export const messageStatusEnum = pgEnum("message_status_enum", [
+  "pending_check",
+  "checked",
+  "flagged",
+]);
+
 export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
 export type BriefStatus = (typeof briefStatusEnum.enumValues)[number];
+export type BriefTemplateStatus = (typeof briefTemplateStatusEnum.enumValues)[number];
 export type DeliverableStatus = (typeof deliverableStatusEnum.enumValues)[number];
 export type DeliverableType = (typeof deliverableTypeEnum.enumValues)[number];
 export type FlagSeverity = (typeof flagSeverityEnum.enumValues)[number];
@@ -112,3 +132,4 @@ export type Plan = (typeof planEnum.enumValues)[number];
 export type AuditAction = (typeof auditActionEnum.enumValues)[number];
 export type ReminderStep = (typeof reminderStepEnum.enumValues)[number];
 export type MessageSource = (typeof messageSourceEnum.enumValues)[number];
+export type MessageStatus = (typeof messageStatusEnum.enumValues)[number];

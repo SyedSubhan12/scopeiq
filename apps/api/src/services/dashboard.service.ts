@@ -1,10 +1,5 @@
-import { db, projects, deliverables, scopeFlags, workspaces, auditLog, users, clients, eq, and, isNull, desc, count, sql, inArray } from "@novabots/db";
-
-const PLAN_PRICING: Record<string, number> = {
-  solo: 79,
-  studio: 129,
-  agency: 199,
-};
+import { db, projects, deliverables, scopeFlags, auditLog, users, clients, eq, and, isNull, desc, count, sql, inArray } from "@novabots/db";
+import { billingService } from "./billing.service.js";
 
 export interface DashboardMetrics {
   activeProjects: number;
@@ -98,15 +93,7 @@ async function getPendingScopeFlags(workspaceId: string): Promise<number> {
 }
 
 async function getMRR(workspaceId: string): Promise<number> {
-  const wsResult = await db
-    .select({ plan: workspaces.plan })
-    .from(workspaces)
-    .where(eq(workspaces.id, workspaceId))
-    .limit(1);
-
-  if (wsResult.length === 0) return 0;
-  const plan = wsResult[0]?.plan ?? "solo";
-  return PLAN_PRICING[plan] ?? 0;
+  return billingService.getMonthlyRecurringRevenue(workspaceId);
 }
 
 async function getUrgentFlags(workspaceId: string): Promise<UrgentFlag[]> {
@@ -250,23 +237,22 @@ async function getUpcomingDeadlines(workspaceId: string): Promise<DeadlineEntry[
     }
   }
 
-  return filtered
-    .map((row) => {
-      const daysRemaining = row.endDate
-        ? Math.ceil((new Date(row.endDate).getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
-        : null;
+  const deadlines: DeadlineEntry[] = [];
 
-      return {
-        projectId: row.projectId,
-        projectName: row.projectName,
-        endDate: row.endDate,
-        daysRemaining,
-        clientId: row.clientId,
-        clientName: row.clientId ? clientMap.get(row.clientId) ?? null : null,
-      };
-    })
-    .filter((d): d is DeadlineEntry & { daysRemaining: number } => d.daysRemaining !== null)
-    .sort((a, b) => a.daysRemaining - b.daysRemaining);
+  for (const row of filtered) {
+    if (!row.endDate) continue;
+
+    deadlines.push({
+      projectId: row.projectId,
+      projectName: row.projectName,
+      endDate: row.endDate,
+      daysRemaining: Math.ceil((new Date(row.endDate).getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+      clientId: row.clientId,
+      clientName: row.clientId ? clientMap.get(row.clientId) ?? null : null,
+    });
+  }
+
+  return deadlines.sort((a, b) => a.daysRemaining - b.daysRemaining);
 }
 
 export const dashboardService = {

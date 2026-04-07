@@ -9,7 +9,7 @@ vi.mock("../repositories/project.repository.js");
 vi.mock("@novabots/db", () => ({
     db: {},
     writeAuditLog: vi.fn(),
-    generatePortalToken: vi.fn(() => "mock-token"),
+    generatePortalToken: vi.fn(() => ({ raw: "mock-token", hash: "mock-hash" })),
 }));
 
 describe("ProjectService", () => {
@@ -56,6 +56,7 @@ describe("ProjectService", () => {
                 workspaceId,
                 name: "New Project",
                 clientId: "c-1",
+                portalToken: "mock-token",
             }));
             expect(writeAuditLog).toHaveBeenCalled();
         });

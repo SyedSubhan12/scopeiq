@@ -2,7 +2,11 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { authMiddleware } from "../middleware/auth.js";
 import { briefTemplateService } from "../services/brief-template.service.js";
-import { createBriefTemplateSchema, updateBriefTemplateSchema } from "./brief-template.schemas.js";
+import {
+  createBriefTemplateSchema,
+  restoreBriefTemplateVersionSchema,
+  updateBriefTemplateSchema,
+} from "./brief-template.schemas.js";
 
 export const briefTemplateRouter = new Hono();
 
@@ -42,6 +46,39 @@ briefTemplateRouter.patch(
     const templateId = c.req.param("id");
     const body = c.req.valid("json");
     const template = await briefTemplateService.updateTemplate(workspaceId, templateId, userId, body);
+    return c.json({ data: template });
+  },
+);
+
+briefTemplateRouter.get("/:id/versions", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const templateId = c.req.param("id");
+  const versions = await briefTemplateService.listTemplateVersions(workspaceId, templateId);
+  return c.json({ data: versions });
+});
+
+briefTemplateRouter.post("/:id/publish", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const userId = c.get("userId");
+  const templateId = c.req.param("id");
+  const result = await briefTemplateService.publishTemplate(workspaceId, templateId, userId);
+  return c.json({ data: result });
+});
+
+briefTemplateRouter.post(
+  "/:id/restore",
+  zValidator("json", restoreBriefTemplateVersionSchema),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const templateId = c.req.param("id");
+    const body = c.req.valid("json");
+    const template = await briefTemplateService.restoreTemplateVersion(
+      workspaceId,
+      templateId,
+      body.versionId,
+      userId,
+    );
     return c.json({ data: template });
   },
 );

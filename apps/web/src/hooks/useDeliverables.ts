@@ -15,7 +15,7 @@ export interface Deliverable {
   mimeType: string | null;
   originalName: string | null;
   externalUrl: string | null;
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
   revisionRound: number;
   maxRevisions: number;
   dueDate: string | null;
@@ -52,7 +52,7 @@ export function useCreateDeliverable(projectId: string) {
       description?: string;
       type?: Deliverable["type"];
       externalUrl?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
       maxRevisions?: number;
       dueDate?: string;
     }) =>
@@ -62,6 +62,9 @@ export function useCreateDeliverable(projectId: string) {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["deliverables", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -73,7 +76,7 @@ export function useUpdateDeliverable(id: string, projectId: string) {
       name?: string;
       description?: string;
       status?: Deliverable["status"];
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
       maxRevisions?: number;
       dueDate?: string;
     }) =>
@@ -84,6 +87,9 @@ export function useUpdateDeliverable(id: string, projectId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["deliverables", projectId] });
       void queryClient.invalidateQueries({ queryKey: ["deliverable", id] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -95,6 +101,9 @@ export function useDeleteDeliverable(projectId: string) {
       fetchWithAuth(`/v1/deliverables/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["deliverables", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -130,6 +139,9 @@ export function useConfirmUpload(deliverableId: string, projectId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["deliverables", projectId] });
       void queryClient.invalidateQueries({ queryKey: ["deliverable", deliverableId] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

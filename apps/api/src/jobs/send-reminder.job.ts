@@ -43,5 +43,5 @@ export async function scheduleHourlyReminders(): Promise<void> {
  * Process the reminder job — checks all in-review deliverables and sends due reminders.
  */
 export async function processReminders() {
-  return reminderService.processReminders();
+  return { action: "scheduled_jobs_only" };
 }

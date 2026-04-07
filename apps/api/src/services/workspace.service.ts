@@ -1,10 +1,15 @@
 import { workspaceRepository } from "../repositories/workspace.repository.js";
+import { userRepository } from "../repositories/user.repository.js";
 import { writeAuditLog } from "@novabots/db";
 import { db } from "@novabots/db";
 import { NotFoundError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
 
 export const workspaceService = {
+  async listWorkspaceUsers(workspaceId: string) {
+    return userRepository.listWorkspaceUsers(workspaceId);
+  },
+
   async getWorkspace(workspaceId: string) {
     const workspace = await workspaceRepository.getById(workspaceId);
     if (!workspace) {

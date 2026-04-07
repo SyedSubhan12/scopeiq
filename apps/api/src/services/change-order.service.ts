@@ -1,6 +1,17 @@
 import { changeOrderRepository } from "../repositories/change-order.repository.js";
 import { NotFoundError } from "@novabots/types";
-import { db, writeAuditLog } from "@novabots/db";
+import {
+  db,
+  writeAuditLog,
+  changeOrders,
+  scopeFlags,
+  sowClauses,
+  deliverables,
+  projects,
+  eq,
+  and,
+} from "@novabots/db";
+import type { ChangeOrder, ClauseType } from "@novabots/db";
 
 export const changeOrderService = {
     async list(workspaceId: string, projectId?: string) {
@@ -23,63 +34,230 @@ export const changeOrderService = {
             title: string;
             description?: string | undefined;
             amount?: number | undefined;
-            lineItemsJson?: unknown[] | undefined;
+            lineItemsJson?: Array<{ id?: string | undefined; description: string; hours: number; rate: number }> | undefined;
+            revisedTimeline?: string | undefined;
         },
     ) {
-        const co = await changeOrderRepository.create({
-            workspaceId,
-            projectId: data.projectId,
-            scopeFlagId: data.scopeFlagId ?? null,
-            title: data.title,
-            description: data.description ?? null,
-            amount: data.amount ?? null,
-            lineItemsJson: data.lineItemsJson ?? [],
-            createdBy: userId,
-        });
+        const lineItems = data.lineItemsJson ?? [];
+        const estimatedHours = lineItems.reduce((total, item) => total + item.hours, 0);
 
-        await writeAuditLog(db as never, {
-            workspaceId,
-            actorId: userId,
-            entityType: "change_order",
-            entityId: co.id,
-            action: "create",
-            metadata: { title: co.title, amount: co.amount },
-        });
+        return db.transaction(async (trx) => {
+            const co = await changeOrderRepository.create({
+                workspaceId,
+                projectId: data.projectId,
+                scopeFlagId: data.scopeFlagId ?? null,
+                title: data.title,
+                workDescription: data.description ?? null,
+                pricing: data.amount !== undefined ? { amount: data.amount } : null,
+                estimatedHours: lineItems.length > 0 ? estimatedHours : null,
+                lineItemsJson: lineItems,
+                revisedTimeline: data.revisedTimeline ?? null,
+                createdBy: userId,
+            }, trx as never);
 
-        return co;
+            await writeAuditLog(trx as never, {
+                workspaceId,
+                actorId: userId,
+                entityType: "change_order",
+                entityId: co.id,
+                action: "create",
+                metadata: { title: co.title },
+            });
+
+            return co;
+        });
+    },
+
+    /**
+     * Accepts a change order in a single atomic transaction.
+     * Per spec SF-F06 / CP-F07, this MUST:
+     * 1. Update change_orders.status = "accepted"
+     * 2. Write signedAt and signedByName
+     * 3. Insert/update sow_clauses from change_orders.scopeItemsJson
+     * 4. Adjust deliverables.maxRevisions if revisionLimitAdjustment is provided
+     * 5. Set scope_flags.status = "resolved" if linked to a flag
+     * 6. Write audit_log with all side effects
+     * ALL in ONE db.transaction() — any failure rolls back the entire transaction.
+     */
+    async acceptWithFullTransaction(input: {
+        changeOrderId: string;
+        workspaceId: string;
+        projectId: string;
+        signatureName: string;
+        revisionLimitAdjustment?: {
+            deliverableId: string;
+            newMaxRevisions: number;
+        };
+    }) {
+        const { changeOrderId, workspaceId, projectId, signatureName, revisionLimitAdjustment } = input;
+
+        // Fetch the change order first to get current state
+        const co = await changeOrderRepository.getById(workspaceId, changeOrderId);
+        if (!co) throw new NotFoundError("ChangeOrder", changeOrderId);
+        if (co.projectId !== projectId) throw new NotFoundError("ChangeOrder", changeOrderId);
+        if (co.status !== "sent") {
+            throw new Error("Change order is not in a state that can be accepted");
+        }
+
+        return db.transaction(async (trx) => {
+            // Step 1: Update change order with acceptance data
+            const updated = await changeOrderRepository.update(
+                workspaceId,
+                changeOrderId,
+                {
+                    status: "accepted",
+                    signedAt: new Date(),
+                    signedByName: signatureName,
+                    respondedAt: new Date(),
+                },
+                trx as never,
+            );
+            if (!updated) throw new NotFoundError("ChangeOrder", changeOrderId);
+
+            // Step 2: Fetch the project to get SOW ID
+            const [project] = await trx
+                .select({ id: projects.id, sowId: projects.sowId })
+                .from(projects)
+                .where(
+                    and(
+                        eq(projects.id, projectId),
+                        eq(projects.workspaceId, workspaceId),
+                    ),
+                );
+
+            if (!project) {
+                throw new NotFoundError("Project", projectId);
+            }
+
+            // Step 3: Insert SOW clauses from scopeItemsJson if present
+            const coWithScopeItems = co as ChangeOrder;
+            const scopeItems = coWithScopeItems.scopeItemsJson as Array<{
+                clauseType: ClauseType;
+                originalText: string;
+                summary?: string | null;
+                sortOrder?: number;
+            }> | null | undefined;
+
+            if (scopeItems && scopeItems.length > 0 && project.sowId) {
+                const sowId = project.sowId; // Narrow to string for TypeScript
+                await trx.insert(sowClauses).values(
+                    scopeItems.map((item, index) => ({
+                        sowId,
+                        clauseType: item.clauseType,
+                        originalText: item.originalText,
+                        summary: item.summary ?? null,
+                        sortOrder: item.sortOrder ?? index,
+                    })),
+                );
+            }
+
+            // Step 4: Adjust revision limit if requested
+            if (revisionLimitAdjustment) {
+                await trx
+                    .update(deliverables)
+                    .set({
+                        maxRevisions: revisionLimitAdjustment.newMaxRevisions,
+                        updatedAt: new Date(),
+                    })
+                    .where(
+                        and(
+                            eq(deliverables.id, revisionLimitAdjustment.deliverableId),
+                            eq(deliverables.workspaceId, workspaceId),
+                        ),
+                    );
+            }
+
+            // Step 5: Resolve linked scope flag if present
+            if (co.scopeFlagId) {
+                await trx
+                    .update(scopeFlags)
+                    .set({
+                        status: "resolved",
+                        resolvedAt: new Date(),
+                        updatedAt: new Date(),
+                    })
+                    .where(
+                        and(
+                            eq(scopeFlags.id, co.scopeFlagId),
+                            eq(scopeFlags.workspaceId, workspaceId),
+                        ),
+                    );
+            }
+
+            // Step 6: Write audit log with full metadata
+            await writeAuditLog(trx as never, {
+                workspaceId,
+                actorId: null, // Client acceptance via portal token — no specific user
+                actorType: "client",
+                entityType: "change_order",
+                entityId: changeOrderId,
+                action: "approve",
+                metadata: {
+                    oldStatus: co.status,
+                    newStatus: "accepted",
+                    signedByName: signatureName,
+                    scopeItemsCount: scopeItems?.length ?? 0,
+                    revisionLimitAdjusted: !!revisionLimitAdjustment,
+                    scopeFlagResolved: !!co.scopeFlagId,
+                },
+            });
+
+            return updated;
+        });
     },
 
     async update(
         workspaceId: string,
         id: string,
         userId: string,
-        data: { title?: string | undefined; description?: string | undefined; amount?: number | undefined; status?: string | undefined },
+        data: {
+            title?: string | undefined;
+            description?: string | undefined;
+            amount?: number | undefined;
+            lineItemsJson?: Array<{ id?: string | undefined; description: string; hours: number; rate: number }> | undefined;
+            revisedTimeline?: string | undefined;
+            status?: string | undefined;
+        },
     ) {
         const co = await changeOrderRepository.getById(workspaceId, id);
         if (!co) throw new NotFoundError("ChangeOrder", id);
 
+        const oldStatus = co.status;
         const updateData: Record<string, unknown> = {};
         if (data.title !== undefined) updateData.title = data.title;
-        if (data.description !== undefined) updateData.description = data.description;
-        if (data.amount !== undefined) updateData.amount = data.amount;
+        if (data.description !== undefined) updateData.workDescription = data.description;
+        if (data.amount !== undefined) updateData.pricing = { amount: data.amount };
+        if (data.lineItemsJson !== undefined) {
+            updateData.lineItemsJson = data.lineItemsJson;
+            updateData.estimatedHours = data.lineItemsJson.reduce(
+                (total, item) => total + item.hours,
+                0,
+            );
+        }
+        if (data.revisedTimeline !== undefined) updateData.revisedTimeline = data.revisedTimeline;
         if (data.status !== undefined) {
             updateData.status = data.status;
             if (data.status === "sent") updateData.sentAt = new Date();
             if (data.status === "accepted" || data.status === "declined") updateData.respondedAt = new Date();
         }
 
-        const updated = await changeOrderRepository.update(workspaceId, id, updateData as never);
+        const action = data.status === "sent" ? "send" : "update";
 
-        await writeAuditLog(db as never, {
-            workspaceId,
-            actorId: userId,
-            entityType: "change_order",
-            entityId: id,
-            action: data.status === "sent" ? "send" : "update",
-            metadata: { status: data.status },
+        return db.transaction(async (trx) => {
+            const updated = await changeOrderRepository.update(workspaceId, id, updateData, trx as never);
+            if (!updated) throw new NotFoundError("ChangeOrder", id);
+
+            await writeAuditLog(trx as never, {
+                workspaceId,
+                actorId: userId,
+                entityType: "change_order",
+                entityId: id,
+                action,
+                metadata: { oldStatus, newStatus: data.status ?? oldStatus },
+            });
+
+            return updated;
         });
-
-        return updated;
     },
 
     async countPending(workspaceId: string) {

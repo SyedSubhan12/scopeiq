@@ -5,7 +5,7 @@ import { BarChart2, TrendingUp, ShieldAlert, FileText, FolderKanban, Package } f
 import { Card, Skeleton, Badge } from "@novabots/ui";
 import { PortfolioHealth } from "@/components/analytics/PortfolioHealth";
 import { useAssetsReady } from "@/hooks/useAssetsReady";
-import { getChangeOrdersQueryOptions } from "@/hooks/useChangeOrders";
+import { getChangeOrdersQueryOptions } from "@/hooks/change-orders";
 import { getWorkspaceTimelineQueryOptions } from "@/hooks/useProjectHealth";
 import { getProjectsQueryOptions } from "@/hooks/useProjects";
 import { queryClient } from "@/lib/query-client";
@@ -14,7 +14,7 @@ import { useWorkspaceStore } from "@/stores/workspace.store";
 import { useProjects } from "@/hooks/useProjects";
 import { useScopeFlags } from "@/hooks/useScopeFlags";
 import { useWorkspaceTimeline } from "@/hooks/useProjectHealth";
-import { useChangeOrders } from "@/hooks/useChangeOrders";
+import { useChangeOrders } from "@/hooks/change-orders";
 
 type Range = "7d" | "30d" | "90d" | "all";
 

@@ -59,7 +59,7 @@ messageIngestRouter.post(
 
     let scopeCheckDispatched = false;
     try {
-      await dispatchCheckScopeJob(messageRecord.id, projectId, workspaceId);
+      await dispatchCheckScopeJob(messageRecord.id, projectId, workspaceId, message, userId);
       scopeCheckDispatched = true;
     } catch (err) {
       console.error("[MessageIngest] Failed to dispatch scope check job:", err);

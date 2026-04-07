@@ -2,8 +2,9 @@ import { db, deliverableRevisions, eq, and, desc } from "@novabots/db";
 import type { NewDeliverableRevision } from "@novabots/db";
 
 export const deliverableRevisionRepository = {
-    async create(data: NewDeliverableRevision) {
-        const [revision] = await db
+    async create(data: NewDeliverableRevision, trx?: unknown) {
+        const driver = trx ?? db;
+        const [revision] = await (driver as typeof db)
             .insert(deliverableRevisions)
             .values(data)
             .returning();

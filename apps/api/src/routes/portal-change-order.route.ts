@@ -30,6 +30,12 @@ portalChangeOrderRouter.get("/:id", async (c) => {
 
 const acceptSchema = z.object({
   signatureName: z.string().min(1).max(200),
+  revisionLimitAdjustment: z
+    .object({
+      deliverableId: z.string().uuid(),
+      newMaxRevisions: z.number().int().min(1).max(100),
+    })
+    .optional(),
 });
 
 portalChangeOrderRouter.post(
@@ -39,7 +45,7 @@ portalChangeOrderRouter.post(
     const workspaceId = c.get("portalWorkspaceId");
     const projectId = c.get("portalProjectId");
     const id = c.req.param("id");
-    const { signatureName } = c.req.valid("json");
+    const { signatureName, revisionLimitAdjustment } = c.req.valid("json");
 
     const co = await changeOrderService.getById(workspaceId, id);
     if (co.projectId !== projectId) throw new NotFoundError("ChangeOrder", id);
@@ -47,9 +53,18 @@ portalChangeOrderRouter.post(
       return c.json({ error: "Change order is not in a state that can be accepted" }, 400);
     }
 
-    const updated = await changeOrderService.update(workspaceId, id, co.createdBy ?? "portal", {
-      status: "accepted",
-    });
+    const acceptInput: Parameters<typeof changeOrderService.acceptWithFullTransaction>[0] = {
+      changeOrderId: id,
+      workspaceId,
+      projectId,
+      signatureName,
+    };
+
+    if (revisionLimitAdjustment !== undefined) {
+      acceptInput.revisionLimitAdjustment = revisionLimitAdjustment;
+    }
+
+    const updated = await changeOrderService.acceptWithFullTransaction(acceptInput);
 
     return c.json({ data: updated });
   },

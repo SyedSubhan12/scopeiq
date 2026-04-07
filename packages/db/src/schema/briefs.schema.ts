@@ -3,6 +3,8 @@ import { briefStatusEnum } from './enums';
 import { workspaces } from './workspaces.schema';
 import { projects } from './projects.schema';
 import { briefTemplates } from './brief-templates.schema';
+import { briefTemplateVersions } from './brief-template-versions.schema';
+import { users } from './users.schema';
 
 export const briefs = pgTable(
   "briefs",
@@ -10,7 +12,10 @@ export const briefs = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id),
     projectId: uuid("project_id").notNull().references(() => projects.id),
+    version: integer("version").notNull().default(1),
     templateId: uuid("template_id").references(() => briefTemplates.id),
+    templateVersionId: uuid("template_version_id").references(() => briefTemplateVersions.id),
+    reviewerId: uuid("reviewer_id").references(() => users.id),
     title: varchar("title", { length: 255 }).notNull(),
     status: briefStatusEnum("status").notNull().default("pending_score"),
     scopeScore: integer("scope_score"),
@@ -25,6 +30,7 @@ export const briefs = pgTable(
   (table) => ({
     projectIdx: index("idx_briefs_project").on(table.projectId),
     workspaceStatusIdx: index("idx_briefs_workspace_status").on(table.workspaceId, table.status),
+    projectVersionIdx: index("idx_briefs_project_version").on(table.projectId, table.version),
   }),
 );
 

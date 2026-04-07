@@ -54,6 +54,7 @@ function fireConfetti() {
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+  const context = ctx;
 
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -87,7 +88,7 @@ function fireConfetti() {
       y: canvas.height / 2,
       vx: (Math.random() - 0.5) * 16,
       vy: Math.random() * -18 - 4,
-      color: colors[Math.floor(Math.random() * colors.length)],
+      color: colors[Math.floor(Math.random() * colors.length)] ?? "#0F6E56",
       size: Math.random() * 8 + 4,
       rotation: Math.random() * 360,
       rotationSpeed: (Math.random() - 0.5) * 12,
@@ -104,7 +105,7 @@ function fireConfetti() {
       return;
     }
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    context.clearRect(0, 0, canvas.width, canvas.height);
 
     for (const p of particles) {
       p.x += p.vx;
@@ -114,13 +115,13 @@ function fireConfetti() {
       p.rotation += p.rotationSpeed;
       p.opacity = Math.max(0, 1 - frame / maxFrames);
 
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate((p.rotation * Math.PI) / 180);
-      ctx.globalAlpha = p.opacity;
-      ctx.fillStyle = p.color;
-      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-      ctx.restore();
+      context.save();
+      context.translate(p.x, p.y);
+      context.rotate((p.rotation * Math.PI) / 180);
+      context.globalAlpha = p.opacity;
+      context.fillStyle = p.color;
+      context.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+      context.restore();
     }
 
     frame++;

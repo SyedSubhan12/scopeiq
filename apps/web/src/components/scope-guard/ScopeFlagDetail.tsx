@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Card, Badge, Button, Dialog, Textarea, useToast } from "@novabots/ui";
 import { useUpdateScopeFlag } from "@/hooks/useScopeFlags";
-import { useCreateChangeOrder } from "@/hooks/useChangeOrders";
+import { useCreateChangeOrder } from "@/hooks/change-orders";
 import { cn } from "@novabots/ui";
 import { formatDistanceToNow, format } from "date-fns";
 

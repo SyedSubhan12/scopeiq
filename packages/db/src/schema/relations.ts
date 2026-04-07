@@ -11,8 +11,13 @@ import { users } from './users.schema';
 import { clients } from './clients.schema';
 import { projects } from './projects.schema';
 import { briefTemplates } from './brief-templates.schema';
+import { briefTemplateVersions } from './brief-template-versions.schema';
 import { briefs } from './briefs.schema';
 import { briefFields } from './brief-fields.schema';
+import { briefAttachments } from './brief-attachments.schema';
+import { briefVersions } from './brief-versions.schema';
+import { briefClarificationRequests } from './brief-clarification-requests.schema';
+import { briefClarificationItems } from './brief-clarification-items.schema';
 import { deliverables } from './deliverables.schema';
 import { feedbackItems } from './feedback-items.schema';
 import { approvalEvents } from './approval-events.schema';
@@ -78,6 +83,22 @@ export const briefTemplatesRelations = relations(briefTemplates, ({ one, many })
     references: [workspaces.id],
   }),
   briefs: many(briefs),
+  versions: many(briefTemplateVersions),
+}));
+
+export const briefTemplateVersionsRelations = relations(briefTemplateVersions, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [briefTemplateVersions.workspaceId],
+    references: [workspaces.id],
+  }),
+  template: one(briefTemplates, {
+    fields: [briefTemplateVersions.templateId],
+    references: [briefTemplates.id],
+  }),
+  publisher: one(users, {
+    fields: [briefTemplateVersions.publishedBy],
+    references: [users.id],
+  }),
 }));
 
 export const briefsRelations = relations(briefs, ({ one, many }) => ({
@@ -93,13 +114,77 @@ export const briefsRelations = relations(briefs, ({ one, many }) => ({
     fields: [briefs.templateId],
     references: [briefTemplates.id],
   }),
+  templateVersion: one(briefTemplateVersions, {
+    fields: [briefs.templateVersionId],
+    references: [briefTemplateVersions.id],
+  }),
+  reviewer: one(users, {
+    fields: [briefs.reviewerId],
+    references: [users.id],
+  }),
   fields: many(briefFields),
+  attachments: many(briefAttachments),
+  versions: many(briefVersions),
+  clarificationRequests: many(briefClarificationRequests),
 }));
 
 export const briefFieldsRelations = relations(briefFields, ({ one }) => ({
   brief: one(briefs, {
     fields: [briefFields.briefId],
     references: [briefs.id],
+  }),
+}));
+
+export const briefAttachmentsRelations = relations(briefAttachments, ({ one }) => ({
+  brief: one(briefs, {
+    fields: [briefAttachments.briefId],
+    references: [briefs.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [briefAttachments.workspaceId],
+    references: [workspaces.id],
+  }),
+}));
+
+export const briefVersionsRelations = relations(briefVersions, ({ one }) => ({
+  brief: one(briefs, {
+    fields: [briefVersions.briefId],
+    references: [briefs.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [briefVersions.workspaceId],
+    references: [workspaces.id],
+  }),
+  reviewer: one(users, {
+    fields: [briefVersions.reviewerId],
+    references: [users.id],
+  }),
+}));
+
+export const briefClarificationRequestsRelations = relations(briefClarificationRequests, ({ one, many }) => ({
+  brief: one(briefs, {
+    fields: [briefClarificationRequests.briefId],
+    references: [briefs.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [briefClarificationRequests.workspaceId],
+    references: [workspaces.id],
+  }),
+  version: one(briefVersions, {
+    fields: [briefClarificationRequests.briefVersionId],
+    references: [briefVersions.id],
+  }),
+  requester: one(users, {
+    fields: [briefClarificationRequests.requestedBy],
+    references: [users.id],
+  }),
+  items: many(briefClarificationItems),
+}));
+
+export const briefClarificationItemsRelations = relations(briefClarificationItems, ({ one }) => ({
+  request: one(briefClarificationRequests, {
+    fields: [briefClarificationItems.requestId],
+    references: [briefClarificationRequests.id],
   }),
 }));
 

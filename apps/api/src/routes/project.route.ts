@@ -5,6 +5,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { projectService } from "../services/project.service.js";
 import { createProjectSchema, updateProjectSchema, listProjectsQuerySchema } from "./project.schemas.js";
 import { dispatchScopeCheckJob } from "../jobs/scope-check.job.js";
+import { createDeliverableSchema, deliverableResponseSchema } from "./deliverable.schemas.js";
 
 export const projectRouter = new Hono();
 
@@ -70,14 +71,18 @@ projectRouter.get("/:id/deliverables", async (c) => {
   return c.json(result);
 });
 
-projectRouter.post("/:id/deliverables", async (c) => {
-  const workspaceId = c.get("workspaceId");
-  const userId = c.get("userId");
-  const projectId = c.req.param("id");
-  const body = await c.req.json();
-  const deliverable = await projectService.createProjectDeliverable(workspaceId, projectId, userId, body);
-  return c.json({ data: deliverable }, 201);
-});
+projectRouter.post(
+  "/:id/deliverables",
+  zValidator("json", createDeliverableSchema.omit({ projectId: true })),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const projectId = c.req.param("id");
+    const body = c.req.valid("json");
+    const deliverable = await projectService.createProjectDeliverable(workspaceId, projectId, userId, body);
+    return c.json(deliverableResponseSchema.parse({ data: deliverable }), 201);
+  },
+);
 
 projectRouter.delete("/:id", async (c) => {
   const workspaceId = c.get("workspaceId");

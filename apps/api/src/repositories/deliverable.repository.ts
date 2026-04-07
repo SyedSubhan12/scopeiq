@@ -31,7 +31,6 @@ export const deliverableRepository = {
       );
     }
     if (options.cursor) {
-      // cursor is an ISO timestamp string from the last item's createdAt
       conditions.push(lt(deliverables.createdAt, new Date(options.cursor)));
     }
 
@@ -48,7 +47,6 @@ export const deliverableRepository = {
     return {
       data,
       pagination: {
-        // Return ISO timestamp as cursor so next page fetches older items
         next_cursor: hasMore ? data[data.length - 1]!.createdAt.toISOString() : null,
         has_more: hasMore,
       },
@@ -85,8 +83,9 @@ export const deliverableRepository = {
     return deliverable ?? null;
   },
 
-  async create(data: NewDeliverable) {
-    const [deliverable] = await db.insert(deliverables).values(data).returning();
+  async create(data: NewDeliverable, trx?: unknown) {
+    const driver = trx ?? db;
+    const [deliverable] = await (driver as typeof db).insert(deliverables).values(data).returning();
     return deliverable!;
   },
 
@@ -94,8 +93,10 @@ export const deliverableRepository = {
     workspaceId: string,
     deliverableId: string,
     data: Partial<NewDeliverable>,
+    trx?: unknown,
   ) {
-    const [updated] = await db
+    const driver = trx ?? db;
+    const [updated] = await (driver as typeof db)
       .update(deliverables)
       .set({ ...data, updatedAt: new Date() })
       .where(
@@ -109,8 +110,9 @@ export const deliverableRepository = {
     return updated ?? null;
   },
 
-  async softDelete(workspaceId: string, deliverableId: string) {
-    const [deleted] = await db
+  async softDelete(workspaceId: string, deliverableId: string, trx?: unknown) {
+    const driver = trx ?? db;
+    const [deleted] = await (driver as typeof db)
       .update(deliverables)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(
@@ -124,7 +126,6 @@ export const deliverableRepository = {
     return deleted ?? null;
   },
 
-  /** Find all in_review deliverables whose review started before a given date (for reminder dispatch). */
   async findInReviewSince(since: Date) {
     return db
       .select()

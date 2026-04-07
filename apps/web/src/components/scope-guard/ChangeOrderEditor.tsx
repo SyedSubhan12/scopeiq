@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FileText, DollarSign, Clock, Send, Eye, Calculator, X } from "lucide-react";
 import { Card, Badge, Button, Input, Textarea, Dialog, useToast } from "@novabots/ui";
-import { useCreateChangeOrder, useUpdateChangeOrder } from "@/hooks/useChangeOrders";
+import { useCreateChangeOrder, useUpdateChangeOrder, type ChangeOrderLineItem } from "@/hooks/change-orders";
 import { cn } from "@novabots/ui";
 
 interface ChangeOrderEditorProps {
@@ -16,15 +16,25 @@ interface ChangeOrderEditorProps {
     title: string;
     description: string;
     amount: number | null;
-    lineItemsJson?: any[];
+    lineItemsJson?: ChangeOrderLineItem[];
   };
 }
 
-interface LineItem {
+interface LineItem extends ChangeOrderLineItem {
   id: string;
-  description: string;
-  hours: number;
-  rate: number;
+}
+
+function ensureLineItems(items?: ChangeOrderLineItem[]): LineItem[] {
+  if (!items || items.length === 0) {
+    return [{ id: crypto.randomUUID(), description: "", hours: 0, rate: 0 }];
+  }
+
+  return items.map((item) => ({
+    id: item.id ?? crypto.randomUUID(),
+    description: item.description,
+    hours: item.hours,
+    rate: item.rate,
+  }));
 }
 
 export function ChangeOrderEditor({
@@ -41,11 +51,7 @@ export function ChangeOrderEditor({
 
   const [title, setTitle] = useState(existingData?.title ?? "");
   const [description, setDescription] = useState(existingData?.description ?? "");
-  const [lineItems, setLineItems] = useState<LineItem[]>(
-    existingData?.lineItemsJson ?? [
-      { id: crypto.randomUUID(), description: "", hours: 0, rate: 0 },
-    ],
-  );
+  const [lineItems, setLineItems] = useState<LineItem[]>(ensureLineItems(existingData?.lineItemsJson));
   const [revisedTimeline, setRevisedTimeline] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,11 +86,20 @@ export function ChangeOrderEditor({
     setIsSubmitting(true);
     try {
       if (existingId && updateCO) {
-        const patchData: { title: string; description?: string; amount: number; status?: string } = {
+        const patchData: {
+          title: string;
+          description?: string;
+          amount: number;
+          lineItemsJson: LineItem[];
+          revisedTimeline?: string;
+          status?: "sent";
+        } = {
           title: title.trim(),
           amount: totalAmount,
+          lineItemsJson: lineItems,
         };
         if (description.trim()) patchData.description = description.trim();
+        if (revisedTimeline.trim()) patchData.revisedTimeline = revisedTimeline.trim();
         if (sendToClient) patchData.status = "sent";
         await updateCO.mutateAsync(patchData);
         toast("success", sendToClient ? "Change order sent to client" : "Change order saved");
@@ -95,7 +110,8 @@ export function ChangeOrderEditor({
           title: string;
           description?: string;
           amount: number;
-          lineItemsJson?: any[];
+          lineItemsJson?: LineItem[];
+          revisedTimeline?: string;
         } = {
           projectId,
           title: title.trim(),
@@ -103,6 +119,7 @@ export function ChangeOrderEditor({
         };
         if (scopeFlagId) createData.scopeFlagId = scopeFlagId;
         if (description.trim()) createData.description = description.trim();
+        if (revisedTimeline.trim()) createData.revisedTimeline = revisedTimeline.trim();
         createData.lineItemsJson = lineItems;
         await createCO.mutateAsync(createData);
         toast("success", sendToClient ? "Change order created and sent" : "Change order created");
@@ -118,11 +135,7 @@ export function ChangeOrderEditor({
   const resetForm = () => {
     setTitle(existingData?.title ?? "");
     setDescription(existingData?.description ?? "");
-    setLineItems(
-      existingData?.lineItemsJson ?? [
-        { id: crypto.randomUUID(), description: "", hours: 0, rate: 0 },
-      ],
-    );
+    setLineItems(ensureLineItems(existingData?.lineItemsJson));
     setRevisedTimeline("");
     setShowPreview(false);
   };

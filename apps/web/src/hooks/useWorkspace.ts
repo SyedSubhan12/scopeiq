@@ -1,15 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
+export interface WorkspaceRecord {
+  id: string;
+  name: string;
+  plan: "solo" | "studio" | "agency";
+  brandColor?: string | null;
+  secondaryColor?: string | null;
+  logoUrl?: string | null;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+}
+
 export function getWorkspaceQueryOptions() {
   return {
     queryKey: ["workspace"],
-    queryFn: () => fetchWithAuth("/v1/workspaces/me") as Promise<{ data: any }>,
+    queryFn: () => fetchWithAuth("/v1/workspaces/me") as Promise<{ data: WorkspaceRecord }>,
   };
 }
 
 export function useWorkspace() {
-  return useQuery<{ data: any }>(getWorkspaceQueryOptions());
+  return useQuery<{ data: WorkspaceRecord }>(getWorkspaceQueryOptions());
 }
 
 export function useUpdateWorkspace() {

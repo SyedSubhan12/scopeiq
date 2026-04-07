@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { AlertCircle, Plus, RefreshCcw } from "lucide-react";
 import { Button, Skeleton } from "@novabots/ui";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useAuth } from "@/providers/auth-provider";
 import { MetricCardGrid } from "./MetricCardGrid";
 import { RecentActivity } from "./RecentActivity";
 import { ScopeFlagsSummary } from "./ScopeFlagsSummary";
@@ -36,18 +37,51 @@ function DashboardSkeleton() {
 }
 
 export function DashboardOverview() {
-  const { data, isLoading, error } = useDashboard();
+  const { session, loading: authLoading } = useAuth();
+  const { data, isLoading, error, refetch, isFetching } = useDashboard(
+    !authLoading && !!session,
+  );
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return <DashboardSkeleton />;
   }
 
-  if (error) {
+  if (!session) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <p className="text-sm text-[rgb(var(--text-muted))]">
-          Failed to load dashboard data. Please try again.
+          Your session is still loading. Refresh this page if the dashboard does not appear.
         </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load dashboard data.";
+
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="max-w-xl rounded-[28px] border border-[rgb(var(--border-subtle))] bg-white px-8 py-10 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-[rgb(var(--text-primary))]">
+            Dashboard data could not load
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[rgb(var(--text-muted))]">
+            {message}
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button onClick={() => void refetch()} disabled={isFetching}>
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              {isFetching ? "Retrying..." : "Retry"}
+            </Button>
+            <Link href="/projects/new">
+              <Button variant="secondary">Create project</Button>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

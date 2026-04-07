@@ -23,17 +23,20 @@ export const changeOrderRepository = {
         return co ?? null;
     },
 
-    async create(data: NewChangeOrder) {
-        const [co] = await db.insert(changeOrders).values(data).returning();
+    async create(data: NewChangeOrder, trx?: unknown) {
+        const driver = trx ?? db;
+        const [co] = await (driver as typeof db).insert(changeOrders).values(data).returning();
         return co!;
     },
 
     async update(
         workspaceId: string,
         id: string,
-        data: Partial<Pick<NewChangeOrder, "title" | "description" | "amount" | "status" | "sentAt" | "respondedAt">>,
+        data: Record<string, unknown>,
+        trx?: unknown,
     ) {
-        const [updated] = await db
+        const driver = trx ?? db;
+        const [updated] = await (driver as typeof db)
             .update(changeOrders)
             .set({ ...data, updatedAt: new Date() })
             .where(and(eq(changeOrders.id, id), eq(changeOrders.workspaceId, workspaceId)))

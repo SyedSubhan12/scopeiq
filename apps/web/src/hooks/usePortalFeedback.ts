@@ -45,9 +45,9 @@ export function useResolvePortalFeedback(deliverableId: string, portalToken: str
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (feedbackId: string) =>
-            portalFetch(`/portal/feedback/${feedbackId}`, portalToken, {
+            portalFetch(`/portal/deliverables/${deliverableId}/feedback/${feedbackId}/resolve`, portalToken, {
                 method: "PATCH",
-                body: JSON.stringify({ resolvedAt: new Date().toISOString() }),
+                body: JSON.stringify({ resolved: true }),
             }),
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: ["portal-feedback", deliverableId] });

@@ -1,8 +1,13 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { changeOrderService } from "../services/change-order.service.js";
+import {
+    createChangeOrderSchema,
+    updateChangeOrderSchema,
+    changeOrderResponseSchema,
+    serializeChangeOrder,
+} from "./change-order.schemas.js";
 
 export const changeOrderRouter = new Hono();
 
@@ -12,7 +17,7 @@ changeOrderRouter.get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
     const projectId = c.req.query("projectId");
     const result = await changeOrderService.list(workspaceId, projectId ?? undefined);
-    return c.json(result);
+    return c.json({ data: result.data.map((co) => serializeChangeOrder(co)) });
 });
 
 changeOrderRouter.get("/count", async (c) => {
@@ -25,16 +30,7 @@ changeOrderRouter.get("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const co = await changeOrderService.getById(workspaceId, id);
-    return c.json({ data: co });
-});
-
-const createChangeOrderSchema = z.object({
-    projectId: z.string().uuid(),
-    scopeFlagId: z.string().uuid().optional(),
-    title: z.string().min(1),
-    description: z.string().optional(),
-    amount: z.number().int().optional(),
-    lineItemsJson: z.array(z.any()).optional(),
+    return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }));
 });
 
 changeOrderRouter.post(
@@ -45,16 +41,9 @@ changeOrderRouter.post(
         const userId = c.get("userId");
         const body = c.req.valid("json");
         const co = await changeOrderService.create(workspaceId, userId, body);
-        return c.json({ data: co }, 201);
+        return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }), 201);
     },
 );
-
-const updateChangeOrderSchema = z.object({
-    title: z.string().min(1).optional(),
-    description: z.string().optional(),
-    amount: z.number().int().optional(),
-    status: z.enum(["draft", "sent", "accepted", "declined", "expired"]).optional(),
-});
 
 changeOrderRouter.patch(
     "/:id",
@@ -65,6 +54,6 @@ changeOrderRouter.patch(
         const id = c.req.param("id");
         const body = c.req.valid("json");
         const co = await changeOrderService.update(workspaceId, id, userId, body);
-        return c.json({ data: co });
+        return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }));
     },
 );

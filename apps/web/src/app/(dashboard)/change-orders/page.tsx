@@ -7,7 +7,7 @@ import { Card, Badge, Button, Skeleton, Dialog, Input, Textarea, useToast } from
 import { fetchWithAuth } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { useAssetsReady } from "@/hooks/useAssetsReady";
-import { getChangeOrdersQueryOptions, useChangeOrders } from "@/hooks/useChangeOrders";
+import { getChangeOrdersQueryOptions, useChangeOrders } from "@/hooks/change-orders";
 import { queryClient } from "@/lib/query-client";
 
 const STATUS_FILTERS = ["all", "pending", "sent", "accepted", "declined"];

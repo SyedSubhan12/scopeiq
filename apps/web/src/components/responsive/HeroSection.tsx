@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@novabots/ui";
-import { Container, Section } from "@/components/responsive/Container";
+import { Container } from "@/components/responsive/Container";
 
 export interface HeroProps {
   title: string;
@@ -51,13 +51,16 @@ export function HeroSection({
 }: HeroProps) {
   const reduceMotion = useReducedMotion();
 
-  const fadeInUp = reduceMotion
-    ? undefined
-    : { opacity: 1, y: 0 };
-
-  const fadeFromBelow = reduceMotion
-    ? undefined
-    : { opacity: 0, y: 20 };
+  const getRevealProps = (delay = 0, duration = 0.4) =>
+    reduceMotion
+      ? {
+          transition: { duration, delay },
+        }
+      : {
+          initial: { opacity: 0, y: 20 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration, delay },
+        };
 
   const sizePadding = {
     sm: "py-12 sm:py-16 lg:py-20",
@@ -80,9 +83,7 @@ export function HeroSection({
             {/* Badge */}
             {badge && (
               <motion.div
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4 }}
+                {...getRevealProps()}
                 className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgb(var(--border-subtle))] bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[rgb(var(--primary-dark))] backdrop-blur sm:text-sm"
               >
                 {badge.icon}
@@ -92,9 +93,7 @@ export function HeroSection({
 
             {/* Title */}
             <motion.h1
-              initial={fadeFromBelow}
-              {...(fadeInUp ? { animate: fadeInUp } : {})}
-              transition={{ duration: 0.4, delay: 0.1 }}
+              {...getRevealProps(0.1)}
               className="mb-4 font-serif text-4xl leading-tight tracking-tight text-[rgb(var(--text-primary))] sm:text-5xl lg:text-6xl xl:text-7xl"
             >
               {title}
@@ -103,9 +102,7 @@ export function HeroSection({
             {/* Subtitle */}
             {subtitle && (
               <motion.p
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4, delay: 0.15 }}
+                {...getRevealProps(0.15)}
                 className="mb-4 text-xl font-medium text-[rgb(var(--primary-dark))] sm:text-2xl"
               >
                 {subtitle}
@@ -115,9 +112,7 @@ export function HeroSection({
             {/* Description */}
             {description && (
               <motion.p
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4, delay: 0.2 }}
+                {...getRevealProps(0.2)}
                 className="mx-auto mb-8 max-w-2xl text-base leading-relaxed text-[rgb(var(--text-secondary))] sm:text-lg lg:text-xl"
               >
                 {description}
@@ -127,9 +122,7 @@ export function HeroSection({
             {/* Actions */}
             {actions && (
               <motion.div
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4, delay: 0.3 }}
+                {...getRevealProps(0.3)}
                 className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4"
               >
                 {actions}
@@ -139,9 +132,7 @@ export function HeroSection({
             {/* Media */}
             {media && (
               <motion.div
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.5, delay: 0.4 }}
+                {...getRevealProps(0.4, 0.5)}
                 className="mt-12 lg:mt-16"
               >
                 {media}
@@ -155,9 +146,7 @@ export function HeroSection({
           <div className="mx-auto max-w-3xl text-left">
             {badge && (
               <motion.div
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4 }}
+                {...getRevealProps()}
                 className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgb(var(--border-subtle))] bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[rgb(var(--primary-dark))] backdrop-blur sm:text-sm"
               >
                 {badge.icon}
@@ -166,9 +155,7 @@ export function HeroSection({
             )}
 
             <motion.h1
-              initial={fadeFromBelow}
-              {...(fadeInUp ? { animate: fadeInUp } : {})}
-              transition={{ duration: 0.4, delay: 0.1 }}
+              {...getRevealProps(0.1)}
               className="mb-4 font-serif text-4xl leading-tight tracking-tight text-[rgb(var(--text-primary))] sm:text-5xl lg:text-6xl"
             >
               {title}
@@ -176,9 +163,7 @@ export function HeroSection({
 
             {subtitle && (
               <motion.p
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4, delay: 0.15 }}
+                {...getRevealProps(0.15)}
                 className="mb-4 text-xl font-medium text-[rgb(var(--primary-dark))] sm:text-2xl"
               >
                 {subtitle}
@@ -187,9 +172,7 @@ export function HeroSection({
 
             {description && (
               <motion.p
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4, delay: 0.2 }}
+                {...getRevealProps(0.2)}
                 className="mb-8 max-w-xl text-base leading-relaxed text-[rgb(var(--text-secondary))] sm:text-lg"
               >
                 {description}
@@ -198,9 +181,7 @@ export function HeroSection({
 
             {actions && (
               <motion.div
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4, delay: 0.3 }}
+                {...getRevealProps(0.3)}
                 className="flex flex-col gap-3 sm:flex-row sm:gap-4"
               >
                 {actions}
@@ -209,9 +190,7 @@ export function HeroSection({
 
             {media && (
               <motion.div
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.5, delay: 0.4 }}
+                {...getRevealProps(0.4, 0.5)}
                 className="mt-12"
               >
                 {media}
@@ -227,9 +206,7 @@ export function HeroSection({
             <div className="flex flex-col justify-center">
               {badge && (
                 <motion.div
-                  initial={fadeFromBelow}
-                  {...(fadeInUp ? { animate: fadeInUp } : {})}
-                  transition={{ duration: 0.4 }}
+                  {...getRevealProps()}
                   className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgb(var(--border-subtle))] bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[rgb(var(--primary-dark))] backdrop-blur sm:text-sm"
                 >
                   {badge.icon}
@@ -238,9 +215,7 @@ export function HeroSection({
               )}
 
               <motion.h1
-                initial={fadeFromBelow}
-                {...(fadeInUp ? { animate: fadeInUp } : {})}
-                transition={{ duration: 0.4, delay: 0.1 }}
+                {...getRevealProps(0.1)}
                 className="mb-4 font-serif text-4xl leading-tight tracking-tight text-[rgb(var(--text-primary))] sm:text-5xl lg:text-5xl xl:text-6xl"
               >
                 {title}
@@ -248,9 +223,7 @@ export function HeroSection({
 
               {subtitle && (
                 <motion.p
-                  initial={fadeFromBelow}
-                  {...(fadeInUp ? { animate: fadeInUp } : {})}
-                  transition={{ duration: 0.4, delay: 0.15 }}
+                  {...getRevealProps(0.15)}
                   className="mb-4 text-xl font-medium text-[rgb(var(--primary-dark))] sm:text-2xl"
                 >
                   {subtitle}
@@ -259,9 +232,7 @@ export function HeroSection({
 
               {description && (
                 <motion.p
-                  initial={fadeFromBelow}
-                  {...(fadeInUp ? { animate: fadeInUp } : {})}
-                  transition={{ duration: 0.4, delay: 0.2 }}
+                  {...getRevealProps(0.2)}
                   className="mb-8 text-base leading-relaxed text-[rgb(var(--text-secondary))] sm:text-lg"
                 >
                   {description}
@@ -270,9 +241,7 @@ export function HeroSection({
 
               {actions && (
                 <motion.div
-                  initial={fadeFromBelow}
-                  {...(fadeInUp ? { animate: fadeInUp } : {})}
-                  transition={{ duration: 0.4, delay: 0.3 }}
+                  {...getRevealProps(0.3)}
                   className="flex flex-col gap-3 sm:flex-row sm:gap-4"
                 >
                   {actions}
@@ -282,9 +251,7 @@ export function HeroSection({
 
             {/* Media */}
             <motion.div
-              initial={fadeFromBelow}
-              {...(fadeInUp ? { animate: fadeInUp } : {})}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              {...getRevealProps(0.3, 0.5)}
               className="flex items-center justify-center"
             >
               {media}
