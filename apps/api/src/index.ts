@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { cors } from "hono/cors";
 import { logger } from "./middleware/logger.js";
 import { errorHandler } from "./middleware/error.js";
+import { corsConfig } from "./lib/cors.js";
 import { healthRouter } from "./routes/health.route.js";
 import { authRouter } from "./routes/auth.route.js";
 import { workspaceRouter } from "./routes/workspace.route.js";
@@ -44,7 +44,7 @@ const app = new Hono();
 
 // Middleware
 app.use("*", logger());
-app.use("*", cors({ origin: "*" })); // Configure for production later
+app.use("*", corsConfig);
 app.onError(errorHandler);
 
 // Routes

@@ -10,6 +10,8 @@ const envSchema = z.object({
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
     RESEND_API_KEY: z.string().optional(),
     APP_URL: z.string().url().optional(),
+    WEB_URL: z.string().url().optional(),
+    ALLOWED_ORIGINS: z.string().optional(), // Comma-separated list of allowed origins for CORS
 });
 
 export const env = envSchema.parse(process.env);
