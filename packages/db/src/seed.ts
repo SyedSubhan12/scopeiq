@@ -5,6 +5,10 @@ import { clients } from "./schema/clients.schema.js";
 import { projects } from "./schema/projects.schema.js";
 import { generatePortalToken } from "./helpers.js";
 
+function getPortalTokenRaw(): string {
+  return generatePortalToken().raw;
+}
+
 async function seed() {
   console.log("Seeding database...");
 
@@ -84,7 +88,7 @@ async function seed() {
       description: "Complete brand identity redesign for Acme Corp",
       status: "active" as const,
       budget: 25000,
-      portalToken: generatePortalToken(),
+      portalToken: getPortalTokenRaw(),
     },
     {
       workspaceId: workspace.id,
@@ -93,7 +97,7 @@ async function seed() {
       description: "Product launch marketing campaign",
       status: "draft" as const,
       budget: 15000,
-      portalToken: generatePortalToken(),
+      portalToken: getPortalTokenRaw(),
     },
   ];
 

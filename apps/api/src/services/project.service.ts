@@ -5,6 +5,19 @@ import { stripUndefined } from "../lib/strip-undefined.js";
 import { briefService } from "./brief.service.js";
 import { deliverableService } from "./deliverable.service.js";
 
+function getProjectPortalToken(): string {
+  const generated = generatePortalToken();
+  if (typeof generated === "string") {
+    return generated;
+  }
+
+  if (generated && typeof generated === "object" && typeof generated.raw === "string") {
+    return generated.raw;
+  }
+
+  throw new Error("generatePortalToken returned an invalid value");
+}
+
 export const projectService = {
   async listProjects(
     workspaceId: string,
@@ -44,7 +57,7 @@ export const projectService = {
       budget: budget ?? null,
       startDate: startDate ?? null,
       endDate: endDate ?? null,
-      portalToken: generatePortalToken(),
+      portalToken: getProjectPortalToken(),
     });
 
     await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {

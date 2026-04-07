@@ -85,15 +85,16 @@ export default function RemindersSettingsPage() {
   const initialAutoApprove = saved?.autoApproveOnSilence ?? true;
 
   const [steps, setSteps] = useState<[number, number, number]>([
-    initialSteps[0],
-    initialSteps[1],
-    initialSteps[2],
+    initialSteps[0] ?? 48,
+    initialSteps[1] ?? 96,
+    initialSteps[2] ?? 168,
   ]);
   const [autoApprove, setAutoApprove] = useState(initialAutoApprove);
   const [saving, setSaving] = useState(false);
 
   const updateStep = (index: number, value: number) => {
     const stepConfig = REMINDER_STEPS[index];
+    if (!stepConfig) return;
     const clamped = Math.min(
       stepConfig.maxHours,
       Math.max(stepConfig.minHours, value),
@@ -177,7 +178,7 @@ export default function RemindersSettingsPage() {
                         hours
                       </span>
                       <span className="ml-2 rounded-md bg-[rgb(var(--surface-subtle))] px-2 py-1 text-xs text-[rgb(var(--text-secondary))]">
-                        = {formatDuration(steps[i])}
+                        = {formatDuration(steps[i] ?? step.defaultHours)}
                       </span>
                     </div>
                   </div>

@@ -10,7 +10,10 @@ import {
   updateDeliverableSchema,
   uploadUrlSchema,
   confirmUploadSchema,
+  deliverableResponseSchema,
+  deliverableDeleteResponseSchema,
 } from "./deliverable.schemas.js";
+import { submitFeedbackSchema, feedbackResponseSchema } from "./feedback.schemas.js";
 
 export const deliverableRouter = new Hono();
 
@@ -49,7 +52,7 @@ deliverableRouter.post(
     const userId = c.get("userId");
     const body = c.req.valid("json");
     const deliverable = await deliverableService.create(workspaceId, userId, body);
-    return c.json({ data: deliverable }, 201);
+    return c.json(deliverableResponseSchema.parse({ data: deliverable }), 201);
   },
 );
 
@@ -62,7 +65,7 @@ deliverableRouter.patch(
     const id = c.req.param("id");
     const body = c.req.valid("json");
     const deliverable = await deliverableService.update(workspaceId, id, userId, body);
-    return c.json({ data: deliverable });
+    return c.json(deliverableResponseSchema.parse({ data: deliverable }));
   },
 );
 
@@ -71,7 +74,7 @@ deliverableRouter.delete("/:id", async (c) => {
   const userId = c.get("userId");
   const id = c.req.param("id");
   await deliverableService.delete(workspaceId, id, userId);
-  return c.json({ message: "Deliverable deleted" });
+  return c.json(deliverableDeleteResponseSchema.parse({ message: "Deliverable deleted" }));
 });
 
 deliverableRouter.post(
@@ -112,26 +115,34 @@ deliverableRouter.post(
         ...(body.notes !== undefined && { notes: body.notes }),
       },
     );
-    return c.json({ data: deliverable });
+    return c.json(deliverableResponseSchema.parse({ data: deliverable }));
   },
 );
 
 deliverableRouter.get("/:id/feedback", async (c) => {
+  const workspaceId = c.get("workspaceId");
   const deliverableId = c.req.param("id");
-  const items = await feedbackService.listByDeliverable(deliverableId);
+  const items = await feedbackService.listByDeliverable(workspaceId, deliverableId);
   return c.json({ data: items });
 });
 
-deliverableRouter.post("/:id/feedback", async (c) => {
-  const userId = c.get("userId");
-  const deliverableId = c.req.param("id");
-  const body = await c.req.json();
-  const item = await feedbackService.submit({
-    deliverableId,
-    body: body.body,
-    annotationJson: body.annotationJson,
-    authorId: userId,
-    source: "manual_input",
-  });
-  return c.json({ data: item }, 201);
-});
+deliverableRouter.post(
+  "/:id/feedback",
+  zValidator("json", submitFeedbackSchema.omit({ deliverableId: true })),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const deliverableId = c.req.param("id");
+    const body = c.req.valid("json");
+    const item = await feedbackService.submit({
+      workspaceId,
+      deliverableId,
+      body: body.body,
+      annotationJson: body.annotationJson,
+      authorId: userId,
+      source: "manual_input",
+      pageNumber: body.pageNumber,
+    });
+    return c.json(feedbackResponseSchema.parse({ data: item }), 201);
+  },
+);

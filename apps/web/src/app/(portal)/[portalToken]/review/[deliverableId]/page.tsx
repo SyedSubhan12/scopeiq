@@ -7,8 +7,10 @@ import { PortalHeader } from "@/components/portal/PortalHeader";
 import { DeliverableViewer } from "@/components/approval/DeliverableViewer";
 import { FeedbackPanel } from "@/components/approval/FeedbackPanel";
 import { RevisionCounter } from "@/components/approval/RevisionCounter";
+import { RevisionLimitModal } from "@/components/approval/RevisionLimitModal";
 import { RevisionHistory } from "@/components/approval/RevisionHistory";
 import { PoweredByBadge } from "@/components/portal/PoweredByBadge";
+import { useRevisionLimitModal } from "@/stores/revision-limit-modal.store";
 import {
   usePortalFeedback,
   useCreatePortalFeedback,
@@ -38,6 +40,7 @@ const statusMap: Record<string, { label: string; status: "active" | "pending" | 
 function DeliverableReviewContent({ deliverableId }: { deliverableId: string }) {
   const session = usePortalSession();
   const { toast } = useToast();
+  const openLimitModal = useRevisionLimitModal((s) => s.openModal);
   const [showFeedback, setShowFeedback] = useState(false);
   const [placingPin, setPlacingPin] = useState(false);
   const [activePinId, setActivePinId] = useState<string | null>(null);
@@ -119,6 +122,17 @@ function DeliverableReviewContent({ deliverableId }: { deliverableId: string }) 
   };
 
   const handleRequestRevision = async () => {
+    const atLimit = deliverable.revisionRound >= deliverable.maxRevisions && deliverable.maxRevisions > 0;
+    if (atLimit) {
+      openLimitModal({
+        deliverableId: deliverable.id,
+        deliverableName: deliverable.name,
+        currentRound: deliverable.revisionRound,
+        maxRevisions: deliverable.maxRevisions,
+        projectId: session.project.id,
+      });
+      return;
+    }
     if (!revisionComment.trim()) return;
     try {
       await requestRevisionMutation.mutateAsync(revisionComment.trim());
@@ -322,6 +336,8 @@ function DeliverableReviewContent({ deliverableId }: { deliverableId: string }) 
           <PoweredByBadge plan={workspace.plan} />
         </div>
       </main>
+
+      <RevisionLimitModal />
     </div>
   );
 }

@@ -1,31 +1,18 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import {
-  DndContext,
-  DragOverlay,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragStartEvent,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Trash2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { ArrowDown, ArrowUp, GripVertical, Trash2 } from "lucide-react";
 import { Card, Button } from "@novabots/ui";
 import { FieldLibrary, FIELD_TYPES } from "./FieldLibrary";
 import { FieldEditor } from "./FieldEditor";
 import { FormPreview } from "./FormPreview";
 import type { BriefField } from "@/hooks/useBriefTemplates";
+import {
+  insertField,
+  moveField,
+  removeField,
+  updateField,
+} from "./form-builder.utils";
 
 interface FormBuilderProps {
   fields: BriefField[];
@@ -33,214 +20,176 @@ interface FormBuilderProps {
   onChange: (fields: BriefField[]) => void;
 }
 
-function generateKey(type: string): string {
-  return `${type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-}
-
-function createField(type: BriefField["type"], order: number): BriefField {
-  const config = FIELD_TYPES.find((f) => f.type === type);
-  return {
-    key: generateKey(type),
-    type,
-    label: config?.label ?? type,
-    required: false,
-    ...(type === "single_choice" || type === "multi_choice" ? { options: ["Option 1"] } : {}),
-    conditions: [],
-    order,
-  };
-}
-
-interface SortableFieldCardProps {
+interface FieldCardProps {
   field: BriefField;
+  index: number;
+  total: number;
   isSelected: boolean;
   onSelect: () => void;
+  onMove: (direction: "up" | "down") => void;
   onDelete: () => void;
 }
 
-function SortableFieldCard({ field, isSelected, onSelect, onDelete }: SortableFieldCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: field.key });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const typeConfig = FIELD_TYPES.find((f) => f.type === field.type);
+function FieldCard({
+  field,
+  index,
+  total,
+  isSelected,
+  onSelect,
+  onMove,
+  onDelete,
+}: FieldCardProps) {
+  const typeConfig = FIELD_TYPES.find((item) => item.type === field.type);
 
   return (
-    <div ref={setNodeRef} style={style}>
-      <Card
-        className={`flex cursor-pointer items-center gap-2 transition-all ${
-          isSelected
-            ? "border-primary ring-1 ring-primary"
-            : "hover:border-primary/40"
-        }`}
+    <Card
+      data-testid="brief-field-card"
+      className={`flex items-center gap-3 transition-all ${
+        isSelected ? "border-primary ring-1 ring-primary" : "hover:border-primary/40"
+      }`}
+    >
+      <button
+        type="button"
         onClick={onSelect}
+        aria-label={`Select field ${field.label || "Untitled field"}`}
+        className="flex flex-1 items-center gap-3 text-left"
       >
-        <button
-          {...attributes}
-          {...listeners}
-          className="shrink-0 cursor-grab rounded p-1 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface-subtle))] active:cursor-grabbing"
-        >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-muted))]">
           <GripVertical className="h-4 w-4" />
-        </button>
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-[rgb(var(--text-primary))]">
               {field.label || "Untitled field"}
             </span>
             <span className="rounded bg-[rgb(var(--surface-subtle))] px-1.5 py-0.5 text-xs text-[rgb(var(--text-muted))]">
               {typeConfig?.label ?? field.type}
             </span>
-            {field.required && (
+            {field.required ? (
               <span className="text-xs text-status-red">Required</span>
-            )}
+            ) : null}
           </div>
+          <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
+            Step {index + 1} of {total}
+          </p>
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="shrink-0 rounded p-1 text-[rgb(var(--text-muted))] hover:text-status-red"
+      </button>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={index === 0}
+          onClick={() => onMove("up")}
+          aria-label={`Move field ${field.label || "Untitled field"} up`}
         >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </Card>
-    </div>
+          <ArrowUp className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={index === total - 1}
+          onClick={() => onMove("down")}
+          aria-label={`Move field ${field.label || "Untitled field"} down`}
+        >
+          <ArrowDown className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          aria-label={`Delete field ${field.label || "Untitled field"}`}
+        >
+          <Trash2 className="h-4 w-4 text-status-red" />
+        </Button>
+      </div>
+    </Card>
   );
 }
 
 export function FormBuilder({ fields, templateName, onChange }: FormBuilderProps) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  const sortedFields = [...fields].sort((a, b) => a.order - b.order);
+  const selectedField = sortedFields.find((field) => field.key === selectedKey) ?? null;
+
+  const handleAddField = useCallback(
+    (type: BriefField["type"]) => {
+      const nextFields = insertField(sortedFields, type);
+      const addedField = nextFields[nextFields.length - 1] ?? null;
+      onChange(nextFields);
+      if (addedField) {
+        setSelectedKey(addedField.key);
+      }
+    },
+    [onChange, sortedFields],
   );
 
-  const selectedField = fields.find((f) => f.key === selectedKey) ?? null;
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveDragId(String(event.active.id));
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDragId(null);
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeData = active.data.current;
-
-    // Dragging from library → add new field
-    if (activeData?.source === "library") {
-      const newField = createField(activeData.type as BriefField["type"], fields.length);
-      const overIndex = fields.findIndex((f) => f.key === over.id);
-      const updated = [...fields];
-      if (overIndex >= 0) {
-        updated.splice(overIndex + 1, 0, newField);
-      } else {
-        updated.push(newField);
-      }
-      onChange(updated.map((f, i) => ({ ...f, order: i })));
-      setSelectedKey(newField.key);
-      return;
-    }
-
-    // Reordering within canvas
-    if (active.id !== over.id) {
-      const oldIndex = fields.findIndex((f) => f.key === active.id);
-      const newIndex = fields.findIndex((f) => f.key === over.id);
-      if (oldIndex >= 0 && newIndex >= 0) {
-        const reordered = arrayMove(fields, oldIndex, newIndex);
-        onChange(reordered.map((f, i) => ({ ...f, order: i })));
-      }
-    }
-  };
-
   const handleFieldChange = useCallback(
-    (updated: BriefField) => {
-      onChange(fields.map((f) => (f.key === updated.key ? updated : f)));
+    (updatedField: BriefField) => {
+      onChange(updateField(sortedFields, updatedField));
     },
-    [fields, onChange],
+    [onChange, sortedFields],
   );
 
   const handleDelete = useCallback(
     (key: string) => {
-      if (selectedKey === key) setSelectedKey(null);
-      onChange(
-        fields
-          .filter((f) => f.key !== key)
-          .map((f, i) => ({ ...f, order: i })),
-      );
+      if (selectedKey === key) {
+        setSelectedKey(null);
+      }
+      onChange(removeField(sortedFields, key));
     },
-    [fields, onChange, selectedKey],
+    [onChange, selectedKey, sortedFields],
   );
 
-  const sortedFields = [...fields].sort((a, b) => a.order - b.order);
+  const handleMove = useCallback(
+    (key: string, direction: "up" | "down") => {
+      onChange(moveField(sortedFields, key, direction));
+    },
+    [onChange, sortedFields],
+  );
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex h-full gap-4">
-        {/* Left: Field Library */}
-        <FieldLibrary />
+    <div className="flex h-full gap-4">
+      <FieldLibrary onAddField={handleAddField} />
 
-        {/* Center: Canvas */}
-        <div className="flex-1 overflow-y-auto">
-          <SortableContext
-            items={sortedFields.map((f) => f.key)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="space-y-2">
-              {sortedFields.length === 0 ? (
-                <Card className="py-12 text-center">
-                  <p className="text-sm text-[rgb(var(--text-muted))]">
-                    Drag fields from the library to build your form
-                  </p>
-                </Card>
-              ) : (
-                sortedFields.map((field) => (
-                  <SortableFieldCard
-                    key={field.key}
-                    field={field}
-                    isSelected={selectedKey === field.key}
-                    onSelect={() =>
-                      setSelectedKey(selectedKey === field.key ? null : field.key)
-                    }
-                    onDelete={() => handleDelete(field.key)}
-                  />
-                ))
-              )}
-            </div>
-          </SortableContext>
+      <div className="flex-1 overflow-y-auto">
+        <div className="space-y-3" data-testid="brief-field-stack">
+          {sortedFields.length === 0 ? (
+            <Card className="py-12 text-center" data-testid="brief-field-stack-empty">
+              <p className="text-sm text-[rgb(var(--text-muted))]">
+                Add fields from the library to build your brief flow.
+              </p>
+            </Card>
+          ) : (
+            sortedFields.map((field, index) => (
+              <FieldCard
+                key={field.key}
+                field={field}
+                index={index}
+                total={sortedFields.length}
+                isSelected={selectedKey === field.key}
+                onSelect={() => setSelectedKey(selectedKey === field.key ? null : field.key)}
+                onMove={(direction) => handleMove(field.key, direction)}
+                onDelete={() => handleDelete(field.key)}
+              />
+            ))
+          )}
         </div>
-
-        {/* Right: Editor or Preview */}
-        {selectedField ? (
-          <FieldEditor
-            field={selectedField}
-            allFields={fields}
-            onChange={handleFieldChange}
-            onClose={() => setSelectedKey(null)}
-          />
-        ) : (
-          <FormPreview fields={fields} {...(templateName ? { templateName } : {})} />
-        )}
       </div>
-    </DndContext>
+
+      {selectedField ? (
+        <FieldEditor
+          field={selectedField}
+          allFields={sortedFields}
+          onChange={handleFieldChange}
+          onClose={() => setSelectedKey(null)}
+        />
+      ) : (
+        <FormPreview fields={sortedFields} {...(templateName ? { templateName } : {})} />
+      )}
+    </div>
   );
 }

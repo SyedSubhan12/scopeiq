@@ -5,8 +5,10 @@ import { useBootLoader } from "@/providers/boot-loader-provider";
 
 type AssetOptions = {
   scopeId: string;
+  enabled?: boolean;
   lottieSrcs?: string[];
   imageSrcs?: string[];
+  tasks?: (Promise<unknown> | (() => Promise<unknown> | unknown))[];
   customTasks?: (Promise<unknown> | (() => Promise<unknown> | unknown))[];
 };
 
@@ -16,22 +18,25 @@ type AssetOptions = {
  */
 export function useAssetsReady({
   scopeId,
+  enabled = true,
   lottieSrcs = [],
   imageSrcs = [],
+  tasks = [],
   customTasks = [],
 }: AssetOptions) {
   const { registerTasks, isBootReady } = useBootLoader();
 
   useEffect(() => {
-    if (isBootReady) return;
+    if (isBootReady || !enabled) return;
 
-    const tasks: (Promise<unknown> | (() => Promise<unknown> | unknown))[] = [
+    const taskQueue: (Promise<unknown> | (() => Promise<unknown> | unknown))[] = [
+      ...tasks,
       ...customTasks,
     ];
 
     // Track Lottie preloads if any
     if (lottieSrcs.length > 0) {
-      tasks.push(async () => {
+      taskQueue.push(async () => {
         const { preloadLottieAnimationData } = await import("@/lib/lottie-preload");
         return Promise.all(lottieSrcs.map(src => preloadLottieAnimationData(src)));
       });
@@ -39,7 +44,7 @@ export function useAssetsReady({
 
     // Track Image preloads if any
     if (imageSrcs.length > 0) {
-      tasks.push(() => {
+      taskQueue.push(() => {
         return Promise.all(
           imageSrcs.map((src) => {
             return new Promise((resolve) => {
@@ -53,6 +58,6 @@ export function useAssetsReady({
       });
     }
 
-    return registerTasks(scopeId, tasks);
-  }, [scopeId, lottieSrcs, imageSrcs, customTasks, registerTasks, isBootReady]);
+    return registerTasks(scopeId, taskQueue);
+  }, [scopeId, enabled, lottieSrcs, imageSrcs, tasks, customTasks, registerTasks, isBootReady]);
 }

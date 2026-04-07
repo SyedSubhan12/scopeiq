@@ -8,6 +8,69 @@
       "when": 1775249847528,
       "tag": "0000_lonely_snowbird",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1775454000000,
+      "tag": "0001_brief_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1775457600000,
+      "tag": "0002_brief_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1775459400000,
+      "tag": "0003_brief_clarifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1775461200000,
+      "tag": "0004_brief_template_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1775463000000,
+      "tag": "0005_briefs_template_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1775464800000,
+      "tag": "0006_brief_template_branding",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1775470000000,
+      "tag": "0011_add_project_status_enum_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1775471000000,
+      "tag": "0012_briefs_version_column",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1775472000000,
+      "tag": "0013_brief_templates_status_enum_and_threshold",
+      "breakpoints": true
     }
   ]
 }

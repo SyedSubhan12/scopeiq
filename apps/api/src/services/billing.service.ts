@@ -107,6 +107,42 @@ function getPriceIdForTier(tier: PlanTier): string {
   return priceId;
 }
 
+function calculateMonthlyRevenueFromSubscription(subscription: Stripe.Subscription): number {
+  const monthlyRevenueCents = subscription.items.data.reduce((total, item) => {
+    const price = item.price;
+    const unitAmount =
+      typeof price.unit_amount === "number"
+        ? price.unit_amount
+        : price.unit_amount_decimal
+          ? Number(price.unit_amount_decimal)
+          : 0;
+    const quantity = item.quantity ?? 1;
+    const recurring = price.recurring;
+
+    if (!recurring) {
+      return total + unitAmount * quantity;
+    }
+
+    const intervalCount = recurring.interval_count || 1;
+    const lineAmount = unitAmount * quantity;
+
+    switch (recurring.interval) {
+      case "year":
+        return total + lineAmount / (12 * intervalCount);
+      case "month":
+        return total + lineAmount / intervalCount;
+      case "week":
+        return total + (lineAmount * 52) / (12 * intervalCount);
+      case "day":
+        return total + (lineAmount * 365) / (12 * intervalCount);
+      default:
+        return total + lineAmount;
+    }
+  }, 0);
+
+  return Math.round(monthlyRevenueCents / 100);
+}
+
 // ---------------------------------------------------------------------------
 // Public service methods
 // ---------------------------------------------------------------------------
@@ -262,6 +298,25 @@ export const billingService = {
         clients: clientCount,
       },
     };
+  },
+
+  async getMonthlyRecurringRevenue(workspaceId: string): Promise<number> {
+    const [workspace] = await db
+      .select({ stripeSubscriptionId: workspaces.stripeSubscriptionId })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1);
+
+    if (!workspace?.stripeSubscriptionId) {
+      return 0;
+    }
+
+    try {
+      const subscription = await stripe.subscriptions.retrieve(workspace.stripeSubscriptionId);
+      return calculateMonthlyRevenueFromSubscription(subscription);
+    } catch {
+      return 0;
+    }
   },
 
   /**

@@ -1,44 +1,68 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
+import {
+  mapBriefRecord,
+  mapBriefVersionRecord,
+  type BriefRecord,
+  type BriefVersionRecord,
+  type BriefFlag as NormalizedBriefFlag,
+} from "@/lib/briefs";
+export type Brief = BriefRecord;
+export type BriefFlag = NormalizedBriefFlag;
 
 export interface BriefFieldValue {
   field_key: string;
   value: string | string[];
 }
 
-export interface BriefFlag {
-  id: string;
-  field_key?: string;
-  severity: "low" | "medium" | "high";
-  message: string;
-  suggested_question?: string;
-}
-
-export interface Brief {
-  id: string;
-  projectId: string;
-  templateId: string;
-  values: BriefFieldValue[];
-  flags: BriefFlag[];
-  clarityScore: number;
-  status: "draft" | "submitted" | "approved" | "flagged";
-  createdAt: string;
-  updatedAt: string;
-}
-
 export function useBriefs(projectId: string) {
-  return useQuery<{ data: any[] }>({
+  return useQuery<{ data: Brief[] }>({
     queryKey: ["briefs", projectId],
-    queryFn: () => fetchWithAuth(`/v1/projects/${projectId}/briefs`) as Promise<{ data: any[] }>,
+    queryFn: async () => {
+      const response = (await fetchWithAuth(`/v1/projects/${projectId}/briefs`)) as {
+        data: Record<string, unknown>[];
+      };
+      return { data: response.data.map(mapBriefRecord) };
+    },
     enabled: !!projectId,
   });
 }
 
-export function useBrief(projectId: string, briefId: string) {
-  return useQuery<{ data: any }>({
-    queryKey: ["brief", projectId, briefId],
-    queryFn: () => fetchWithAuth(`/v1/projects/${projectId}/briefs/${briefId}`) as Promise<{ data: any }>,
-    enabled: !!projectId && !!briefId,
+export function useAllBriefs() {
+  return useQuery<{ data: Brief[] }>({
+    queryKey: ["briefs", "all"],
+    queryFn: async () => {
+      const response = (await fetchWithAuth("/v1/briefs")) as {
+        data: Record<string, unknown>[];
+      };
+      return { data: response.data.map(mapBriefRecord) };
+    },
+  });
+}
+
+export function useBrief(briefId: string) {
+  return useQuery<{ data: Brief }>({
+    queryKey: ["brief", briefId],
+    queryFn: async () => {
+      const response = (await fetchWithAuth(`/v1/briefs/${briefId}`)) as {
+        data: Record<string, unknown>;
+      };
+      return { data: mapBriefRecord(response.data) };
+    },
+    enabled: !!briefId,
+  });
+}
+
+export function useBriefVersions(briefId: string) {
+  return useQuery<{ data: BriefVersionRecord[] }>({
+    queryKey: ["brief", briefId, "versions"],
+    queryFn: async () => {
+      const response = (await fetchWithAuth(`/v1/briefs/${briefId}/versions`)) as {
+        data: Record<string, unknown>[];
+      };
+      return { data: response.data.map(mapBriefVersionRecord) };
+    },
+    enabled: !!briefId,
   });
 }
 
@@ -94,6 +118,89 @@ export function useSubmitBrief(projectId: string, briefId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["briefs", projectId] });
       void queryClient.invalidateQueries({ queryKey: ["brief", projectId, briefId] });
+    },
+  });
+}
+
+export function useOverrideBrief(briefId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      title?: string;
+      status?: "pending_score" | "scored" | "clarification_needed" | "approved" | "rejected";
+      scopeScore?: number;
+      scoringResultJson?: Record<string, unknown>;
+    }) =>
+      fetchWithAuth(`/v1/briefs/${briefId}/override`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["briefs"] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId] });
+    },
+  });
+}
+
+export function useReviewBrief(briefId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      action: "approve" | "clarify" | "hold" | "override";
+      status: "clarification_needed" | "approved" | "rejected";
+      note?: string;
+    }) =>
+      fetchWithAuth(`/v1/briefs/${briefId}/review`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["briefs"] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId, "versions"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+    },
+  });
+}
+
+export function useCreateClarificationRequest(briefId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      message?: string;
+      items: Array<{
+        fieldKey: string;
+        fieldLabel: string;
+        prompt: string;
+        severity: "low" | "medium" | "high";
+        sourceFlagId?: string;
+      }>;
+    }) =>
+      fetchWithAuth(`/v1/briefs/${briefId}/clarification-request`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["briefs"] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId, "versions"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+    },
+  });
+}
+
+export function useAssignBriefReviewer(briefId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reviewerId: string | null) =>
+      fetchWithAuth(`/v1/briefs/${briefId}/reviewer`, {
+        method: "POST",
+        body: JSON.stringify({ reviewerId }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["briefs"] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId, "versions"] });
     },
   });
 }

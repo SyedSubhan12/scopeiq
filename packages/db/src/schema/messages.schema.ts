@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, timestamp, index } from "drizzle-orm/pg-core";
-import { messageSourceEnum } from './enums';
+import { messageSourceEnum, messageStatusEnum } from './enums';
 import { workspaces } from './workspaces.schema';
 import { projects } from './projects.schema';
 
@@ -12,12 +12,14 @@ export const messages = pgTable(
     authorId: uuid("author_id"),
     authorName: text("author_name"),
     source: messageSourceEnum("source").notNull(),
+    status: messageStatusEnum("status").notNull().default("pending_check"),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     projectIdx: index("idx_messages_project").on(table.projectId),
     workspaceIdx: index("idx_messages_workspace").on(table.workspaceId),
+    statusIdx: index("idx_messages_status").on(table.status),
     createdIdx: index("idx_messages_created").on(table.projectId, table.createdAt),
   }),
 );

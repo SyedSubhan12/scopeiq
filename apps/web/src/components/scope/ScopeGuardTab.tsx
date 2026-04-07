@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ShieldAlert, CheckCircle, Plus, FileText, X, Send } from "lucide-react";
 import { Card, Badge, Button, Skeleton, useToast } from "@novabots/ui";
-import { useScopeFlags, useUpdateScopeFlag } from "@/hooks/useScopeFlags";
-import { useCreateChangeOrder } from "@/hooks/useChangeOrders";
+import { useScopeFlags, useUpdateScopeFlag, type ScopeFlag } from "@/hooks/useScopeFlags";
+import { useCreateChangeOrder } from "@/hooks/change-orders";
 import { fetchWithAuth } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -175,7 +175,7 @@ function FlagCard({ flag, projectId }: { flag: any; projectId: string }) {
     const [isUpdating, setIsUpdating] = useState(false);
     const { toast } = useToast();
 
-    const handleStatusUpdate = async (status: string) => {
+    const handleStatusUpdate = async (status: ScopeFlag["status"]) => {
         setIsUpdating(true);
         try {
             await updateFlag.mutateAsync({ status });

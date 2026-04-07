@@ -21,6 +21,8 @@ interface ApprovalReminderEmailProps {
   approvalStep: ApprovalStep;
   reviewUrl: string;
   deadlineDate?: string;
+  approveUrl?: string;
+  declineUrl?: string;
 }
 
 const stepConfig: Record<1 | 2 | 3, { heading: string; tone: "info" | "warning" | "urgent" }> = {
@@ -44,6 +46,8 @@ export function ApprovalReminderEmail({
   approvalStep,
   reviewUrl,
   deadlineDate,
+  approveUrl,
+  declineUrl,
 }: ApprovalReminderEmailProps) {
   const config = stepConfig[step];
   const accentColor = toneColors[config.tone];
@@ -96,6 +100,30 @@ export function ApprovalReminderEmail({
                 Review Now
               </Button>
             </Section>
+
+            {/* Inline Approve / Decline Action Buttons */}
+            {approveUrl && declineUrl && (
+              <Section style={actionSection}>
+                <Text style={actionLabel}>Quick Actions</Text>
+                <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "8px 0" }}>
+                  <tr>
+                    <td style={{ width: "50%" }}>
+                      <Button href={approveUrl} style={approveButton}>
+                        Approve
+                      </Button>
+                    </td>
+                    <td style={{ width: "50%" }}>
+                      <Button href={declineUrl} style={declineButton}>
+                        Request Changes
+                      </Button>
+                    </td>
+                  </tr>
+                </table>
+                <Text style={actionNote}>
+                  Clicking "Approve" will immediately mark this deliverable as approved. "Request Changes" will notify the team.
+                </Text>
+              </Section>
+            )}
 
             {/* Step-specific note */}
             {step === 3 && (
@@ -239,6 +267,55 @@ const footerCopyright: React.CSSProperties = {
   color: "#aaaaaa",
   textAlign: "center",
   margin: "0",
+};
+
+const actionSection: React.CSSProperties = {
+  padding: "16px 0 24px",
+  borderTop: "1px solid #e8e8e8",
+  marginTop: "8px",
+};
+
+const actionLabel: React.CSSProperties = {
+  fontSize: "12px",
+  fontWeight: "600",
+  color: "#888888",
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
+  margin: "0 0 12px",
+};
+
+const approveButton: React.CSSProperties = {
+  display: "block",
+  color: "#ffffff",
+  fontSize: "14px",
+  fontWeight: "600",
+  textAlign: "center",
+  textDecoration: "none",
+  borderRadius: "6px",
+  padding: "12px 24px",
+  width: "100%",
+  backgroundColor: "#0F6E56",
+};
+
+const declineButton: React.CSSProperties = {
+  display: "block",
+  color: "#ffffff",
+  fontSize: "14px",
+  fontWeight: "600",
+  textAlign: "center",
+  textDecoration: "none",
+  borderRadius: "6px",
+  padding: "12px 24px",
+  width: "100%",
+  backgroundColor: "#d4870e",
+};
+
+const actionNote: React.CSSProperties = {
+  fontSize: "12px",
+  color: "#888888",
+  textAlign: "center",
+  margin: "12px 0 0",
+  fontStyle: "italic",
 };
 
 export default ApprovalReminderEmail;

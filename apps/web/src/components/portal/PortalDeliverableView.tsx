@@ -15,6 +15,8 @@ import { RevisionHistory } from "../approval/RevisionHistory";
 import { DeliverableViewer } from "../approval/DeliverableViewer";
 import { FeedbackPanel } from "../approval/FeedbackPanel";
 import { RevisionCounter } from "../approval/RevisionCounter";
+import { RevisionLimitModal } from "../approval/RevisionLimitModal";
+import { useRevisionLimitModal } from "@/stores/revision-limit-modal.store";
 import {
     usePortalFeedback,
     useCreatePortalFeedback,
@@ -54,6 +56,7 @@ export function PortalDeliverableView({
     const [activePinId, setActivePinId] = useState<string | null>(null);
     const [revisionComment, setRevisionComment] = useState("");
     const [showRevisionInput, setShowRevisionInput] = useState(false);
+    const openLimitModal = useRevisionLimitModal((s) => s.openModal);
 
     const { toast } = useToast();
 
@@ -78,6 +81,17 @@ export function PortalDeliverableView({
     };
 
     const handleRequestRevision = async () => {
+        const atLimit = deliverable.revisionRound >= deliverable.maxRevisions && deliverable.maxRevisions > 0;
+        if (atLimit) {
+            openLimitModal({
+                deliverableId: deliverable.id,
+                deliverableName: deliverable.name,
+                currentRound: deliverable.revisionRound,
+                maxRevisions: deliverable.maxRevisions,
+                projectId: "",
+            });
+            return;
+        }
         if (!revisionComment.trim()) return;
         try {
             await requestRevisionMutation.mutateAsync(revisionComment.trim());
@@ -263,6 +277,8 @@ export function PortalDeliverableView({
                     )}
                 </div>
             )}
+
+            <RevisionLimitModal />
         </div>
     );
 }

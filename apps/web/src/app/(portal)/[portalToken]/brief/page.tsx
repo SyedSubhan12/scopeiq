@@ -48,6 +48,11 @@ function BriefPageContent() {
   }
 
   const { project, workspace, pendingBrief } = session;
+  const effectiveBranding = pendingBrief?.branding ?? null;
+  const portalBrandColor = effectiveBranding?.accentColor || workspace.brandColor;
+  const portalLogoUrl = effectiveBranding?.logoUrl ?? workspace.logoUrl;
+  const introHeading =
+    effectiveBranding?.introMessage || "Help us start your project with the right scope";
 
   if (!pendingBrief) {
     return (
@@ -71,11 +76,11 @@ function BriefPageContent() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: `${workspace.brandColor}08` }}>
+    <div className="min-h-screen" style={{ backgroundColor: `${portalBrandColor}08` }}>
       <PortalHeader
         workspaceName={workspace.name}
-        logoUrl={workspace.logoUrl}
-        brandColor={workspace.brandColor}
+        logoUrl={portalLogoUrl}
+        brandColor={portalBrandColor}
         projectName={project.name}
         clientName={project.clientName}
       />
@@ -84,7 +89,7 @@ function BriefPageContent() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">Project Brief</h1>
           <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
-            Help us understand your project by answering the questions below.
+            {introHeading}
           </p>
         </div>
 
@@ -92,11 +97,10 @@ function BriefPageContent() {
           brief={{
             id: pendingBrief.id,
             title: pendingBrief.title,
+            ...(pendingBrief.branding ? { branding: pendingBrief.branding } : {}),
             fields: pendingBrief.fields,
           }}
-          projectId={project.id}
-          workspaceId={workspace.id}
-          onSuccess={() => router.push(`/portal/${session.token}`)}
+          onSuccess={() => router.push(`/${session.token}/success?kind=brief`)}
         />
 
         <div className="mt-8">

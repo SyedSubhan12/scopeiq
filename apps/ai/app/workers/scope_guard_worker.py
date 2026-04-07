@@ -1,98 +1,129 @@
 import asyncio
-import json
+import time
 import structlog
 from bullmq import Worker
-import asyncpg
-from uuid import uuid4
 
 from app.config import settings
 from app.schemas.scope_schemas import ScopeAnalysisInput, ScopeClauseInput
 from app.services.scope_analyzer import ScopeAnalyzerService
+from app.services.callback_service import post_callback
 
 logger = structlog.get_logger()
 
-async def get_db_pool():
-    return await asyncpg.create_pool(settings.DATABASE_URL, min_size=1, max_size=5)
+# Performance SLA: scope flag detection within 5s p95
+SCOPE_FLAG_SLA_THRESHOLD_MS = 5000
+
+CONFIDENCE_THRESHOLD = 0.60  # Flag only when confidence > 0.60
+
 
 async def process_scope_check(job, token):
     """Process a scope check job: input text vs. project SOW."""
+    start_time = time.monotonic()
+
+    message_id = job.data.get("message_id")
     project_id = job.data.get("project_id")
-    input_text = job.data.get("text")
-    author_id = job.data.get("author_id") # Optional tracking
-    
-    logger.info("processing_scope_check", project_id=project_id)
-    
+    input_text = job.data.get("text") or job.data.get("message_text")
+    author_id = job.data.get("author_id")
+
+    logger.info("processing_scope_check", project_id=project_id, message_id=message_id)
+
     analyzer = ScopeAnalyzerService()
-    pool = await get_db_pool()
-    
+
     try:
-        async with pool.acquire() as conn:
-            # 1. Fetch SOW clauses for the project
-            project = await conn.fetchrow("SELECT sow_id, workspace_id FROM projects WHERE id = $1", project_id)
-            if not project or not project["sow_id"]:
-                logger.warning("no_sow_for_project", project_id=project_id)
-                return {"status": "no_sow"}
-                
-            workspace_id = project["workspace_id"]
-            
-            clauses_rows = await conn.fetch(
-                "SELECT id, clause_type, summary, original_text FROM sow_clauses WHERE sow_id = $1",
-                project["sow_id"]
+        # NOTE: The worker no longer fetches SOW clauses from the database directly.
+        # The API must include SOW clause data in the job payload or the worker
+        # must call an API endpoint to fetch them. For now, we pass the job data
+        # and let the scope analyzer work with what it has.
+        #
+        # The clauses are now expected to be fetched by the callback handler
+        # or included in the job data by the API dispatcher.
+
+        # Build a minimal analysis input — the scope analyzer service
+        # will need to be adapted or the API should pre-fetch clauses.
+        # For the callback pattern, the clauses are included in the response.
+
+        # For backward compatibility during transition, we still call the analyzer
+        # with whatever data is available. The analyzer should be updated separately
+        # to accept pre-fetched clauses.
+        clauses = job.data.get("clauses", [])
+        clauses_input = [
+            ScopeClauseInput(
+                id=c.get("id", ""),
+                clause_type=c.get("clause_type", "other"),
+                summary=c.get("summary"),
+                original_text=c.get("original_text", ""),
             )
-            
-            clauses = [
-                ScopeClauseInput(
-                    id=str(row["id"]),
-                    clause_type=row["clause_type"],
-                    summary=row["summary"],
-                    original_text=row["original_text"]
-                )
-                for row in clauses_rows
-            ]
-            
-            # 2. Analyze
-            analysis_input = ScopeAnalysisInput(
-                project_id=project_id,
-                input_text=input_text,
-                clauses=clauses
-            )
-            
-            result = await analyzer.analyze(analysis_input)
-            
-            # 3. If deviation detected, create a scope flag
-            if result.is_deviation and result.confidence >= 0.7:
-                flag_id = str(uuid4())
-                await conn.execute(
-                    """
-                    INSERT INTO scope_flags (
-                        id, workspace_id, project_id, title, description, 
-                        severity, status, source, metadata
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
-                    """,
-                    flag_id,
-                    workspace_id,
-                    project_id,
-                    f"AI Detection: Possible Scope Deviation",
-                    result.reasoning,
-                    result.suggested_severity,
-                    "pending",
-                    "ai_audit",
-                    json.dumps({
-                        "confidence": result.confidence,
-                        "matched_clause_id": result.matched_clause_id,
-                        "original_request": input_text
-                    })
-                )
-                logger.info("scope_flag_created", flag_id=flag_id, confidence=result.confidence)
-                
-            return {
-                "is_deviation": result.is_deviation,
-                "confidence": result.confidence,
-                "reasoning": result.reasoning
+            for c in clauses
+        ]
+
+        analysis_input = ScopeAnalysisInput(
+            project_id=project_id,
+            input_text=input_text,
+            clauses=clauses_input,
+        )
+
+        result = await analyzer.analyze(analysis_input)
+
+        duration_ms = (time.monotonic() - start_time) * 1000
+
+        # Build matching clauses list
+        matching_clauses = result.matching_clauses if hasattr(result, 'matching_clauses') and result.matching_clauses else []
+        matching_clauses_list = [
+            {
+                "clauseId": mc.get("clause_id", mc.get("id", "")),
+                "clauseText": mc.get("clause_text", mc.get("original_text", "")),
+                "relevance": mc.get("relevance", mc.get("score", 0)),
             }
-            
-    finally:
-        await pool.close()
+            for mc in matching_clauses
+        ]
+
+        # POST results to the API callback instead of writing directly to DB
+        is_deviation = result.is_deviation and result.confidence > CONFIDENCE_THRESHOLD
+
+        callback_payload = {
+            "jobId": job.id,
+            "messageId": message_id,
+            "projectId": project_id,
+            "isDeviation": is_deviation,
+            "confidence": result.confidence,
+            "reasoning": result.reasoning,
+            "suggestedSeverity": result.suggested_severity,
+            "suggestedResponse": result.suggested_response if hasattr(result, 'suggested_response') else None,
+            "matchedClauseId": result.matched_clause_id if hasattr(result, 'matched_clause_id') else None,
+            "matchingClauses": matching_clauses_list,
+            "durationMs": round(duration_ms, 2),
+            "slaMet": duration_ms < SCOPE_FLAG_SLA_THRESHOLD_MS,
+        }
+
+        response = await post_callback("/api/ai-callback/scope-checked", callback_payload)
+
+        logger.info(
+            "scope_check_completed",
+            project_id=project_id,
+            duration_ms=round(duration_ms, 2),
+            sla_met=duration_ms < SCOPE_FLAG_SLA_THRESHOLD_MS,
+            is_deviation=is_deviation,
+        )
+
+        return {
+            "is_deviation": is_deviation,
+            "confidence": result.confidence,
+            "reasoning": result.reasoning,
+            "duration_ms": round(duration_ms, 2),
+            "sla_met": duration_ms < SCOPE_FLAG_SLA_THRESHOLD_MS,
+            "callback_response": response,
+        }
+
+    except Exception as e:
+        duration_ms = (time.monotonic() - start_time) * 1000
+        logger.error(
+            "scope_check_failed",
+            project_id=project_id,
+            duration_ms=round(duration_ms, 2),
+            error=str(e),
+        )
+        raise
+
 
 def start_worker():
     worker = Worker(
@@ -100,11 +131,12 @@ def start_worker():
         process_scope_check,
         {
             "connection": settings.REDIS_URL,
-            "concurrency": 2,
+            "concurrency": 5,  # Max 5 concurrent Claude API calls per worker
         },
     )
     logger.info("scope_guard_worker_started")
     return worker
+
 
 if __name__ == "__main__":
     worker = start_worker()

@@ -45,7 +45,7 @@ export default function WorkspaceSettingsPage() {
       await updateWorkspace.mutateAsync({
         name: wsName.trim(),
         brandColor,
-        logoUrl: logoUrl || null,
+        ...(logoUrl ? { logoUrl } : {}),
       });
       toast("success", "Workspace updated successfully");
     } catch {

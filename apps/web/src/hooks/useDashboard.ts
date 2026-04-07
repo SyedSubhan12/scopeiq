@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
+import { dashboardQueryKey } from "./query-keys";
 
 export interface DashboardMetrics {
   activeProjects: number;
@@ -49,15 +50,16 @@ export interface DashboardResponse {
   data: DashboardData;
 }
 
-export function getDashboardQueryOptions() {
+export function getDashboardQueryOptions(enabled = true) {
   return {
-    queryKey: ["dashboard"] as const,
+    queryKey: dashboardQueryKey,
     queryFn: () =>
       fetchWithAuth("/v1/dashboard") as Promise<DashboardResponse>,
     refetchInterval: 60_000,
+    enabled,
   };
 }
 
-export function useDashboard() {
-  return useQuery<DashboardResponse>(getDashboardQueryOptions());
+export function useDashboard(enabled = true) {
+  return useQuery<DashboardResponse>(getDashboardQueryOptions(enabled));
 }

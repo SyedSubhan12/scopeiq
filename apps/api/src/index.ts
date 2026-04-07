@@ -18,6 +18,7 @@ import { feedbackRouter } from "./routes/feedback.route.js";
 import { portalDeliverableRouter } from "./routes/portal-deliverable.route.js";
 import { portalSessionRouter } from "./routes/portal-session.route.js";
 import { portalChangeOrderRouter } from "./routes/portal-change-order.route.js";
+import { emailApprovalRouter } from "./routes/email-approval.route.js";
 import { portalRouter } from "./routes/portal.route.js";
 import { sowRouter } from "./routes/sow.route.js";
 import { inviteRouter } from "./routes/invite.route.js";
@@ -27,11 +28,16 @@ import { messageIngestRouter } from "./routes/message-ingest.route.js";
 import { notificationRouter } from "./routes/notification.route.js";
 import { analyticsRouter } from "./routes/analytics.route.js";
 import { aiRouter } from "./routes/ai.route.js";
+import { aiCallbackRouter } from "./routes/ai-callback.route.js";
 import { billingRouter } from "./routes/billing.route.js";
 import { dashboardRouter } from "./routes/dashboard.route.js";
 import webhookStripe from "./routes/webhook-stripe.route.js";
+import { resendWebhookRouter } from "./routes/resend-webhook.route.js";
 import { env } from "./lib/env.js";
 import { scheduleHourlyReminders } from "./jobs/send-reminder.job.js";
+import { startScopeFlagAlertWorker } from "./services/scope-flag-alert.service.js";
+import { startBriefScoringWorker } from "./services/brief-scoring-worker.service.js";
+import { startClarificationEmailWorker } from "./services/clarification-email.service.js";
 import { ensureBucketExists } from "./lib/storage.js";
 
 const app = new Hono();
@@ -72,14 +78,23 @@ app.route("/v1", v1);
 // Public Stripe webhook (outside /v1, no auth)
 app.route("/webhooks/stripe", webhookStripe);
 
+// Public Resend webhook (outside /v1, no auth)
+app.route("/webhooks/resend", resendWebhookRouter);
+
 // Public routes (outside /v1)
 app.route("/briefs/submit", briefSubmitRouter);
 
+// AI callback routes (secret-authenticated, no user auth)
+app.route("/api/ai-callback", aiCallbackRouter);
+
 // Portal routes (token-authenticated)
-app.route("/portal", portalRouter);
-app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/session", portalSessionRouter);
+app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/change-orders", portalChangeOrderRouter);
+app.route("/portal", portalRouter);
+
+// Email approval links (HMAC-token authenticated, public)
+app.route("/api/portal/email-approve", emailApprovalRouter);
 
 // Public invite acceptance (outside /v1)
 app.route("/invites", inviteRouter);
@@ -101,5 +116,14 @@ ensureBucketExists().catch((err) => {
 scheduleHourlyReminders().catch((err) => {
     console.error("[Startup] Failed to schedule reminders:", err);
 });
+
+// Start scope flag alert worker (processes delayed 2-hour email fallback jobs)
+startScopeFlagAlertWorker();
+
+// Start brief scoring worker (processes AI scoring jobs from brief-scoring queue)
+startBriefScoringWorker();
+
+// Start clarification email worker (sends clarification request emails to clients)
+startClarificationEmailWorker();
 
 export default app;

@@ -61,13 +61,23 @@ export default function RateCardSettingsPage() {
   const handleSaveEdit = async (item: RateCardItem) => {
     if (!editName.trim() || !editRate) return;
     try {
-      await updateRateCardItem.mutateAsync({
+      const payload: {
+        id: string;
+        name: string;
+        rateInCents: number;
+        unit: string;
+        description?: string;
+      } = {
         id: item.id,
         name: editName.trim(),
         rateInCents: Math.round(parseFloat(editRate) * 100),
         unit: editUnit,
-        description: editDescription.trim() || undefined,
-      });
+      };
+      if (editDescription.trim()) {
+        payload.description = editDescription.trim();
+      }
+
+      await updateRateCardItem.mutateAsync(payload);
       toast("success", "Rate card item updated");
       setEditingId(null);
     } catch {
@@ -98,12 +108,21 @@ export default function RateCardSettingsPage() {
       return;
     }
     try {
-      await createRateCardItem.mutateAsync({
+      const payload: {
+        name: string;
+        rateInCents: number;
+        unit: string;
+        description?: string;
+      } = {
         name: newItemName.trim(),
         rateInCents: Math.round(parseFloat(newItemRate) * 100),
         unit: newItemUnit,
-        description: newItemDescription.trim() || undefined,
-      });
+      };
+      if (newItemDescription.trim()) {
+        payload.description = newItemDescription.trim();
+      }
+
+      await createRateCardItem.mutateAsync(payload);
       toast("success", "Rate card item added");
       setNewItemName("");
       setNewItemRate("");

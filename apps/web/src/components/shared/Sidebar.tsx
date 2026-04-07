@@ -27,7 +27,7 @@ import { Badge, cn } from "@novabots/ui";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/providers/auth-provider";
 import { supabase } from "@/lib/supabase";
-import { useChangeOrderCount } from "@/hooks/useChangeOrders";
+import { useChangeOrderCount } from "@/hooks/change-orders";
 import { useScopeFlagCount } from "@/hooks/useScopeFlags";
 import { useUIStore } from "@/stores/ui.store";
 import { useWorkspaceStore } from "@/stores/workspace.store";
@@ -100,6 +100,13 @@ function SidebarLink({
         />
         {!expanded && item.count !== undefined && item.count > 0 ? (
           <span
+            data-testid={
+              item.href === "/change-orders"
+                ? "sidebar-change-order-count"
+                : item.href === "/scope-flags"
+                  ? "sidebar-scope-flag-count"
+                  : undefined
+            }
             className={cn(
               "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none text-white",
               item.urgent ? "bg-status-red" : "bg-primary",
@@ -114,6 +121,13 @@ function SidebarLink({
           <span className="min-w-0 flex-1 truncate">{item.label}</span>
           {item.count !== undefined && item.count > 0 ? (
             <span
+              data-testid={
+                item.href === "/change-orders"
+                  ? "sidebar-change-order-count"
+                  : item.href === "/scope-flags"
+                    ? "sidebar-scope-flag-count"
+                    : undefined
+              }
               className={cn(
                 "rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
                 item.urgent

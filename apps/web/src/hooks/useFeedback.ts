@@ -4,6 +4,7 @@ import { fetchWithAuth } from "@/lib/api";
 export interface FeedbackItem {
   id: string;
   deliverableId: string;
+  parentId: string | null;
   authorId: string | null;
   authorName: string | null;
   source: "portal" | "email_forward" | "manual_input";
@@ -13,7 +14,7 @@ export interface FeedbackItem {
     yPos: number;
     pageNumber?: number | null;
     pinNumber: number;
-    [key: string]: any;
+    [key: string]: unknown;
   } | null;
   resolvedAt: string | null;
   createdAt: string;
@@ -33,10 +34,27 @@ export function useCreateFeedback(deliverableId: string) {
     mutationFn: (data: {
       body: string;
       annotationJson?: FeedbackItem["annotationJson"];
+      parentId?: string;
     }) =>
       fetchWithAuth(`/v1/deliverables/${deliverableId}/feedback`, {
         method: "POST",
         body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["feedback", deliverableId] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useReplyFeedback(deliverableId: string, parentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) =>
+      fetchWithAuth(`/v1/deliverables/${deliverableId}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({ body, parentId }),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["feedback", deliverableId] });
@@ -49,17 +67,19 @@ export function useUpdateFeedback(deliverableId: string) {
   return useMutation({
     mutationFn: ({
       feedbackId,
-      data,
+      resolved,
     }: {
       feedbackId: string;
-      data: { body?: string; resolvedAt?: string | null };
+      resolved: boolean;
     }) =>
-      fetchWithAuth(`/v1/feedback/${feedbackId}`, {
+      fetchWithAuth(`/v1/feedback/${feedbackId}/resolve`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: JSON.stringify({ resolved }),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["feedback", deliverableId] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -71,6 +91,8 @@ export function useDeleteFeedback(deliverableId: string) {
       fetchWithAuth(`/v1/feedback/${feedbackId}`, { method: "DELETE" }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["feedback", deliverableId] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -79,12 +101,14 @@ export function useResolveFeedback(deliverableId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (feedbackId: string) =>
-      fetchWithAuth(`/v1/feedback/${feedbackId}`, {
+      fetchWithAuth(`/v1/feedback/${feedbackId}/resolve`, {
         method: "PATCH",
-        body: JSON.stringify({ resolvedAt: new Date().toISOString() }),
+        body: JSON.stringify({ resolved: true }),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["feedback", deliverableId] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

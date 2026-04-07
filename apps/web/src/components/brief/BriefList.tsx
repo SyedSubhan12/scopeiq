@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Search, Filter } from "lucide-react";
-import { Card, Badge, Skeleton, Input } from "@novabots/ui";
+import { FileText, Search } from "lucide-react";
+import { Card, Badge, Skeleton } from "@novabots/ui";
 import { ClarityScoreRing } from "./ClarityScoreRing";
 import type { Brief } from "@/hooks/useBriefs";
 
@@ -14,10 +14,12 @@ interface BriefListProps {
 }
 
 const statusConfig: Record<Brief["status"], { label: string; badgeStatus: string }> = {
-  draft: { label: "Draft", badgeStatus: "draft" },
-  submitted: { label: "Submitted", badgeStatus: "active" },
+  pending_score: { label: "Pending score", badgeStatus: "draft" },
+  scoring: { label: "Scoring", badgeStatus: "active" },
+  scored: { label: "Ready", badgeStatus: "active" },
+  clarification_needed: { label: "Clarification needed", badgeStatus: "pending" },
   approved: { label: "Approved", badgeStatus: "approved" },
-  flagged: { label: "Flagged", badgeStatus: "flagged" },
+  rejected: { label: "Held", badgeStatus: "flagged" },
 };
 
 type StatusFilter = Brief["status"] | "all";
@@ -43,10 +45,11 @@ export function BriefList({ briefs, isLoading, onSelect, selectedId }: BriefList
     .filter(
       (b) =>
         !search ||
-        b.id.toLowerCase().includes(search.toLowerCase()),
+        b.id.toLowerCase().includes(search.toLowerCase()) ||
+        (b.title ?? "").toLowerCase().includes(search.toLowerCase()),
     )
     .sort((a, b) => {
-      if (sortBy === "score") return (b.clarityScore ?? 0) - (a.clarityScore ?? 0);
+      if (sortBy === "score") return (b.scopeScore ?? 0) - (a.scopeScore ?? 0);
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
@@ -69,10 +72,12 @@ export function BriefList({ briefs, isLoading, onSelect, selectedId }: BriefList
           className="rounded-lg border border-[rgb(var(--border-default))] px-3 py-2 text-sm outline-none focus:border-primary"
         >
           <option value="all">All statuses</option>
-          <option value="draft">Draft</option>
-          <option value="submitted">Submitted</option>
+          <option value="pending_score">Pending score</option>
+          <option value="scoring">Scoring</option>
+          <option value="scored">Ready</option>
+          <option value="clarification_needed">Clarification needed</option>
           <option value="approved">Approved</option>
-          <option value="flagged">Flagged</option>
+          <option value="rejected">Held</option>
         </select>
         <select
           value={sortBy}
@@ -105,13 +110,13 @@ export function BriefList({ briefs, isLoading, onSelect, selectedId }: BriefList
                 }`}
                 onClick={() => onSelect(brief)}
               >
-                <ClarityScoreRing score={brief.clarityScore ?? 0} size={48} strokeWidth={5} />
+                <ClarityScoreRing score={brief.scopeScore ?? 0} size={48} strokeWidth={5} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-medium text-[rgb(var(--text-primary))]">
-                      Brief #{brief.id.slice(0, 8)}
+                      {brief.title || `Brief #${brief.id.slice(0, 8)}`}
                     </p>
-                    <Badge status={config.badgeStatus as "approved" | "draft" | "active" | "flagged"}>
+                    <Badge status={config.badgeStatus as "approved" | "draft" | "active" | "flagged" | "pending"}>
                       {config.label}
                     </Badge>
                   </div>

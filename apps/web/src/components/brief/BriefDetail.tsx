@@ -16,10 +16,12 @@ interface BriefDetailProps {
 }
 
 const statusConfig: Record<Brief["status"], { label: string; badgeStatus: string }> = {
-  draft: { label: "Draft", badgeStatus: "draft" },
-  submitted: { label: "Submitted", badgeStatus: "active" },
+  pending_score: { label: "Pending score", badgeStatus: "draft" },
+  scoring: { label: "Scoring", badgeStatus: "active" },
+  scored: { label: "Ready", badgeStatus: "active" },
+  clarification_needed: { label: "Clarification needed", badgeStatus: "pending" },
   approved: { label: "Approved", badgeStatus: "approved" },
-  flagged: { label: "Flagged", badgeStatus: "flagged" },
+  rejected: { label: "Held", badgeStatus: "flagged" },
 };
 
 export function BriefDetail({
@@ -58,7 +60,7 @@ export function BriefDetail({
             <h2 className="text-xl font-bold text-[rgb(var(--text-primary))]">
               Brief #{brief.id.slice(0, 8)}
             </h2>
-            <Badge status={config.badgeStatus as "approved" | "draft" | "active" | "flagged"}>
+            <Badge status={config.badgeStatus as "approved" | "draft" | "active" | "flagged" | "pending"}>
               {config.label}
             </Badge>
           </div>
@@ -70,11 +72,11 @@ export function BriefDetail({
           </div>
         </div>
 
-        <ClarityScoreRing score={brief.clarityScore ?? 0} size={80} strokeWidth={8} />
+        <ClarityScoreRing score={brief.scopeScore ?? 0} size={80} strokeWidth={8} />
       </div>
 
       {/* Override button for flagged/held briefs */}
-      {brief.status === "flagged" && onOverrideBrief && (
+      {(brief.status === "clarification_needed" || brief.status === "rejected") && onOverrideBrief && (
         <Card className="flex items-center justify-between bg-amber-50 p-4">
           <div>
             <p className="text-sm font-medium text-amber-800">
@@ -96,19 +98,19 @@ export function BriefDetail({
         <h3 className="mb-4 text-sm font-semibold text-[rgb(var(--text-primary))]">
           Submitted Responses
         </h3>
-        {brief.values.length === 0 ? (
+        {(brief.fields ?? []).length === 0 ? (
           <p className="py-4 text-center text-sm text-[rgb(var(--text-muted))]">
             No field values available.
           </p>
         ) : (
           <div className="divide-y divide-[rgb(var(--border-default))]">
-            {brief.values.map((fv) => (
-              <div key={fv.field_key} className="py-3 first:pt-0 last:pb-0">
+            {(brief.fields ?? []).map((field) => (
+              <div key={field.fieldKey} className="py-3 first:pt-0 last:pb-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-[rgb(var(--text-muted))]">
-                  {fv.field_key.replace(/_/g, " ")}
+                  {field.fieldLabel}
                 </p>
                 <p className="mt-1 text-sm text-[rgb(var(--text-primary))]">
-                  {Array.isArray(fv.value) ? fv.value.join(", ") : fv.value || "—"}
+                  {field.value || "—"}
                 </p>
               </div>
             ))}

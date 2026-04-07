@@ -26,6 +26,12 @@ workspaceRouter.get("/me", async (c) => {
   return c.json({ data: workspace });
 });
 
+workspaceRouter.get("/me/users", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const users = await workspaceService.listWorkspaceUsers(workspaceId);
+  return c.json({ data: users });
+});
+
 workspaceRouter.patch("/me", zValidator("json", updateWorkspaceSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const userId = c.get("userId");

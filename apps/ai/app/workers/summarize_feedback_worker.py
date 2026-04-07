@@ -1,20 +1,14 @@
 import asyncio
 import json
-from datetime import datetime, timezone
 import structlog
 from bullmq import Worker
-import asyncpg
 
 from app.config import settings
 from app.schemas.feedback_schemas import FeedbackItemInput
 from app.services.feedback_summarizer import FeedbackSummarizerService
+from app.services.callback_service import post_callback
 
 logger = structlog.get_logger()
-
-
-async def get_db_pool():
-    """Create a connection pool for database operations."""
-    return await asyncpg.create_pool(settings.DATABASE_URL, min_size=1, max_size=5)
 
 
 async def process_summarize_feedback(job, token):
@@ -24,27 +18,31 @@ async def process_summarize_feedback(job, token):
 
     summarizer = FeedbackSummarizerService()
 
-    # Fetch feedback items from database
-    pool = await get_db_pool()
-    try:
-        async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT id, body, annotation_json, source, author_name, created_at
-                FROM feedback_items
-                WHERE deliverable_id = $1
-                ORDER BY created_at ASC
-                """,
-                deliverable_id,
-            )
+    # Feedback items should be pre-fetched and included in the job data
+    # by the API dispatcher to avoid direct DB access.
+    feedback_data = job.data.get("feedback_items", [])
 
-        if not rows:
-            logger.warning("no_feedback_items_found", deliverable_id=deliverable_id)
-            return {"deliverable_id": deliverable_id, "task_count": 0, "overall_notes": "No feedback found."}
+    try:
+        if not feedback_data:
+            # No feedback available — return empty result via callback
+            callback_payload = {
+                "jobId": job.id,
+                "deliverableId": deliverable_id,
+                "tasks": [],
+                "overallNotes": "No feedback found.",
+                "taskCount": 0,
+            }
+            response = await post_callback("/api/ai-callback/feedback-summarized", callback_payload)
+            return {
+                "deliverable_id": deliverable_id,
+                "task_count": 0,
+                "overall_notes": "No feedback found.",
+                "callback_response": response,
+            }
 
         items = []
-        for row in rows:
-            annotation = row["annotation_json"] or {}
+        for row in feedback_data:
+            annotation = row.get("annotation_json", {}) or {}
             if isinstance(annotation, str):
                 annotation = json.loads(annotation)
             items.append(
@@ -53,7 +51,7 @@ async def process_summarize_feedback(job, token):
                     x_pos=float(annotation.get("x_pos", 0.0)),
                     y_pos=float(annotation.get("y_pos", 0.0)),
                     content=row["body"],
-                    author_type=row["source"] or "portal",
+                    author_type=row.get("source", "portal"),
                     page_number=annotation.get("page_number"),
                 )
             )
@@ -66,30 +64,36 @@ async def process_summarize_feedback(job, token):
             task_count=len(result.tasks),
         )
 
-        # Store summary result in database — update deliverable with AI summary
-        async with pool.acquire() as conn:
-            await conn.execute(
-                """
-                UPDATE deliverables
-                SET ai_feedback_summary = $1,
-                    updated_at = NOW()
-                WHERE id = $2
-                """,
-                json.dumps({
-                    "tasks": [t.dict() for t in result.tasks],
-                    "overall_notes": result.overall_notes,
-                    "generated_at": datetime.now(timezone.utc).isoformat(),
-                }),
-                deliverable_id,
-            )
+        # POST results to the API callback instead of writing directly to DB
+        callback_payload = {
+            "jobId": job.id,
+            "deliverableId": deliverable_id,
+            "tasks": [
+                {
+                    "action": t.action,
+                    "impact": t.impact,
+                    "sourcePin": t.source_pin,
+                    "contradiction": t.contradiction,
+                    "conflictExplanation": t.conflict_explanation,
+                }
+                for t in result.tasks
+            ],
+            "overallNotes": result.overall_notes,
+            "taskCount": len(result.tasks),
+        }
+
+        response = await post_callback("/api/ai-callback/feedback-summarized", callback_payload)
 
         return {
             "deliverable_id": deliverable_id,
             "task_count": len(result.tasks),
             "overall_notes": result.overall_notes,
+            "callback_response": response,
         }
-    finally:
-        await pool.close()
+
+    except Exception as e:
+        logger.error("feedback_summarization_failed", deliverable_id=deliverable_id, error=str(e))
+        raise
 
 
 def start_worker():

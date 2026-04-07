@@ -167,6 +167,7 @@ export const sowClauseRepository = {
         and(
           eq(statementsOfWork.id, sowId),
           eq(statementsOfWork.workspaceId, workspaceId),
+          isNull(statementsOfWork.deletedAt),
         ),
       )
       .limit(1);

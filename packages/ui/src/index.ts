@@ -11,3 +11,5 @@ export { DropdownMenu, DropdownItem } from "./dropdown-menu.js";
 export { Avatar } from "./avatar.js";
 export { Skeleton } from "./skeleton.js";
 export { ToastProvider, useToast } from "./toast.js";
+// Typography exports temporarily removed — see apps/web/src/lib/typography.ts
+// export { Heading, H1, H2, H3, H4, Body, Label, Caption, Stat, Code } from "./typography.js";

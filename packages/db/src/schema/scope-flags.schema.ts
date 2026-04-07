@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, jsonb, index, doublePrecision } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { flagSeverityEnum, flagStatusEnum } from './enums';
 import { workspaces } from './workspaces.schema';
@@ -12,11 +12,15 @@ export const scopeFlags = pgTable(
     workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id),
     projectId: uuid("project_id").notNull().references(() => projects.id),
     sowClauseId: uuid("sow_clause_id").references(() => sowClauses.id),
+    messageText: text("message_text").notNull(),
+    confidence: doublePrecision("confidence").notNull(),
     severity: flagSeverityEnum("severity").notNull().default("medium"),
     status: flagStatusEnum("status").notNull().default("pending"),
     title: text("title").notNull(),
     description: text("description"),
+    suggestedResponse: text("suggested_response"),
     aiReasoning: text("ai_reasoning"),
+    matchingClausesJson: jsonb("matching_clauses_json").default([]),
     evidence: jsonb("evidence").default({}),
     flaggedBy: uuid("flagged_by"),
     resolvedBy: uuid("resolved_by"),
@@ -31,6 +35,7 @@ export const scopeFlags = pgTable(
       .on(table.projectId)
       .where(sql`status = 'pending'`),
     workspaceIdx: index("idx_scope_flags_workspace").on(table.workspaceId),
+    workspaceStatusIdx: index("idx_scope_flags_workspace_status").on(table.workspaceId, table.status),
   }),
 );
 

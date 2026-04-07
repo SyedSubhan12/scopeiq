@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { scopeFlagService } from "../services/scope-flag.service.js";
+import { updateScopeFlagSchema, scopeFlagResponseSchema } from "./scope-flag.schemas.js";
 
 export const scopeFlagRouter = new Hono();
 
@@ -25,23 +25,18 @@ scopeFlagRouter.get("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const flag = await scopeFlagService.getById(workspaceId, id);
-    return c.json({ data: flag });
-});
-
-const updateStatusSchema = z.object({
-    status: z.enum(["confirmed", "dismissed", "snoozed", "change_order_sent", "resolved"]),
-    reason: z.string().optional(),
+    return c.json(scopeFlagResponseSchema.parse({ data: flag }));
 });
 
 scopeFlagRouter.patch(
     "/:id",
-    zValidator("json", updateStatusSchema),
+    zValidator("json", updateScopeFlagSchema),
     async (c) => {
         const workspaceId = c.get("workspaceId");
         const userId = c.get("userId");
         const id = c.req.param("id");
         const { status, reason } = c.req.valid("json");
         const updated = await scopeFlagService.updateStatus(workspaceId, id, userId, { status, reason });
-        return c.json({ data: updated });
+        return c.json(scopeFlagResponseSchema.parse({ data: updated }));
     },
 );

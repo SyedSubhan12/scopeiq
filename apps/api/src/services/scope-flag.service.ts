@@ -24,6 +24,7 @@ export const scopeFlagService = {
         const flag = await scopeFlagRepository.getById(workspaceId, id);
         if (!flag) throw new NotFoundError("ScopeFlag", id);
 
+        const oldStatus = flag.status;
         const data: {
             status: FlagStatus;
             resolvedBy?: string | null;
@@ -39,32 +40,31 @@ export const scopeFlagService = {
             data.snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
         }
 
-        const updated = await scopeFlagRepository.updateStatus(workspaceId, id, data);
+        const action = update.status === "dismissed" ? "dismiss" : "update";
 
-        await writeAuditLog(db as never, {
-            workspaceId,
-            actorId: userId,
-            entityType: "scope_flag",
-            entityId: id,
-            action: update.status === "dismissed" ? "dismiss" : "update",
-            metadata: { status: update.status, reason: update.reason },
+        return db.transaction(async (trx) => {
+            const updated = await scopeFlagRepository.updateStatus(workspaceId, id, data, trx as never);
+
+            await writeAuditLog(trx as never, {
+                workspaceId,
+                actorId: userId,
+                entityType: "scope_flag",
+                entityId: id,
+                action,
+                metadata: { oldStatus, newStatus: update.status, reason: update.reason },
+            });
+
+            return updated;
         });
-
-        return updated;
     },
 
     async countPending(workspaceId: string) {
         return scopeFlagRepository.countByWorkspace(workspaceId);
     },
 
-    /**
-     * Matches a scope flag against SOW clauses using keyword overlap.
-     * In a production environment, this would use vector embeddings or LLM-based semantic matching.
-     */
     async matchToSOWClause(workspaceId: string, flagId: string) {
         const flag = await this.getById(workspaceId, flagId);
 
-        // Fetch project and its SOW
         const [project] = await db
             .select({ sowId: projects.sowId })
             .from(projects)
@@ -73,7 +73,6 @@ export const scopeFlagService = {
 
         if (!project?.sowId) return null;
 
-        // Fetch clauses
         const clauses = await db
             .select()
             .from(sowClauses)

@@ -1,8 +1,7 @@
 import { deliverableRepository } from "../repositories/deliverable.repository.js";
 import { deliverableRevisionRepository } from "../repositories/deliverable-revision.repository.js";
 import { approvalEventRepository } from "../repositories/approval-event.repository.js";
-import { writeAuditLog } from "@novabots/db";
-import { db } from "@novabots/db";
+import { db, writeAuditLog } from "@novabots/db";
 import { NotFoundError, ValidationError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
 import { getUploadUrl, getDownloadUrl } from "../lib/storage.js";
@@ -32,33 +31,35 @@ export const deliverableService = {
       description?: string | undefined;
       type?: string | undefined;
       externalUrl?: string | undefined;
-      metadata?: Record<string, any> | undefined;
+      metadata?: Record<string, unknown> | undefined;
       maxRevisions?: number | undefined;
       dueDate?: string | undefined;
     },
   ) {
-    const deliverable = await deliverableRepository.create({
-      workspaceId,
-      projectId: data.projectId,
-      name: data.name,
-      description: data.description ?? null,
-      type: (data.type as "file" | "figma" | "loom" | "youtube" | "link") ?? "file",
-      externalUrl: data.externalUrl ?? null,
-      metadata: data.metadata ?? null,
-      maxRevisions: data.maxRevisions ?? 3,
-      dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      revisionRound: 0,
-    });
+    return db.transaction(async (trx) => {
+      const deliverable = await deliverableRepository.create({
+        workspaceId,
+        projectId: data.projectId,
+        name: data.name,
+        description: data.description ?? null,
+        type: (data.type as "file" | "figma" | "loom" | "youtube" | "link") ?? "file",
+        externalUrl: data.externalUrl ?? null,
+        metadata: data.metadata ?? null,
+        maxRevisions: data.maxRevisions ?? 3,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        revisionRound: 0,
+      }, trx as never);
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "deliverable",
-      entityId: deliverable.id,
-      action: "create",
-    });
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "deliverable",
+        entityId: deliverable.id,
+        action: "create",
+      });
 
-    return deliverable;
+      return deliverable;
+    });
   },
 
   async update(
@@ -72,38 +73,42 @@ export const deliverableService = {
       cleaned.dueDate = new Date(cleaned.dueDate);
     }
 
-    const deliverable = await deliverableRepository.update(workspaceId, deliverableId, cleaned);
-    if (!deliverable) {
-      throw new NotFoundError("Deliverable", deliverableId);
-    }
+    return db.transaction(async (trx) => {
+      const deliverable = await deliverableRepository.update(workspaceId, deliverableId, cleaned, trx as never);
+      if (!deliverable) {
+        throw new NotFoundError("Deliverable", deliverableId);
+      }
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "deliverable",
-      entityId: deliverableId,
-      action: "update",
-      metadata: { fields: Object.keys(cleaned) },
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "deliverable",
+        entityId: deliverableId,
+        action: "update",
+        metadata: { fields: Object.keys(cleaned) },
+      });
+
+      return deliverable;
     });
-
-    return deliverable;
   },
 
   async delete(workspaceId: string, deliverableId: string, actorId: string) {
-    const deliverable = await deliverableRepository.softDelete(workspaceId, deliverableId);
-    if (!deliverable) {
-      throw new NotFoundError("Deliverable", deliverableId);
-    }
+    return db.transaction(async (trx) => {
+      const deliverable = await deliverableRepository.softDelete(workspaceId, deliverableId, trx as never);
+      if (!deliverable) {
+        throw new NotFoundError("Deliverable", deliverableId);
+      }
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "deliverable",
-      entityId: deliverableId,
-      action: "delete",
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "deliverable",
+        entityId: deliverableId,
+        action: "delete",
+      });
+
+      return deliverable;
     });
-
-    return deliverable;
   },
 
   async getFreshDownloadUrl(workspaceId: string, deliverableId: string) {
@@ -118,6 +123,12 @@ export const deliverableService = {
     deliverableId: string,
     data: { fileName: string; contentType: string; fileSize: number },
   ) {
+    const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+
+    if (data.fileSize > MAX_FILE_SIZE) {
+      throw new ValidationError("File size must be under 500MB");
+    }
+
     const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
     if (!deliverable) {
       throw new NotFoundError("Deliverable", deliverableId);
@@ -133,7 +144,7 @@ export const deliverableService = {
     workspaceId: string,
     deliverableId: string,
     actorId: string,
-    data: { objectKey: string; originalName?: string; notes?: string },
+    data: { objectKey: string; originalName?: string | undefined; notes?: string | undefined },
   ) {
     const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
     if (!deliverable) {
@@ -141,37 +152,38 @@ export const deliverableService = {
     }
 
     const fileUrl = await getDownloadUrl(data.objectKey);
-
-    // Create new revision
     const nextVersion = (deliverable.revisionRound ?? 0) + 1;
-    const revision = await deliverableRevisionRepository.create({
-      deliverableId,
-      versionNumber: nextVersion,
-      fileUrl,
-      notes: data.notes ?? null,
-      createdBy: actorId,
-    });
 
-    const updated = await deliverableRepository.update(workspaceId, deliverableId, {
-      fileKey: data.objectKey,
-      fileUrl,
-      originalName: data.originalName ?? null,
-      status: "delivered",
-      uploadedBy: actorId,
-      reviewStartedAt: new Date(),
-      currentRevisionId: revision.id,
-    });
+    return db.transaction(async (trx) => {
+      const revision = await deliverableRevisionRepository.create({
+        deliverableId,
+        versionNumber: nextVersion,
+        fileUrl,
+        notes: data.notes ?? null,
+        createdBy: actorId,
+      }, trx as never);
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "deliverable",
-      entityId: deliverableId,
-      action: "update",
-      metadata: { action: "confirm_upload", version: nextVersion, fileKey: data.objectKey },
-    });
+      const updated = await deliverableRepository.update(workspaceId, deliverableId, {
+        fileKey: data.objectKey,
+        fileUrl,
+        originalName: data.originalName ?? null,
+        status: "delivered",
+        uploadedBy: actorId,
+        reviewStartedAt: new Date(),
+        currentRevisionId: revision.id,
+      }, trx as never);
 
-    return updated;
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "deliverable",
+        entityId: deliverableId,
+        action: "update",
+        metadata: { action: "confirm_upload", version: nextVersion, fileKey: data.objectKey },
+      });
+
+      return updated;
+    });
   },
 
   async approve(
@@ -179,7 +191,7 @@ export const deliverableService = {
     deliverableId: string,
     actorId: string | null,
     actorName: string | null,
-    comment?: string,
+    comment?: string | undefined,
   ) {
     const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
     if (!deliverable) {
@@ -190,25 +202,29 @@ export const deliverableService = {
       throw new ValidationError("Deliverable is already approved");
     }
 
-    await deliverableRepository.update(workspaceId, deliverableId, { status: "approved" });
+    return db.transaction(async (trx) => {
+      await deliverableRepository.update(workspaceId, deliverableId, { status: "approved" }, trx as never);
 
-    const event = await approvalEventRepository.create({
-      deliverableId,
-      actorId,
-      actorName,
-      action: "approved",
-      comment: comment ?? null,
+      const event = await approvalEventRepository.create({
+        workspaceId,
+        deliverableId,
+        eventType: "approval",
+        actorId,
+        actorName,
+        action: "approved",
+        comment: comment ?? null,
+      }, trx as never);
+
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "deliverable",
+        entityId: deliverableId,
+        action: "approve",
+      });
+
+      return event;
     });
-
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "deliverable",
-      entityId: deliverableId,
-      action: "approve",
-    });
-
-    return event;
   },
 
   async requestRevision(
@@ -216,7 +232,7 @@ export const deliverableService = {
     deliverableId: string,
     actorId: string | null,
     actorName: string | null,
-    comment?: string,
+    comment?: string | undefined,
   ) {
     const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
     if (!deliverable) {
@@ -230,19 +246,125 @@ export const deliverableService = {
       );
     }
 
-    await deliverableRepository.update(workspaceId, deliverableId, {
-      status: "changes_requested",
-      revisionRound: currentRound + 1,
-    });
+    return db.transaction(async (trx) => {
+      await deliverableRepository.update(workspaceId, deliverableId, {
+        status: "changes_requested",
+        revisionRound: currentRound + 1,
+      }, trx as never);
 
-    const event = await approvalEventRepository.create({
-      deliverableId,
-      actorId,
-      actorName,
-      action: "changes_requested",
-      comment: comment ?? null,
-    });
+      const event = await approvalEventRepository.create({
+        workspaceId,
+        deliverableId,
+        eventType: "revision",
+        actorId,
+        actorName,
+        action: "changes_requested",
+        comment: comment ?? null,
+      }, trx as never);
 
-    return event;
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "deliverable",
+        entityId: deliverableId,
+        action: "update",
+        metadata: { revisionRound: currentRound + 1 },
+      });
+
+      return event;
+    });
+  },
+
+  /**
+   * Approve a deliverable via email link (token-based auth).
+   */
+  async approveViaEmail(
+    workspaceId: string,
+    deliverableId: string,
+    comment?: string | undefined,
+  ) {
+    const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
+    if (!deliverable) {
+      throw new NotFoundError("Deliverable", deliverableId);
+    }
+
+    if (deliverable.status === "approved") {
+      throw new ValidationError("Deliverable is already approved");
+    }
+
+    return db.transaction(async (trx) => {
+      await deliverableRepository.update(workspaceId, deliverableId, { status: "approved" }, trx as never);
+
+      const event = await approvalEventRepository.create({
+        workspaceId,
+        deliverableId,
+        eventType: "email_approval",
+        actorId: null,
+        actorName: "Client (email link)",
+        action: "approved",
+        comment: comment ?? null,
+      }, trx as never);
+
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "deliverable",
+        entityId: deliverableId,
+        action: "approve",
+        metadata: { source: "email_link" },
+      });
+
+      return event;
+    });
+  },
+
+  /**
+   * Decline a deliverable via email link (token-based auth).
+   */
+  async declineViaEmail(
+    workspaceId: string,
+    deliverableId: string,
+    comment?: string | undefined,
+  ) {
+    const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
+    if (!deliverable) {
+      throw new NotFoundError("Deliverable", deliverableId);
+    }
+
+    if (deliverable.status === "approved") {
+      throw new ValidationError("Cannot decline an already-approved deliverable");
+    }
+
+    const currentRound = deliverable.revisionRound ?? 0;
+
+    return db.transaction(async (trx) => {
+      await deliverableRepository.update(workspaceId, deliverableId, {
+        status: "changes_requested",
+        revisionRound: currentRound + 1,
+      }, trx as never);
+
+      const event = await approvalEventRepository.create({
+        workspaceId,
+        deliverableId,
+        eventType: "email_decline",
+        actorId: null,
+        actorName: "Client (email link)",
+        action: "changes_requested",
+        comment: comment ?? null,
+      }, trx as never);
+
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "deliverable",
+        entityId: deliverableId,
+        action: "update",
+        metadata: { source: "email_link", revisionRound: currentRound + 1 },
+      });
+
+      return event;
+    });
   },
 };

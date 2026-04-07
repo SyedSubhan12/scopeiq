@@ -2,18 +2,13 @@ import asyncio
 import json
 import structlog
 from bullmq import Worker
-import asyncpg
 
 from app.config import settings
 from app.schemas.brief_schemas import BriefFieldInput
 from app.services.brief_scorer import BriefScorerService
+from app.services.callback_service import post_callback
 
 logger = structlog.get_logger()
-
-
-async def get_db_pool():
-    """Create a connection pool for database operations."""
-    return await asyncpg.create_pool(settings.DATABASE_URL, min_size=1, max_size=5)
 
 
 async def process_score_brief(job, token):
@@ -23,23 +18,31 @@ async def process_score_brief(job, token):
 
     scorer = BriefScorerService()
 
-    # Fetch brief fields from database
-    pool = await get_db_pool()
-    try:
-        async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT field_key, field_label, field_type, value
-                FROM brief_fields
-                WHERE brief_id = $1
-                ORDER BY sort_order ASC
-                """,
-                brief_id,
-            )
+    # Brief fields should be pre-fetched and included in the job data
+    # by the API dispatcher to avoid direct DB access.
+    fields_data = job.data.get("fields", [])
 
-        if not rows:
-            logger.warning("no_brief_fields_found", brief_id=brief_id)
-            return {"brief_id": brief_id, "score": 0, "status": "clarification_needed", "flag_count": 0}
+    try:
+        if not fields_data:
+            # No fields available — return empty result via callback
+            callback_payload = {
+                "jobId": job.id,
+                "briefId": brief_id,
+                "score": 0,
+                "summary": "No brief fields were available for scoring.",
+                "flags": [],
+                "status": "clarification_needed",
+                "flagCount": 0,
+            }
+            response = await post_callback("/api/ai-callback/brief-scored", callback_payload)
+            return {
+                "brief_id": brief_id,
+                "score": 0,
+                "summary": "No brief fields were available for scoring.",
+                "status": "clarification_needed",
+                "flag_count": 0,
+                "callback_response": response,
+            }
 
         fields = [
             BriefFieldInput(
@@ -48,7 +51,7 @@ async def process_score_brief(job, token):
                 label=row["field_label"],
                 value=row["value"] or "",
             )
-            for row in rows
+            for row in fields_data
         ]
 
         result = await scorer.score(fields)
@@ -60,30 +63,29 @@ async def process_score_brief(job, token):
             flag_count=len(result.flags),
         )
 
-        # Update brief record in database with score + status
-        # scope_score < 50 → clarification_needed, >= 50 → scored
+        # Determine status based on score
         new_status = "clarification_needed" if result.score < 50 else "scored"
-        scoring_result = json.dumps({
+
+        # POST results to the API callback instead of writing directly to DB
+        callback_payload = {
+            "jobId": job.id,
+            "briefId": brief_id,
             "score": result.score,
             "summary": result.summary,
-            "flags": [f.dict() for f in result.flags],
-        })
-        async with pool.acquire() as conn:
-            await conn.execute(
-                """
-                UPDATE briefs
-                SET scope_score = $1,
-                    scoring_result_json = $2::jsonb,
-                    status = $3,
-                    scored_at = NOW(),
-                    updated_at = NOW()
-                WHERE id = $4
-                """,
-                result.score,
-                scoring_result,
-                new_status,
-                brief_id,
-            )
+            "flags": [
+                {
+                    "fieldKey": f.field_key,
+                    "reason": f.reason,
+                    "severity": f.severity,
+                    "suggestedQuestion": f.suggested_question,
+                }
+                for f in result.flags
+            ],
+            "status": new_status,
+            "flagCount": len(result.flags),
+        }
+
+        response = await post_callback("/api/ai-callback/brief-scored", callback_payload)
 
         return {
             "brief_id": brief_id,
@@ -91,9 +93,12 @@ async def process_score_brief(job, token):
             "summary": result.summary,
             "status": new_status,
             "flag_count": len(result.flags),
+            "callback_response": response,
         }
-    finally:
-        await pool.close()
+
+    except Exception as e:
+        logger.error("brief_scoring_failed", brief_id=brief_id, error=str(e))
+        raise
 
 
 def start_worker():

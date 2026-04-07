@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FileSignature, Plus, MoreHorizontal, Download, ExternalLink, Trash2 } from "lucide-react";
 import { Card, Badge, Button, Skeleton, DropdownMenu, DropdownItem } from "@novabots/ui";
-import { useChangeOrders, useUpdateChangeOrder } from "@/hooks/useChangeOrders";
+import { useChangeOrders, useUpdateChangeOrder } from "@/hooks/change-orders";
 import { format } from "date-fns";
 
 export function ChangeOrdersTab({ projectId }: { projectId: string }) {

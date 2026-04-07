@@ -1,62 +1,125 @@
 import { feedbackRepository } from "../repositories/feedback.repository.js";
 import { deliverableRepository } from "../repositories/deliverable.repository.js";
 import { NotFoundError } from "@novabots/types";
+import { db, writeAuditLog } from "@novabots/db";
 import { dispatchSummarizeFeedbackJob } from "../jobs/summarize-feedback.job.js";
 import { dispatchScopeCheckJob } from "../jobs/scope-check.job.js";
 
 export const feedbackService = {
-  async listByDeliverable(deliverableId: string) {
-    return feedbackRepository.listByDeliverable(deliverableId);
+  async listByDeliverable(workspaceId: string, deliverableId: string) {
+    return feedbackRepository.listByDeliverable(workspaceId, deliverableId);
   },
 
   async submit(data: {
+    workspaceId: string;
     deliverableId: string;
     body: string;
     authorId?: string | undefined;
     authorName?: string | undefined;
     source?: "portal" | "email_forward" | "manual_input" | undefined;
     annotationJson?: {
-      x_pos: number;
-      y_pos: number;
-      page_number?: number | undefined;
-      pin_number: number;
+      xPos: number;
+      yPos: number;
+      pageNumber?: number | null | undefined;
+      pinNumber: number;
     } | undefined;
+    pageNumber?: number | null | undefined;
   }) {
-    const item = await feedbackRepository.create({
-      deliverableId: data.deliverableId,
-      body: data.body,
-      authorId: data.authorId ?? null,
-      authorName: data.authorName ?? null,
-      source: data.source ?? "portal",
-      annotationJson: data.annotationJson ?? null,
+    // Verify deliverable belongs to workspace before creating feedback
+    const deliverable = await deliverableRepository.getById(data.workspaceId, data.deliverableId);
+    if (!deliverable) {
+      throw new NotFoundError("Deliverable", data.deliverableId);
+    }
+
+    const item = await db.transaction(async (trx) => {
+      const created = await feedbackRepository.create(data.workspaceId, {
+        deliverableId: data.deliverableId,
+        body: data.body,
+        authorId: data.authorId ?? null,
+        authorName: data.authorName ?? null,
+        source: data.source ?? "portal",
+        annotationJson: data.annotationJson ?? null,
+        pageNumber: data.pageNumber ?? null,
+      }, trx);
+
+      if (!created) {
+        throw new NotFoundError("Deliverable", data.deliverableId);
+      }
+
+      await writeAuditLog(trx, {
+        workspaceId: data.workspaceId,
+        actorId: data.authorId ?? null,
+        entityType: "feedback",
+        entityId: created.id,
+        action: "create",
+        metadata: { deliverableId: data.deliverableId, source: data.source ?? "portal" },
+      });
+
+      return created;
     });
 
-    // Dispatch AI summarization job after new feedback
+    // Dispatch jobs outside the transaction
     await dispatchSummarizeFeedbackJob(data.deliverableId);
 
-    // AI Scope Guard Audit: New for Phase 3
-    // We need the projectId to check against SOW clauses
-    const deliverable = await deliverableRepository.getById("", data.deliverableId); // WorkspaceId not needed here for internal lookup
-    if (deliverable && deliverable.projectId) {
+    if (deliverable.projectId) {
       await dispatchScopeCheckJob(deliverable.projectId, data.body, data.authorId);
     }
 
     return item;
   },
 
-  async resolve(feedbackId: string, resolved: boolean) {
-    const item = await feedbackRepository.setResolved(feedbackId, resolved);
-    if (!item) {
+  async resolve(workspaceId: string, feedbackId: string, actorId: string | null, resolved: boolean) {
+    const existing = await feedbackRepository.getById(workspaceId, feedbackId);
+    if (!existing) {
       throw new NotFoundError("FeedbackItem", feedbackId);
     }
-    return item;
+
+    return db.transaction(async (trx) => {
+      const item = await feedbackRepository.setResolved(workspaceId, feedbackId, resolved, trx as never);
+      if (!item) {
+        throw new NotFoundError("FeedbackItem", feedbackId);
+      }
+
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "feedback",
+        entityId: feedbackId,
+        action: "update",
+        metadata: {
+          deliverableId: existing.deliverableId,
+          resolved,
+        },
+      });
+
+      return item;
+    });
   },
 
-  async delete(feedbackId: string, workspaceId: string) {
-    const item = await feedbackRepository.delete(feedbackId, workspaceId);
-    if (!item) {
+  async delete(feedbackId: string, workspaceId: string, actorId: string | null) {
+    const existing = await feedbackRepository.getById(workspaceId, feedbackId);
+    if (!existing) {
       throw new NotFoundError("FeedbackItem", feedbackId);
     }
-    return item;
+
+    return db.transaction(async (trx) => {
+      const item = await feedbackRepository.delete(feedbackId, workspaceId, trx as never);
+      if (!item) {
+        throw new NotFoundError("FeedbackItem", feedbackId);
+      }
+
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "feedback",
+        entityId: feedbackId,
+        action: "delete",
+        metadata: {
+          deliverableId: existing.deliverableId,
+        },
+      });
+
+      return item;
+    });
   },
 };

@@ -2,7 +2,7 @@
 
 import { AlertTriangle, AlertCircle, Info, HelpCircle, CheckCircle } from "lucide-react";
 import { Card } from "@novabots/ui";
-import type { BriefFlag } from "@/hooks/useBriefs";
+import type { BriefFlag } from "@/lib/briefs";
 
 interface BriefFlagCardProps {
   flag: BriefFlag;
@@ -32,7 +32,7 @@ const severityConfig = {
 } as const;
 
 export function BriefFlagCard({ flag, onOverride, overriding }: BriefFlagCardProps) {
-  const config = severityConfig[flag.severity];
+  const config = severityConfig[flag.severity as keyof typeof severityConfig] ?? severityConfig.medium;
   const { Icon } = config;
 
   return (
@@ -47,12 +47,12 @@ export function BriefFlagCard({ flag, onOverride, overriding }: BriefFlagCardPro
           </span>
         </div>
         <p className="text-sm text-[rgb(var(--text-primary))]">{flag.message}</p>
-        {flag.suggested_question && (
+        {flag.suggestedQuestion && (
           <div className="mt-2 flex items-start gap-1.5 rounded-md bg-[rgb(var(--surface-subtle))] p-2">
             <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[rgb(var(--text-muted))]" />
             <p className="text-xs text-[rgb(var(--text-secondary))]">
               <span className="font-medium">Suggested: </span>
-              {flag.suggested_question}
+              {flag.suggestedQuestion}
             </p>
           </div>
         )}
