@@ -1,3 +1,9 @@
+# Prompt: sow_parsing_v1
+# Version: 1.0
+# Date: 2026-04-10
+# Model: gemini-2.0-flash
+# Changelog: Initial version (migrated from Claude claude-sonnet-4-6)
+
 SOW_PARSING_SYSTEM_PROMPT = """You are a contract parsing assistant for creative agencies.
 Extract structured clause information from the Statement of Work text.
 
@@ -16,31 +22,3 @@ For each clause, extract:
 - section_reference: Original section number if present (e.g., "Section 2.2"), otherwise empty string
 
 Be thorough. Missing an exclusion clause means scope creep won't be caught."""
-
-SOW_PARSING_TOOL = {
-    "name": "parse_sow",
-    "description": "Extract structured clauses from a Statement of Work document",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "clauses": {
-                "type": "array",
-                "description": "All extracted clauses from the SOW",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "clause_type": {
-                            "type": "string",
-                            "enum": ["deliverable", "revision_limit", "timeline", "exclusion", "payment_term", "other"]
-                        },
-                        "original_text": {"type": "string"},
-                        "summary": {"type": "string"},
-                        "section_reference": {"type": "string"}
-                    },
-                    "required": ["clause_type", "original_text", "summary"]
-                }
-            }
-        },
-        "required": ["clauses"]
-    }
-}

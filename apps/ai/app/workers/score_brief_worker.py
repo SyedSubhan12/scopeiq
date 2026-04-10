@@ -1,10 +1,12 @@
 import asyncio
 import json
+import time
 import structlog
 from bullmq import Worker
 import asyncpg
 
 from app.config import settings
+from app.gemini_client import get_gemini_client  # noqa: F401 — imported to confirm singleton pattern
 from app.schemas.brief_schemas import BriefFieldInput
 from app.services.brief_scorer import BriefScorerService
 
@@ -25,6 +27,7 @@ async def process_score_brief(job, token):
 
     # Fetch brief fields from database
     pool = await get_db_pool()
+    start_ms = int(time.monotonic() * 1000)
     try:
         async with pool.acquire() as conn:
             rows = await conn.fetch(
@@ -51,13 +54,28 @@ async def process_score_brief(job, token):
             for row in rows
         ]
 
-        result = await scorer.score(fields)
+        try:
+            result = await asyncio.wait_for(scorer.score(fields), timeout=30)
+        except asyncio.TimeoutError:
+            duration_ms = int(time.monotonic() * 1000) - start_ms
+            logger.error(
+                "score_brief_timeout",
+                brief_id=brief_id,
+                model=settings.GEMINI_MODEL,
+                duration_ms=duration_ms,
+                success=False,
+            )
+            return {"brief_id": brief_id, "score": 0, "status": "error", "flag_count": 0}
 
+        duration_ms = int(time.monotonic() * 1000) - start_ms
         logger.info(
             "brief_scored",
             brief_id=brief_id,
             score=result.score,
             flag_count=len(result.flags),
+            model=settings.GEMINI_MODEL,
+            duration_ms=duration_ms,
+            success=True,
         )
 
         # Update brief record in database with score + status
@@ -66,7 +84,7 @@ async def process_score_brief(job, token):
         scoring_result = json.dumps({
             "score": result.score,
             "summary": result.summary,
-            "flags": [f.dict() for f in result.flags],
+            "flags": [f.model_dump() for f in result.flags],
         })
         async with pool.acquire() as conn:
             await conn.execute(
@@ -92,6 +110,17 @@ async def process_score_brief(job, token):
             "status": new_status,
             "flag_count": len(result.flags),
         }
+    except Exception as exc:
+        duration_ms = int(time.monotonic() * 1000) - start_ms
+        logger.error(
+            "score_brief_failed",
+            brief_id=brief_id,
+            error=str(exc),
+            model=settings.GEMINI_MODEL,
+            duration_ms=duration_ms,
+            success=False,
+        )
+        raise
     finally:
         await pool.close()
 
@@ -111,5 +140,4 @@ def start_worker():
 
 
 if __name__ == "__main__":
-    worker = start_worker()
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(start_worker())

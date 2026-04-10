@@ -1,3 +1,9 @@
+# Prompt: brief_scoring_v1
+# Version: 1.0
+# Date: 2026-04-10
+# Model: gemini-2.0-flash
+# Changelog: Initial version (migrated from Claude claude-sonnet-4-6)
+
 BRIEF_SCORING_SYSTEM_PROMPT = """You are a creative project brief evaluator for a professional agency.
 Analyze the submitted brief and evaluate each field for clarity, completeness, and actionability.
 
@@ -13,46 +19,5 @@ For each flagged field, provide:
 - severity: "low" (minor clarity issue), "medium" (could cause revisions), "high" (will definitely cause revisions)
 - suggested_question: A specific question to ask the client to resolve the ambiguity
 
-Be critical but fair. Focus on fields that would cause revision rounds if left unclear."""
-
-BRIEF_SCORING_TOOL = {
-    "name": "score_brief",
-    "description": "Score a client brief for clarity and flag ambiguous areas",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "score": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 100,
-                "description": "Overall clarity score from 0-100",
-            },
-            "summary": {
-                "type": "string",
-                "description": "One-sentence overall assessment",
-            },
-            "flags": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "field_key": {"type": "string"},
-                        "reason": {"type": "string"},
-                        "severity": {
-                            "type": "string",
-                            "enum": ["low", "medium", "high"],
-                        },
-                        "suggested_question": {"type": "string"},
-                    },
-                    "required": [
-                        "field_key",
-                        "reason",
-                        "severity",
-                        "suggested_question",
-                    ],
-                },
-            },
-        },
-        "required": ["score", "summary", "flags"],
-    },
-}
+Be critical but fair. Focus on fields that would cause revision rounds if left unclear.
+When the score is below 70, you MUST include at least 3 flags identifying the most problematic fields."""

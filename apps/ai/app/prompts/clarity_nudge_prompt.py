@@ -1,3 +1,9 @@
+# Prompt: clarity_nudge_v1
+# Version: 1.0
+# Date: 2026-04-10
+# Model: gemini-2.0-flash
+# Changelog: Initial version (migrated from Claude claude-sonnet-4-6)
+
 CLARITY_NUDGE_SYSTEM_PROMPT = """You are an AI writing assistant for creative project briefs.
 Your goal is to provide a real-time "clarity score" and helpful feedback for a single field response.
 

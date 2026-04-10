@@ -76,7 +76,7 @@ async def process_summarize_feedback(job, token):
                 WHERE id = $2
                 """,
                 json.dumps({
-                    "tasks": [t.dict() for t in result.tasks],
+                    "tasks": [t.model_dump() for t in result.tasks],
                     "overall_notes": result.overall_notes,
                     "generated_at": datetime.now(timezone.utc).isoformat(),
                 }),
@@ -107,5 +107,4 @@ def start_worker():
 
 
 if __name__ == "__main__":
-    worker = start_worker()
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(start_worker())

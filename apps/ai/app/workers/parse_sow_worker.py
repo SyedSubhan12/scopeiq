@@ -17,7 +17,7 @@ async def get_db_pool():
 
 async def process_parse_sow(job, token):
     """
-    Parse a SOW with Claude and write structured clauses back to the DB.
+    Parse a SOW with Gemini and write structured clauses back to the DB.
     Job data: { sow_id, project_id, raw_text }
     """
     sow_id = job.data.get("sow_id")
@@ -69,8 +69,8 @@ async def process_parse_sow(job, token):
         logger.info("sow_clauses_written", sow_id=sow_id, clause_count=result.clause_count)
         return {"status": "ok", "clause_count": result.clause_count}
 
-    except Exception as e:
-        logger.error("parse_sow_failed", sow_id=sow_id, error=str(e))
+    except Exception as exc:
+        logger.error("parse_sow_failed", sow_id=sow_id, error=str(exc))
         raise
     finally:
         await pool.close()
@@ -87,5 +87,4 @@ def start_worker():
 
 
 if __name__ == "__main__":
-    worker = start_worker()
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(start_worker())

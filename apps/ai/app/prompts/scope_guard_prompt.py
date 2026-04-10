@@ -1,3 +1,9 @@
+# Prompt: scope_guard_v1
+# Version: 1.0
+# Date: 2026-04-10
+# Model: gemini-2.0-flash
+# Changelog: Initial version (migrated from Claude claude-sonnet-4-6)
+
 SCOPE_GUARD_SYSTEM_PROMPT = """You are a senior project manager and contract specialist for a high-end creative agency.
 Your task is to analyze client requests or project communication against the project's Statement of Work (SOW) clauses.
 
@@ -17,22 +23,3 @@ Criteria for Deviation:
 4. Requests that exceed "Revision Limits" defined in the clauses.
 
 Be professional and objective. Small clarifications are NOT deviations. New features are DEVIATIONS."""
-
-SCOPE_GUARD_TOOL = {
-    "name": "analyze_scope",
-    "description": "Analyze a project request against SOW clauses for deviations",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "is_deviation": {"type": "boolean"},
-            "confidence": {"type": "number"},
-            "reasoning": {"type": "string"},
-            "matched_clause_id": {"type": ["string", "null"]},
-            "suggested_severity": {
-                "type": "string",
-                "enum": ["low", "medium", "high"]
-            }
-        },
-        "required": ["is_deviation", "confidence", "reasoning", "suggested_severity"]
-    }
-}

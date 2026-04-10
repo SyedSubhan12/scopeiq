@@ -1,13 +1,17 @@
 import asyncio
 import json
 import structlog
+import time
 from bullmq import Worker
 import asyncpg
 from uuid import uuid4
 from datetime import datetime, timezone
 
+from google.genai import types
+
 from app.config import settings
-import anthropic
+from app.gemini_client import get_gemini_client
+from app.schemas.change_order_schemas import ChangeOrderOutput, ChangeOrderLineItem
 
 logger = structlog.get_logger()
 
@@ -20,32 +24,109 @@ generate a professional change order with:
 - Estimated hours for the additional work
 - Pricing calculated from the rate card items
 
-Return the change order as a JSON object with these fields:
-{
-  "title": string (max 255 chars),
-  "description": string (detailed explanation),
-  "estimated_hours": number,
-  "line_items": [
-    {
-      "rate_card_item_id": string,
-      "rate_card_name": string,
-      "quantity": number,
-      "unit": string,
-      "rate_in_cents": number,
-      "subtotal_cents": number
-    }
-  ],
-  "total_amount_cents": number
-}
-
 Rules:
 - Only include line items that match the available rate card items
 - Calculate subtotals as quantity * rate_in_cents
 - total_amount_cents is the sum of all subtotals
 - estimated_hours should be realistic for the described work
 - description should reference the specific SOW clause being violated
-- Keep the tone professional and client-facing
-"""
+- Keep the tone professional and client-facing"""
+
+CHANGE_ORDER_TOOL = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="generate_change_order",
+            description="Generate a professional change order for a scope deviation",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "title": types.Schema(
+                        type="STRING",
+                        description="Change order title (max 255 chars)",
+                    ),
+                    "description": types.Schema(
+                        type="STRING",
+                        description="Detailed explanation of scope change and what the change order covers",
+                    ),
+                    "estimated_hours": types.Schema(
+                        type="NUMBER",
+                        description="Estimated hours for additional work",
+                    ),
+                    "line_items": types.Schema(
+                        type="ARRAY",
+                        items=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "rate_card_item_id": types.Schema(type="STRING"),
+                                "rate_card_name": types.Schema(type="STRING"),
+                                "quantity": types.Schema(type="NUMBER"),
+                                "unit": types.Schema(type="STRING"),
+                                "rate_in_cents": types.Schema(type="INTEGER"),
+                                "subtotal_cents": types.Schema(type="INTEGER"),
+                            },
+                            required=[
+                                "rate_card_item_id",
+                                "rate_card_name",
+                                "quantity",
+                                "unit",
+                                "rate_in_cents",
+                                "subtotal_cents",
+                            ],
+                        ),
+                    ),
+                    "total_amount_cents": types.Schema(
+                        type="INTEGER",
+                        description="Sum of all line item subtotals in cents",
+                    ),
+                    "revised_timeline": types.Schema(
+                        type="STRING",
+                        description="Optional revised timeline if this change affects delivery dates",
+                    ),
+                },
+                required=["title", "description", "estimated_hours", "line_items", "total_amount_cents"],
+            ),
+        )
+    ]
+)
+
+CHANGE_ORDER_CONFIG = types.GenerateContentConfig(
+    system_instruction=CHANGE_ORDER_SYSTEM_PROMPT,
+    tools=[CHANGE_ORDER_TOOL],
+    tool_config=types.ToolConfig(
+        function_calling_config=types.FunctionCallingConfig(
+            mode="ANY",
+            allowed_function_names=["generate_change_order"],
+        )
+    ),
+)
+
+
+async def _call_gemini_with_retry(prompt: str, max_retries: int = 3) -> types.GenerateContentResponse:
+    client = get_gemini_client()
+    last_exc: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.models.generate_content(
+                    model=settings.GEMINI_MODEL,
+                    contents=prompt,
+                    config=CHANGE_ORDER_CONFIG,
+                ),
+            )
+            return response
+        except Exception as exc:
+            last_exc = exc
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt
+                logger.warning(
+                    "change_order_worker_retry",
+                    attempt=attempt + 1,
+                    wait_seconds=wait,
+                    error=str(exc),
+                )
+                await asyncio.sleep(wait)
+    raise last_exc  # type: ignore[misc]
 
 
 async def get_db_pool():
@@ -67,7 +148,6 @@ async def process_generate_change_order(job, token):
     logger.info("processing_generate_change_order", scope_flag_id=scope_flag_id)
 
     pool = await get_db_pool()
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
     try:
         async with pool.acquire() as conn:
@@ -126,28 +206,34 @@ async def process_generate_change_order(job, token):
                 workspace_id,
             )
 
-            # 6. Build context for Claude
-            clauses_context = json.dumps([
-                {
-                    "id": str(row["id"]),
-                    "clause_type": row["clause_type"],
-                    "summary": row["summary"],
-                    "original_text": row["original_text"],
-                }
-                for row in clauses_rows
-            ], indent=2)
+            # 6. Build context for Gemini
+            clauses_context = json.dumps(
+                [
+                    {
+                        "id": str(row["id"]),
+                        "clause_type": row["clause_type"],
+                        "summary": row["summary"],
+                        "original_text": row["original_text"],
+                    }
+                    for row in clauses_rows
+                ],
+                indent=2,
+            )
 
-            rate_card_context = json.dumps([
-                {
-                    "id": str(row["id"]),
-                    "name": row["name"],
-                    "description": row["description"],
-                    "unit": row["unit"],
-                    "rate_in_cents": row["rate_in_cents"],
-                    "currency": row["currency"],
-                }
-                for row in rate_card_rows
-            ], indent=2)
+            rate_card_context = json.dumps(
+                [
+                    {
+                        "id": str(row["id"]),
+                        "name": row["name"],
+                        "description": row["description"],
+                        "unit": row["unit"],
+                        "rate_in_cents": row["rate_in_cents"],
+                        "currency": row["currency"],
+                    }
+                    for row in rate_card_rows
+                ],
+                indent=2,
+            )
 
             prompt = f"""Generate a change order for this scope deviation.
 
@@ -165,35 +251,50 @@ All SOW Clauses:
 Available Rate Card Items:
 {rate_card_context}
 
-Generate the change order as a JSON object."""
+Generate the change order using the generate_change_order function."""
 
-            # 7. Call Claude
-            response = await client.messages.create(
-                model="claude-3-5-sonnet-20240620",
-                max_tokens=4096,
-                system=CHANGE_ORDER_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": prompt}],
+            # 7. Call Gemini with retry + timeout
+            start_ms = int(time.monotonic() * 1000)
+            try:
+                response = await asyncio.wait_for(
+                    _call_gemini_with_retry(prompt),
+                    timeout=60,
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "change_order_generation_timeout",
+                    scope_flag_id=scope_flag_id,
+                )
+                return {"status": "error", "reason": "AI generation timed out"}
+
+            # 8. Parse function call result
+            func_call = response.candidates[0].content.parts[0].function_call
+            raw_args = dict(func_call.args)
+
+            raw_line_items = [dict(li) for li in list(raw_args.get("line_items", []))]
+            line_items = [ChangeOrderLineItem(**li) for li in raw_line_items]
+
+            change_order = ChangeOrderOutput(
+                title=str(raw_args.get("title", flag["title"]))[:255],
+                description=str(raw_args.get("description", flag["description"])),
+                estimated_hours=float(raw_args.get("estimated_hours", 0.0)),
+                line_items=line_items,
+                total_amount_cents=int(raw_args.get("total_amount_cents", 0)),
+                revised_timeline=str(raw_args["revised_timeline"]) if raw_args.get("revised_timeline") else None,
             )
 
-            # 8. Parse Claude's response
-            change_order_text = ""
-            for block in response.content:
-                if block.type == "text":
-                    change_order_text += block.text
-
-            # Extract JSON from response
-            json_start = change_order_text.find("{")
-            json_end = change_order_text.rfind("}") + 1
-            if json_start == -1 or json_end == 0:
-                logger.error("no_json_in_claude_response", scope_flag_id=scope_flag_id)
-                return {"status": "error", "reason": "invalid AI response"}
-
-            change_order_json = json.loads(change_order_text[json_start:json_end])
+            duration_ms = int(time.monotonic() * 1000) - start_ms
+            logger.info(
+                "change_order_ai_complete",
+                scope_flag_id=scope_flag_id,
+                model=settings.GEMINI_MODEL,
+                duration_ms=duration_ms,
+                success=True,
+            )
 
             # 9. Insert change order into database
             change_order_id = str(uuid4())
-            line_items = change_order_json.get("line_items", [])
-            total_amount_cents = change_order_json.get("total_amount_cents", 0)
+            line_items_json = json.dumps([li.model_dump() for li in change_order.line_items])
 
             await conn.execute(
                 """
@@ -207,12 +308,12 @@ Generate the change order as a JSON object."""
                 workspace_id,
                 flag["project_id"],
                 scope_flag_id,
-                change_order_json.get("title", flag["title"]),
-                change_order_json.get("description", flag["description"]),
-                total_amount_cents,
+                change_order.title,
+                change_order.description,
+                change_order.total_amount_cents,
                 "USD",
                 "draft",
-                json.dumps(line_items),
+                line_items_json,
                 None,  # created_by (system-generated)
                 datetime.now(timezone.utc),
                 datetime.now(timezone.utc),
@@ -233,18 +334,22 @@ Generate the change order as a JSON object."""
                 "change_order_generated",
                 change_order_id=change_order_id,
                 scope_flag_id=scope_flag_id,
-                amount_cents=total_amount_cents,
+                amount_cents=change_order.total_amount_cents,
             )
 
             return {
                 "status": "ok",
                 "change_order_id": change_order_id,
-                "title": change_order_json.get("title"),
-                "amount_cents": total_amount_cents,
+                "title": change_order.title,
+                "amount_cents": change_order.total_amount_cents,
             }
 
-    except Exception as e:
-        logger.error("change_order_generation_failed", scope_flag_id=scope_flag_id, error=str(e))
+    except Exception as exc:
+        logger.error(
+            "change_order_generation_failed",
+            scope_flag_id=scope_flag_id,
+            error=str(exc),
+        )
         raise
     finally:
         await pool.close()
@@ -264,5 +369,4 @@ def start_worker():
 
 
 if __name__ == "__main__":
-    worker = start_worker()
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(start_worker())
