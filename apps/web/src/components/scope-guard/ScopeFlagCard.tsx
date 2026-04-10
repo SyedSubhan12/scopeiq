@@ -8,13 +8,14 @@ import {
 } from "lucide-react";
 import { Card, Badge, Button, Dialog, Textarea, useToast } from "@novabots/ui";
 import { useUpdateScopeFlag } from "@/hooks/useScopeFlags";
+import type { ScopeFlag } from "@/hooks/useScopeFlags";
 import { useCreateChangeOrder } from "@/hooks/useChangeOrders";
 import { cn } from "@novabots/ui";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
 interface ScopeFlagCardProps {
-  flag: any;
+  flag: ScopeFlag;
   projectId: string;
   onDetail?: () => void;
 }
@@ -83,10 +84,12 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
   const statusCfg = getStatusConfig(flag.status)!;
   const Icon = cfg.Icon;
   const isPending = flag.status === "pending";
-  const confidence = flag.metadata?.confidence
-    ? Math.round(flag.metadata.confidence * 100)
-    : flag.evidence?.confidence
-      ? Math.round(flag.evidence.confidence * 100)
+  const metaConfidence = typeof flag.metadata?.confidence === "number" ? flag.metadata.confidence : null;
+  const evidenceConfidence = typeof flag.evidence?.confidence === "number" ? flag.evidence.confidence : null;
+  const confidence = metaConfidence != null
+    ? Math.round(metaConfidence * 100)
+    : evidenceConfidence != null
+      ? Math.round(evidenceConfidence * 100)
       : null;
 
   const handleConfirm = async () => {

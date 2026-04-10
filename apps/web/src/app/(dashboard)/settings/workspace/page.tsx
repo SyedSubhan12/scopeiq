@@ -13,11 +13,14 @@ import {
   cn,
 } from "@novabots/ui";
 import { useWorkspace, useUpdateWorkspace } from "@/hooks/useWorkspace";
+import { useQueryClient } from "@tanstack/react-query";
+import { fetchWithAuth } from "@/lib/api";
 
 export default function WorkspaceSettingsPage() {
   const { data, isLoading } = useWorkspace();
   const updateWorkspace = useUpdateWorkspace();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const workspace = data?.data;
 
@@ -53,7 +56,7 @@ export default function WorkspaceSettingsPage() {
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -68,18 +71,36 @@ export default function WorkspaceSettingsPage() {
     }
 
     setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      setLogoPreview(result);
-      setLogoUrl(result);
+    try {
+      // 1. Request presigned URL from API
+      // NOTE: requires backend endpoint POST /v1/workspaces/logo/upload-url
+      const { data: uploadData } = await fetchWithAuth("/v1/workspaces/logo/upload-url", {
+        method: "POST",
+        body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+      }) as { data: { uploadUrl: string; objectKey: string; publicUrl: string } };
+
+      // 2. Upload directly to R2
+      await fetch(uploadData.uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      // 3. Confirm with API — store the object key, get back the public URL
+      await fetchWithAuth("/v1/workspaces/me", {
+        method: "PATCH",
+        body: JSON.stringify({ logoObjectKey: uploadData.objectKey }),
+      });
+
+      // 4. Refresh workspace data and update preview
+      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      setLogoPreview(uploadData.publicUrl);
+      setLogoUrl(uploadData.publicUrl);
+    } catch {
+      toast("error", "Failed to upload logo");
+    } finally {
       setIsUploading(false);
-    };
-    reader.onerror = () => {
-      toast("error", "Failed to read image file");
-      setIsUploading(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleRemoveLogo = () => {

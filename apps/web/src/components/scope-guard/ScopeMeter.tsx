@@ -15,9 +15,9 @@ interface ScopeMeterProps {
 }
 
 function getScopeColor(pct: number): string {
-  if (pct < 50) return "#10b981"; // green
-  if (pct < 80) return "#f59e0b"; // amber
-  return "#ef4444"; // red
+  if (pct < 50) return "rgb(var(--status-green))";
+  if (pct < 80) return "rgb(var(--status-amber))";
+  return "rgb(var(--status-red))";
 }
 
 function getScopeLabel(pct: number): string {

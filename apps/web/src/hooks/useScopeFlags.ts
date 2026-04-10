@@ -1,15 +1,41 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
+export type ScopeFlagSeverity = "high" | "medium" | "low";
+export type ScopeFlagStatus =
+  | "pending"
+  | "confirmed"
+  | "dismissed"
+  | "snoozed"
+  | "change_order_sent"
+  | "resolved";
+
+export interface ScopeFlag {
+  id: string;
+  projectId: string;
+  sowClauseId?: string | null;
+  title?: string | null;
+  description?: string | null;
+  severity: ScopeFlagSeverity;
+  status: ScopeFlagStatus;
+  aiReasoning?: string | null;
+  reason?: string | null;
+  evidence?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  resolvedAt?: string | null;
+  snoozedUntil?: string | null;
+}
+
 export function getScopeFlagsQueryOptions(projectId?: string) {
     return {
         queryKey: ["scope-flags", projectId],
-        queryFn: () => fetchWithAuth(`/v1/scope-flags${projectId ? `?projectId=${projectId}` : ""}`) as Promise<{ data: any[] }>,
+        queryFn: () => fetchWithAuth(`/v1/scope-flags${projectId ? `?projectId=${projectId}` : ""}`) as Promise<{ data: ScopeFlag[] }>,
     };
 }
 
 export function useScopeFlags(projectId?: string) {
-    return useQuery<{ data: any[] }>(getScopeFlagsQueryOptions(projectId));
+    return useQuery<{ data: ScopeFlag[] }>(getScopeFlagsQueryOptions(projectId));
 }
 
 export function useScopeFlagCount() {
