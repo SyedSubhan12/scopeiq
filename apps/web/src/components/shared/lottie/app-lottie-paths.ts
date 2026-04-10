@@ -9,6 +9,7 @@ export const LANDING_LOTTIE = {
   appointmentBookingSmartphone: "/lottie/appointment-booking-smartphone.json",
   cubeShape: "/lottie/cube-shape-animation.json",
   developing: "/lottie/developing.json",
+  isometricDataAnalysis: "/lottie/isometric-data-analysis.json",
   seoIsometric: "/lottie/seo-isometric-composition.json",
   techSupport: "/lottie/tech-support-customer-service.json",
   paperplane: "/lottie/loading-paperplane.json",

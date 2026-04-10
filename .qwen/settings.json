@@ -24,7 +24,8 @@
       "Bash(touch *)",
       "Bash(find *)",
       "Bash(echo *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(sleep *)"
     ]
   },
   "$version": 3

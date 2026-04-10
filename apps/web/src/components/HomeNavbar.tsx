@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { LayoutDashboard } from "lucide-react";
 
@@ -24,7 +25,17 @@ export function HomeNavbar() {
     return (
         <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/80 backdrop-blur">
             <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-                <span className="text-xl font-bold text-[#0F6E56]">ScopeIQ</span>
+                <Link href="/" className="flex shrink-0 items-center gap-3">
+                    <Image
+                        src="/logo.svg"
+                        alt="ScopeIQ"
+                        width={180}
+                        height={180}
+                        className="h-12 w-auto"
+                        priority
+                    />
+                    <span className="text-2xl font-bold text-[#0F6E56]">ScopeIQ</span>
+                </Link>
 
                 <nav className="hidden items-center gap-6 text-sm font-medium text-gray-600 md:flex">
                     <a href="#features" className="hover:text-gray-900">Features</a>

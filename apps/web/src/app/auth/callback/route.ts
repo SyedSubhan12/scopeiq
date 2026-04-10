@@ -4,10 +4,11 @@ import { NextResponse } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const siteUrl = process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000";
 
 /**
  * Server-side route handler for Supabase OAuth callback.
- * Using a manual implementation to avoid dependency resolution issues 
+ * Using a manual implementation to avoid dependency resolution issues
  * while maintaining strict session and cookie synchronization.
  */
 export async function GET(request: Request) {
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
         }
     }
 
-    // Redirect to home after successful auth
-    return NextResponse.redirect(requestUrl.origin);
+    // Redirect to home or dashboard after successful auth
+    // Use the configured site URL instead of requestUrl.origin
+    return NextResponse.redirect(`${siteUrl}/`);
 }

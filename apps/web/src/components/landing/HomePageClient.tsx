@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRef } from "react";
 import {
   FileText,
@@ -64,7 +65,7 @@ const steps = [
 
 const HOME_BOOT_LOTTIES = [
   LANDING_LOTTIE.cubeShape,
-  LANDING_LOTTIE.seoIsometric,
+  LANDING_LOTTIE.isometricDataAnalysis,
   LANDING_LOTTIE.techSupport,
   LANDING_LOTTIE.paperplane,
 ];
@@ -395,7 +396,7 @@ export function HomePageClient() {
                 </div>
 
                 <MarketingLottie
-                  src={LANDING_LOTTIE.seoIsometric}
+                  src={LANDING_LOTTIE.isometricDataAnalysis}
                   containerClassName="mx-auto w-full max-w-[34rem]"
                   className="h-auto w-full object-contain"
                 />
@@ -459,7 +460,7 @@ export function HomePageClient() {
                 </div>
 
                 <MarketingLottie
-                  src={LANDING_LOTTIE.seoIsometric}
+                  src={LANDING_LOTTIE.isometricDataAnalysis}
                   containerClassName="mx-auto w-full max-w-[22rem] relative z-10"
                   className="h-auto w-full object-contain"
                 />
@@ -535,7 +536,16 @@ export function HomePageClient() {
 
       <footer className="border-t border-slate-200 bg-white py-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
-          <span className="text-sm font-bold text-[#0F6E56]">ScopeIQ</span>
+          <div className="flex items-center gap-3 sm:mx-0 sm:justify-start">
+            <Image
+              src="/logo.svg"
+              alt="ScopeIQ"
+              width={160}
+              height={160}
+              className="h-10 w-auto"
+            />
+            <span className="text-xl font-bold text-[#0F6E56]">ScopeIQ</span>
+          </div>
           <div className="flex items-center justify-center gap-4 text-xs text-slate-400 sm:justify-start">
             <Link href="/login" className="hover:text-slate-600">
               Log in

@@ -32,3 +32,5 @@ Object.defineProperty(exports, "Skeleton", { enumerable: true, get: function () 
 var toast_js_1 = require("./toast.js");
 Object.defineProperty(exports, "ToastProvider", { enumerable: true, get: function () { return toast_js_1.ToastProvider; } });
 Object.defineProperty(exports, "useToast", { enumerable: true, get: function () { return toast_js_1.useToast; } });
+// Typography exports temporarily removed — see apps/web/src/lib/typography.ts
+// export { Heading, H1, H2, H3, H4, Body, Label, Caption, Stat, Code } from "./typography.js";
