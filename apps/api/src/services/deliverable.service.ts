@@ -1,11 +1,14 @@
 import { deliverableRepository } from "../repositories/deliverable.repository.js";
 import { deliverableRevisionRepository } from "../repositories/deliverable-revision.repository.js";
 import { approvalEventRepository } from "../repositories/approval-event.repository.js";
-import { writeAuditLog } from "@novabots/db";
+import { writeAuditLog, projects, clients, eq } from "@novabots/db";
 import { db } from "@novabots/db";
 import { NotFoundError, ValidationError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
 import { getUploadUrl, getDownloadUrl } from "../lib/storage.js";
+import { sendEmail } from "../lib/email.js";
+import { DeliverableReadyEmail } from "../emails/index.js";
+import React from "react";
 
 export const deliverableService = {
   async list(
@@ -170,6 +173,33 @@ export const deliverableService = {
       action: "update",
       metadata: { action: "confirm_upload", version: nextVersion, fileKey: data.objectKey },
     });
+
+    // Send DeliverableReadyEmail to client (best-effort — no crash if lookup fails)
+    db
+      .select({ contactEmail: clients.contactEmail, clientName: clients.name, projectName: projects.name })
+      .from(projects)
+      .innerJoin(clients, eq(projects.clientId, clients.id))
+      .where(eq(projects.id, deliverable.projectId))
+      .limit(1)
+      .then(([row]) => {
+        if (!row?.contactEmail) return;
+        return sendEmail({
+          to: row.contactEmail,
+          subject: `Deliverable Ready for Review: ${deliverable.name}`,
+          react: React.createElement(DeliverableReadyEmail, {
+            recipientName: row.clientName ?? "Client",
+            deliverableName: deliverable.name,
+            projectName: row.projectName ?? deliverable.projectId,
+            clientName: row.clientName ?? "Client",
+            reviewUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/portal/deliverables/${deliverableId}`,
+            revisionCount: nextVersion,
+            maxRevisions: deliverable.maxRevisions ?? 3,
+          }),
+        });
+      })
+      .catch((err) =>
+        console.error("[DeliverableService] Failed to send DeliverableReadyEmail:", err),
+      );
 
     return updated;
   },

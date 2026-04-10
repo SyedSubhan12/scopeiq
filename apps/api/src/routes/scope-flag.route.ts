@@ -3,6 +3,8 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { scopeFlagService } from "../services/scope-flag.service.js";
+import { dispatchGenerateChangeOrderJob } from "../jobs/generate-change-order.job.js";
+import { NotFoundError } from "@novabots/types";
 
 export const scopeFlagRouter = new Hono();
 
@@ -45,3 +47,15 @@ scopeFlagRouter.patch(
         return c.json({ data: updated });
     },
 );
+
+scopeFlagRouter.post("/:id/generate-change-order", authMiddleware, async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const id = c.req.param("id");
+
+    const flag = await scopeFlagService.getById(workspaceId, id);
+    if (!flag) throw new NotFoundError("Scope flag not found", id);
+
+    await dispatchGenerateChangeOrderJob(id, workspaceId);
+
+    return c.json({ data: { dispatched: true } });
+});

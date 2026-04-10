@@ -38,7 +38,7 @@ briefRouter.get("/:id", async (c) => {
   return c.json({ data: brief });
 });
 
-briefRouter.post("/:id/override", zValidator("json", overrideBriefSchema), async (c) => {
+briefRouter.patch("/:id/override", zValidator("json", overrideBriefSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const userId = c.get("userId");
   const briefId = c.req.param("id");

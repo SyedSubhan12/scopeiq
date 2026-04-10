@@ -31,7 +31,7 @@ import { billingRouter } from "./routes/billing.route.js";
 import { dashboardRouter } from "./routes/dashboard.route.js";
 import webhookStripe from "./routes/webhook-stripe.route.js";
 import { env } from "./lib/env.js";
-import { scheduleHourlyReminders } from "./jobs/send-reminder.job.js";
+import { scheduleHourlyReminders, startReminderWorker } from "./jobs/send-reminder.job.js";
 import { ensureBucketExists } from "./lib/storage.js";
 
 const app = new Hono();
@@ -81,8 +81,7 @@ app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/session", portalSessionRouter);
 app.route("/portal/change-orders", portalChangeOrderRouter);
 
-// Public invite acceptance (outside /v1)
-app.route("/invites", inviteRouter);
+// Note: invite acceptance (POST /accept) is handled within /v1/invites — no separate mount needed.
 
 const port = Number(env.PORT) || 4000;
 console.log(`Server is running on port ${port}`);
@@ -95,6 +94,11 @@ serve({
 // Ensure MinIO bucket exists (no-op if already present; creates on a fresh volume)
 ensureBucketExists().catch((err) => {
     console.error("[Startup] Failed to ensure storage bucket exists:", err);
+});
+
+// Start BullMQ worker to process reminder jobs
+startReminderWorker().catch((err) => {
+    console.error("[Startup] Failed to start reminder worker:", err);
 });
 
 // Register hourly reminder cron after server starts

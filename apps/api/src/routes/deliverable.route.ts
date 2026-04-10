@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { deliverableService } from "../services/deliverable.service.js";
 import { feedbackService } from "../services/feedback.service.js";
@@ -135,3 +136,25 @@ deliverableRouter.post("/:id/feedback", async (c) => {
   });
   return c.json({ data: item }, 201);
 });
+
+deliverableRouter.patch("/:id/approve", authMiddleware, async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const result = await deliverableService.approve(workspaceId, id, userId, "agency");
+  return c.json({ data: result });
+});
+
+deliverableRouter.patch(
+  "/:id/reject",
+  authMiddleware,
+  zValidator("json", z.object({ feedback: z.string().optional() })),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const id = c.req.param("id");
+    const { feedback } = c.req.valid("json");
+    const result = await deliverableService.requestRevision(workspaceId, id, userId, "agency", feedback ?? undefined);
+    return c.json({ data: result });
+  },
+);
