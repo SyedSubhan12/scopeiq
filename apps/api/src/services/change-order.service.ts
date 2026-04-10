@@ -1,6 +1,7 @@
 import { changeOrderRepository } from "../repositories/change-order.repository.js";
 import { NotFoundError } from "@novabots/types";
-import { db, writeAuditLog, projects, sowClauses, eq, and } from "@novabots/db";
+import { db, writeAuditLog, projects, sowClauses, deliverables, scopeFlags, eq, and } from "@novabots/db";
+import type { ChangeOrder, ClauseType } from "@novabots/db";
 import { sendEmail } from "../lib/email.js";
 import { ChangeOrderSentEmail } from "../emails/index.js";
 import { ChangeOrderAcceptedEmail } from "../emails/index.js";
@@ -203,7 +204,16 @@ export const changeOrderService = {
         workspaceId: string,
         id: string,
         userId: string,
-        data: { title?: string | undefined; description?: string | undefined; amount?: number | undefined; status?: string | undefined; clientEmail?: string | undefined; clientName?: string | undefined },
+        data: {
+            title?: string | undefined;
+            description?: string | undefined;
+            amount?: number | undefined;
+            status?: string | undefined;
+            clientEmail?: string | undefined;
+            clientName?: string | undefined;
+            lineItemsJson?: Array<{ hours: number; [key: string]: unknown }> | undefined;
+            revisedTimeline?: string | undefined;
+        },
     ) {
         const co = await changeOrderRepository.getById(workspaceId, id);
         if (!co) throw new NotFoundError("ChangeOrder", id);
@@ -246,6 +256,7 @@ export const changeOrderService = {
         });
 
         if (data.status === "sent" && data.clientEmail) {
+            const pricingAmount = (updated.pricing as Record<string, unknown> | null)?.amount;
             sendEmail({
                 to: data.clientEmail,
                 subject: `Change Order: ${updated.title}`,
@@ -253,8 +264,8 @@ export const changeOrderService = {
                     recipientName: data.clientName ?? "Client",
                     clientName: data.clientName ?? "Client",
                     changeOrderTitle: updated.title,
-                    description: updated.description ?? "",
-                    pricing: updated.totalAmount != null ? `$${updated.totalAmount}` : "TBD",
+                    description: updated.workDescription ?? "",
+                    pricing: pricingAmount != null ? `$${pricingAmount}` : "TBD",
                     status: "Sent",
                     viewChangeOrderUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/change-orders/${id}`,
                 }),
@@ -264,6 +275,7 @@ export const changeOrderService = {
         }
 
         if (data.status === "accepted" && data.clientEmail) {
+            const pricingAmount = (updated.pricing as Record<string, unknown> | null)?.amount;
             sendEmail({
                 to: data.clientEmail,
                 subject: `Change Order Accepted: ${updated.title}`,
@@ -271,8 +283,8 @@ export const changeOrderService = {
                     recipientName: data.clientName ?? "Client",
                     clientName: data.clientName ?? "Client",
                     changeOrderTitle: updated.title,
-                    description: updated.description ?? "",
-                    pricing: updated.totalAmount != null ? `$${updated.totalAmount}` : "TBD",
+                    description: updated.workDescription ?? "",
+                    pricing: pricingAmount != null ? `$${pricingAmount}` : "TBD",
                     viewSowUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/projects/${updated.projectId}/sow`,
                 }),
             }).catch((err) =>

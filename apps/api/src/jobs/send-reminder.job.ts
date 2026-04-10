@@ -1,7 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { dispatchJob } from "../lib/queue.js";
-import { reminderService } from "../services/reminder.service.js";
+import { reminderService, type ReminderJobData } from "../services/reminder.service.js";
 
 const QUEUE_NAME = "reminders";
 const JOB_NAME = "send-reminder";

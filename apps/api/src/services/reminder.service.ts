@@ -25,7 +25,7 @@ export function getReminderQueue(): Queue {
   return reminderQueue;
 }
 
-interface ReminderJobData {
+export interface ReminderJobData {
   projectId: string;
   deliverableId: string;
   workspaceId: string;
