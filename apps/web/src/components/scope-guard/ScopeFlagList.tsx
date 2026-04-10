@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion";
 import { Filter, ShieldAlert } from "lucide-react";
 import { Card, Skeleton } from "@novabots/ui";
 import { useScopeFlags } from "@/hooks/useScopeFlags";
+import type { ScopeFlag } from "@/hooks/useScopeFlags";
 import { ScopeFlagCard } from "./ScopeFlagCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@novabots/ui";
@@ -36,10 +37,10 @@ export function ScopeFlagList({ projectId }: ScopeFlagListProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
 
-  const flags: any[] = data?.data ?? [];
+  const flags: ScopeFlag[] = data?.data ?? [];
 
   const filtered = useMemo(() => {
-    return flags.filter((flag: any) => {
+    return flags.filter((flag: ScopeFlag) => {
       if (statusFilter !== "all" && flag.status !== statusFilter) return false;
       if (severityFilter !== "all" && flag.severity !== severityFilter) return false;
       return true;
@@ -47,7 +48,7 @@ export function ScopeFlagList({ projectId }: ScopeFlagListProps) {
   }, [flags, statusFilter, severityFilter]);
 
   const pendingCount = flags.filter(
-    (f: any) => f.status === "pending" || f.status === "pending_review",
+    (f: ScopeFlag) => f.status === "pending",
   ).length;
 
   if (isLoading) {
@@ -72,7 +73,7 @@ export function ScopeFlagList({ projectId }: ScopeFlagListProps) {
           {STATUS_OPTIONS.map((opt) => {
             const count = opt.value === "all"
               ? flags.length
-              : flags.filter((f: any) => f.status === opt.value).length;
+              : flags.filter((f: ScopeFlag) => f.status === opt.value).length;
             return (
               <button
                 key={opt.value}
@@ -132,7 +133,7 @@ export function ScopeFlagList({ projectId }: ScopeFlagListProps) {
       ) : (
         <AnimatePresence initial={false}>
           <div className="space-y-3">
-            {filtered.map((flag: any) => (
+            {filtered.map((flag: ScopeFlag) => (
               <ScopeFlagCard
                 key={flag.id}
                 flag={flag}

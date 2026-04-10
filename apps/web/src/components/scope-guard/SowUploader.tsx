@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Upload, X, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button, Card, useToast } from "@novabots/ui";
 import { useCreateSow } from "@/hooks/useSow";
+import { fetchWithAuth } from "@/lib/api";
 import { cn } from "@novabots/ui";
 
 interface SowUploaderProps {
@@ -77,15 +78,6 @@ export function SowUploader({ projectId, onComplete, onCancel }: SowUploaderProp
     input.click();
   };
 
-  const readFileAsText = (f: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsText(f);
-    });
-  };
-
   const handleUpload = async () => {
     if (!title.trim()) {
       toast("error", "Please provide a title");
@@ -96,17 +88,35 @@ export function SowUploader({ projectId, onComplete, onCancel }: SowUploaderProp
     setProgress(10);
 
     try {
-      let text = rawText.trim();
+      const text = rawText.trim();
 
       if (mode === "file" && file) {
-        setProgress(30);
-        // For PDF/Word files, we send the file metadata and dispatch a parse job server-side
-        // The server will extract text from the uploaded file
-        // For now, we create with a placeholder and the server-side job handles extraction
+        setProgress(20);
+        // 1. Get presigned upload URL from API
+        // NOTE: requires backend endpoint POST /v1/sow/upload
+        const { data: uploadData } = await fetchWithAuth("/v1/sow/upload", {
+          method: "POST",
+          body: JSON.stringify({
+            projectId,
+            fileName: file.name,
+            contentType: file.type,
+          }),
+        }) as { data: { uploadUrl: string; objectKey: string } };
+
+        setProgress(40);
+        // 2. Upload directly to R2 storage
+        await fetch(uploadData.uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+
+        setProgress(70);
+        // 3. Create SOW record with the object key (server parses file async)
         await createSow.mutateAsync({
           projectId,
           title: title.trim(),
-          rawText: `[File: ${file.name} - ${formatSize(file.size)}]`,
+          rawText: uploadData.objectKey,
         });
       } else if (text.length < 10) {
         setStatus("error");
