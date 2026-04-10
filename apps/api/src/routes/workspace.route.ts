@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { authMiddleware } from "../middleware/auth.js";
 import { workspaceService } from "../services/workspace.service.js";
 import { updateWorkspaceSchema } from "./workspace.schemas.js";
+import { getUploadUrl, validateMimeType } from "../lib/storage.js";
 import { z } from "zod";
 
 const onboardingStepSchema = z.object({
@@ -52,5 +53,28 @@ workspaceRouter.patch(
       complete,
     );
     return c.json({ data: workspace });
+  },
+);
+
+workspaceRouter.post(
+  "/logo/upload-url",
+  zValidator("json", z.object({ contentType: z.string() })),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const { contentType } = c.req.valid("json");
+
+    // Validate MIME type
+    validateMimeType(contentType);
+
+    // Generate object key for workspace logo
+    const objectKey = `workspaces/${workspaceId}/logo`;
+
+    // Get presigned upload URL (15 min expiry)
+    const uploadUrl = await getUploadUrl(objectKey, contentType, 900);
+
+    // Get public download URL for immediate use
+    const publicUrl = `${process.env.STORAGE_ENDPOINT}:${process.env.STORAGE_PORT}/${process.env.STORAGE_BUCKET}/${objectKey}`;
+
+    return c.json({ data: { uploadUrl, objectKey, publicUrl } }, 200);
   },
 );

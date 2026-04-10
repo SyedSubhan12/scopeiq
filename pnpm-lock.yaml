@@ -62,6 +62,9 @@ importers:
       '@react-email/components':
         specifier: ^1.0.11
         version: 1.0.11(react-dom@18.3.1)(react@18.3.1)
+      '@react-email/render':
+        specifier: ^0.0.16
+        version: 0.0.16(react-dom@18.3.1)(react@18.3.1)
       '@sentry/node':
         specifier: ^7.102.1
         version: 7.120.4
@@ -84,13 +87,10 @@ importers:
         specifier: ^8.11.3
         version: 8.20.0
       react:
-        specifier: ^18.2.0
+        specifier: ^18.3.1
         version: 18.3.1
-      react-dom:
-        specifier: ^18.2.0
-        version: 18.3.1(react@18.3.1)
       resend:
-        specifier: ^3.5.0
+        specifier: ^3.2.0
         version: 3.5.0(react-dom@18.3.1)(react@18.3.1)
       stripe:
         specifier: ^14.19.0
