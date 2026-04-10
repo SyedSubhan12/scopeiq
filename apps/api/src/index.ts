@@ -33,6 +33,7 @@ import webhookStripe from "./routes/webhook-stripe.route.js";
 import { env } from "./lib/env.js";
 import { scheduleHourlyReminders } from "./jobs/send-reminder.job.js";
 import { ensureBucketExists } from "./lib/storage.js";
+import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
 
 const app = new Hono();
 
@@ -75,7 +76,8 @@ app.route("/webhooks/stripe", webhookStripe);
 // Public routes (outside /v1)
 app.route("/briefs/submit", briefSubmitRouter);
 
-// Portal routes (token-authenticated)
+// Portal routes (token-authenticated, rate-limited)
+app.use("/portal/*", portalRateLimiter);
 app.route("/portal", portalRouter);
 app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/session", portalSessionRouter);
