@@ -1,17 +1,10 @@
 import { changeOrderRepository } from "../repositories/change-order.repository.js";
 import { NotFoundError } from "@novabots/types";
-import {
-  db,
-  writeAuditLog,
-  changeOrders,
-  scopeFlags,
-  sowClauses,
-  deliverables,
-  projects,
-  eq,
-  and,
-} from "@novabots/db";
-import type { ChangeOrder, ClauseType } from "@novabots/db";
+import { db, writeAuditLog } from "@novabots/db";
+import { sendEmail } from "../lib/email.js";
+import { ChangeOrderSentEmail } from "../emails/index.js";
+import { ChangeOrderAcceptedEmail } from "../emails/index.js";
+import React from "react";
 
 export const changeOrderService = {
     async list(workspaceId: string, projectId?: string) {
@@ -210,14 +203,7 @@ export const changeOrderService = {
         workspaceId: string,
         id: string,
         userId: string,
-        data: {
-            title?: string | undefined;
-            description?: string | undefined;
-            amount?: number | undefined;
-            lineItemsJson?: Array<{ id?: string | undefined; description: string; hours: number; rate: number }> | undefined;
-            revisedTimeline?: string | undefined;
-            status?: string | undefined;
-        },
+        data: { title?: string | undefined; description?: string | undefined; amount?: number | undefined; status?: string | undefined; clientEmail?: string | undefined; clientName?: string | undefined },
     ) {
         const co = await changeOrderRepository.getById(workspaceId, id);
         if (!co) throw new NotFoundError("ChangeOrder", id);
@@ -258,6 +244,43 @@ export const changeOrderService = {
 
             return updated;
         });
+
+        if (data.status === "sent" && data.clientEmail) {
+            sendEmail({
+                to: data.clientEmail,
+                subject: `Change Order: ${co.title}`,
+                react: React.createElement(ChangeOrderSentEmail, {
+                    recipientName: data.clientName ?? "Client",
+                    clientName: data.clientName ?? "Client",
+                    changeOrderTitle: co.title,
+                    description: co.description ?? "",
+                    pricing: co.amount != null ? `$${co.amount}` : "TBD",
+                    status: "Sent",
+                    viewChangeOrderUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/change-orders/${id}`,
+                }),
+            }).catch((err) =>
+                console.error("[ChangeOrderService] Failed to send ChangeOrderSentEmail:", err),
+            );
+        }
+
+        if (data.status === "accepted" && data.clientEmail) {
+            sendEmail({
+                to: data.clientEmail,
+                subject: `Change Order Accepted: ${co.title}`,
+                react: React.createElement(ChangeOrderAcceptedEmail, {
+                    recipientName: data.clientName ?? "Client",
+                    clientName: data.clientName ?? "Client",
+                    changeOrderTitle: co.title,
+                    description: co.description ?? "",
+                    pricing: co.amount != null ? `$${co.amount}` : "TBD",
+                    viewSowUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/projects/${co.projectId}/sow`,
+                }),
+            }).catch((err) =>
+                console.error("[ChangeOrderService] Failed to send ChangeOrderAcceptedEmail:", err),
+            );
+        }
+
+        return updated;
     },
 
     async countPending(workspaceId: string) {

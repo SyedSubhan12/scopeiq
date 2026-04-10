@@ -2,6 +2,7 @@ import { scopeFlagRepository } from "../repositories/scope-flag.repository.js";
 import { NotFoundError } from "@novabots/types";
 import { db, writeAuditLog, projects, sowClauses, eq, and, isNull } from "@novabots/db";
 import type { FlagStatus } from "@novabots/db";
+import { dispatchGenerateChangeOrderJob } from "../jobs/generate-change-order.job.js";
 
 export const scopeFlagService = {
     async list(workspaceId: string, projectId?: string) {
@@ -56,6 +57,14 @@ export const scopeFlagService = {
 
             return updated;
         });
+
+        if (update.status === "confirmed") {
+            dispatchGenerateChangeOrderJob(id, workspaceId).catch((err) =>
+                console.error("[ScopeFlagService] Failed to dispatch generate-change-order job:", err),
+            );
+        }
+
+        return updated;
     },
 
     async countPending(workspaceId: string) {

@@ -1,4 +1,4 @@
-import { Queue } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { dispatchJob } from "../lib/queue.js";
 import { reminderService } from "../services/reminder.service.js";
@@ -44,4 +44,32 @@ export async function scheduleHourlyReminders(): Promise<void> {
  */
 export async function processReminders() {
   return { action: "scheduled_jobs_only" };
+}
+
+/**
+ * Start the BullMQ worker that processes reminder jobs.
+ * Call once at server startup so queued jobs are actually consumed.
+ */
+export async function startReminderWorker(): Promise<Worker> {
+  const connection = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+    maxRetriesPerRequest: null,
+  });
+
+  const worker = new Worker(
+    QUEUE_NAME,
+    async () => {
+      await reminderService.processReminders();
+    },
+    { connection },
+  );
+
+  worker.on("failed", (job, err) => {
+    console.error(`[ReminderWorker] Job ${job?.id} failed:`, err.message);
+  });
+
+  worker.on("completed", (job) => {
+    console.log(`[ReminderWorker] Job ${job.id} completed`);
+  });
+
+  return worker;
 }

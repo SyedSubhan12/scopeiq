@@ -34,10 +34,7 @@ import { dashboardRouter } from "./routes/dashboard.route.js";
 import webhookStripe from "./routes/webhook-stripe.route.js";
 import { resendWebhookRouter } from "./routes/resend-webhook.route.js";
 import { env } from "./lib/env.js";
-import { scheduleHourlyReminders } from "./jobs/send-reminder.job.js";
-import { startScopeFlagAlertWorker } from "./services/scope-flag-alert.service.js";
-import { startBriefScoringWorker } from "./services/brief-scoring-worker.service.js";
-import { startClarificationEmailWorker } from "./services/clarification-email.service.js";
+import { scheduleHourlyReminders, startReminderWorker } from "./jobs/send-reminder.job.js";
 import { ensureBucketExists } from "./lib/storage.js";
 import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
 
@@ -97,8 +94,7 @@ app.route("/portal", portalRouter);
 // Email approval links (HMAC-token authenticated, public)
 app.route("/api/portal/email-approve", emailApprovalRouter);
 
-// Public invite acceptance (outside /v1)
-app.route("/invites", inviteRouter);
+// Note: invite acceptance (POST /accept) is handled within /v1/invites — no separate mount needed.
 
 const port = Number(env.PORT) || 4000;
 console.log(`Server is running on port ${port}`);
@@ -111,6 +107,11 @@ serve({
 // Ensure MinIO bucket exists (no-op if already present; creates on a fresh volume)
 ensureBucketExists().catch((err) => {
     console.error("[Startup] Failed to ensure storage bucket exists:", err);
+});
+
+// Start BullMQ worker to process reminder jobs
+startReminderWorker().catch((err) => {
+    console.error("[Startup] Failed to start reminder worker:", err);
 });
 
 // Register hourly reminder cron after server starts
