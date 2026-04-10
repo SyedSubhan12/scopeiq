@@ -93,32 +93,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export const useAuth = () => useContext(AuthContext);
 
 /**
- * Syncs the session to a cookie so the Next.js middleware can see it.
- * Middleware expects: name includes "supabase" and "auth-token"
+ * Syncs session state. The httpOnly auth cookie is set server-side via the
+ * /auth/callback route handler — we must not write it from client JS.
+ * This function is kept as a no-op placeholder so call sites remain unchanged.
  */
-function syncSessionToCookie(session: Session | null) {
-    if (!session) return;
-
-    // We use a name that matches the loose regex in middleware.ts:
-    // cookie.name.includes("supabase") && cookie.name.includes("auth-token")
-    const cookieName = "sb-supabase-auth-token";
-    const cookieValue = session.access_token;
-    const maxAge = session.expires_in;
-
-    // `Secure` cookies are not persisted on http://localhost — omit so middleware
-    // can see the session in local dev over HTTP.
-    const secure =
-        typeof window !== "undefined" && window.location.protocol === "https:";
-    const secureAttr = secure ? "; Secure" : "";
-
-    document.cookie = `${cookieName}=${cookieValue}; path=/; max-age=${maxAge}; SameSite=Lax${secureAttr}`;
+function syncSessionToCookie(_session: Session | null) {
+    // The sb-supabase-auth-token cookie is httpOnly and is written/refreshed
+    // server-side. Client JS cannot and must not write it.
 }
 
 function clearAuthCookie() {
+    // httpOnly cookies cannot be cleared from JS — the server-side logout
+    // route is responsible for expiring sb-supabase-auth-token.
+    // Clear only the non-httpOnly onboarding hint cookie.
     const secure =
         typeof window !== "undefined" && window.location.protocol === "https:";
     const secureAttr = secure ? "; Secure" : "";
 
-    document.cookie = `sb-supabase-auth-token=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
     document.cookie = `x-onboarded=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
 }

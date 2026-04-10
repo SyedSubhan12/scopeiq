@@ -4,7 +4,7 @@ import { approvalEventRepository } from "../repositories/approval-event.reposito
 import { db, writeAuditLog } from "@novabots/db";
 import { NotFoundError, ValidationError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
-import { getUploadUrl, getDownloadUrl } from "../lib/storage.js";
+import { getUploadUrl, getDownloadUrl, validateMimeType } from "../lib/storage.js";
 
 export const deliverableService = {
   async list(
@@ -134,6 +134,8 @@ export const deliverableService = {
       throw new NotFoundError("Deliverable", deliverableId);
     }
 
+    validateMimeType(data.contentType);
+
     const objectKey = `deliverables/${workspaceId}/${deliverableId}/${data.fileName}`;
     const uploadUrl = await getUploadUrl(objectKey, data.contentType);
 
@@ -149,6 +151,11 @@ export const deliverableService = {
     const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
     if (!deliverable) {
       throw new NotFoundError("Deliverable", deliverableId);
+    }
+
+    const expectedPrefix = `deliverables/${workspaceId}/`;
+    if (!data.objectKey.startsWith(expectedPrefix)) {
+      throw new ValidationError("Invalid object key: does not belong to this workspace");
     }
 
     const fileUrl = await getDownloadUrl(data.objectKey);

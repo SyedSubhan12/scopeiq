@@ -10,12 +10,15 @@ export const resendWebhookRouter = new Hono();
 
 /**
  * Validate Resend webhook signature using HMAC-SHA256.
- * Rejects all unsigned requests per security requirements.
+ * In production, rejects all requests when the secret is not configured.
  */
 function verifyResendSignature(payload: string, signature: string | undefined): boolean {
   if (!RESEND_WEBHOOK_SECRET) {
-    // If no secret configured, allow all (development mode)
-    console.warn("[ResendWebhook] RESEND_WEBHOOK_SECRET not set — accepting unsigned");
+    if (process.env.NODE_ENV === "production") {
+      console.error("[ResendWebhook] RESEND_WEBHOOK_SECRET not set in production — rejecting all requests");
+      return false;
+    }
+    console.warn("[ResendWebhook] RESEND_WEBHOOK_SECRET not set — allowing in development");
     return true;
   }
   if (!signature) return false;

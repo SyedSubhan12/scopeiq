@@ -3,6 +3,8 @@ import { authMiddleware } from "../middleware/auth.js";
 
 export const aiRouter = new Hono();
 
+aiRouter.use("*", authMiddleware);
+
 // This router acts as a proxy to the FastAPI AI service
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 

@@ -39,6 +39,7 @@ import { startScopeFlagAlertWorker } from "./services/scope-flag-alert.service.j
 import { startBriefScoringWorker } from "./services/brief-scoring-worker.service.js";
 import { startClarificationEmailWorker } from "./services/clarification-email.service.js";
 import { ensureBucketExists } from "./lib/storage.js";
+import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
 
 const app = new Hono();
 
@@ -84,10 +85,10 @@ app.route("/webhooks/resend", resendWebhookRouter);
 // Public routes (outside /v1)
 app.route("/briefs/submit", briefSubmitRouter);
 
-// AI callback routes (secret-authenticated, no user auth)
-app.route("/api/ai-callback", aiCallbackRouter);
-
-// Portal routes (token-authenticated)
+// Portal routes (token-authenticated, rate-limited)
+app.use("/portal/*", portalRateLimiter);
+app.route("/portal", portalRouter);
+app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/session", portalSessionRouter);
 app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/change-orders", portalChangeOrderRouter);

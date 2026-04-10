@@ -1,9 +1,13 @@
 import { Hono } from "hono";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { deliverableService } from "../services/deliverable.service.js";
 import { db, projects, clients, eq, and, isNull, constantTimeCompare } from "@novabots/db";
 
-const EMAIL_APPROVAL_SECRET = process.env.EMAIL_APPROVAL_SECRET ?? "change-this-in-production";
+const EMAIL_APPROVAL_SECRET = process.env.EMAIL_APPROVAL_SECRET;
+if (!EMAIL_APPROVAL_SECRET) {
+  throw new Error("EMAIL_APPROVAL_SECRET environment variable is required");
+}
+
 const PORTAL_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://scopeiq.app";
 
 /**
@@ -16,7 +20,7 @@ export function generateEmailApprovalToken(deliverableId: string, projectId: str
   declineUrl: string;
 } {
   const payload = `${deliverableId}:${projectId}`;
-  const hmac = createHmac("sha256", EMAIL_APPROVAL_SECRET);
+  const hmac = createHmac("sha256", EMAIL_APPROVAL_SECRET!);
   const signature = hmac.update(payload).digest("hex");
   const token = `${payload}:${signature}`;
 
@@ -40,7 +44,7 @@ function validateEmailApprovalToken(token: string): { deliverableId: string; pro
   if (!deliverableId || !projectId || !providedSig) return null;
 
   const payload = `${deliverableId}:${projectId}`;
-  const hmac = createHmac("sha256", EMAIL_APPROVAL_SECRET);
+  const hmac = createHmac("sha256", EMAIL_APPROVAL_SECRET!);
   const expectedSig = hmac.update(payload).digest("hex");
 
   if (!constantTimeCompare(providedSig, expectedSig)) {

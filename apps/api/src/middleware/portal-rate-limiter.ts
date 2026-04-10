@@ -37,8 +37,8 @@ async function checkRedisRateLimit(ip: string, max: number, windowMs: number): P
 
 /**
  * Rate limiter for public portal endpoints.
- * Uses Redis if available, falls back to in-memory store.
- * 10 requests per hour per IP (enforced at Cloudflare edge + Redis counter).
+ * Uses Redis sliding window counter.
+ * 10 requests per hour per IP.
  */
 export const portalRateLimiter = createMiddleware(async (c, next) => {
   const ip = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
