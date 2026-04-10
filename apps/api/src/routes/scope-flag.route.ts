@@ -4,6 +4,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { scopeFlagService } from "../services/scope-flag.service.js";
 import { dispatchGenerateChangeOrderJob } from "../jobs/generate-change-order.job.js";
 import { NotFoundError } from "@novabots/types";
+import { scopeFlagResponseSchema, updateScopeFlagSchema } from "./scope-flag.schemas.js";
 
 export const scopeFlagRouter = new Hono();
 

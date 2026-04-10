@@ -57,8 +57,9 @@ export async function startReminderWorker(): Promise<Worker> {
 
   const worker = new Worker(
     QUEUE_NAME,
-    async () => {
-      await reminderService.processReminders();
+    async (job) => {
+      if (!job || !job.data) throw new Error("Invalid job: no data provided");
+      await reminderService.processReminderStep(job.data as ReminderJobData);
     },
     { connection },
   );

@@ -1,5 +1,4 @@
 import { Resend } from "resend";
-import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 
 const FROM = process.env.EMAIL_FROM ?? "ScopeIQ <noreply@scopeiq.io>";
@@ -25,13 +24,11 @@ export async function sendEmail({
     return;
   }
 
-  const html = await render(react);
-
   await resend.emails.send({
     from: FROM,
     to,
     subject,
-    html,
+    react,
   });
 }
 

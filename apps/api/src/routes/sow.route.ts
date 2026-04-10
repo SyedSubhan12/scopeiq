@@ -96,11 +96,11 @@ sowRouter.post("/:id/activate", authMiddleware, zValidator("json", activateClaus
   const { clauses } = c.req.valid("json");
 
   const result = await sowService.activateSow(workspaceId, userId, id, {
-    clauses: clauses.map((clause) => ({
+    clauses: clauses.map((clause, index) => ({
       clauseType: clause.clauseType as ClauseType,
       originalText: clause.originalText,
       summary: clause.summary ?? null,
-      sortOrder: clause.sortOrder,
+      sortOrder: clause.sortOrder ?? index,
     })),
   });
 

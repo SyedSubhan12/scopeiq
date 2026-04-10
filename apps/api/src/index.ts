@@ -119,13 +119,4 @@ scheduleHourlyReminders().catch((err) => {
     console.error("[Startup] Failed to schedule reminders:", err);
 });
 
-// Start scope flag alert worker (processes delayed 2-hour email fallback jobs)
-startScopeFlagAlertWorker();
-
-// Start brief scoring worker (processes AI scoring jobs from brief-scoring queue)
-startBriefScoringWorker();
-
-// Start clarification email worker (sends clarification request emails to clients)
-startClarificationEmailWorker();
-
 export default app;

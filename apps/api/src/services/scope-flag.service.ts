@@ -43,8 +43,8 @@ export const scopeFlagService = {
 
         const action = update.status === "dismissed" ? "dismiss" : "update";
 
-        return db.transaction(async (trx) => {
-            const updated = await scopeFlagRepository.updateStatus(workspaceId, id, data, trx as never);
+        const updated = await db.transaction(async (trx) => {
+            const result = await scopeFlagRepository.updateStatus(workspaceId, id, data, trx as never);
 
             await writeAuditLog(trx as never, {
                 workspaceId,
@@ -55,7 +55,7 @@ export const scopeFlagService = {
                 metadata: { oldStatus, newStatus: update.status, reason: update.reason },
             });
 
-            return updated;
+            return result;
         });
 
         if (update.status === "confirmed") {

@@ -34,7 +34,7 @@ messageIngestRouter.post(
     const messageRecord = await messageService.ingest(workspaceId, projectId, userId, {
       message,
       source,
-      authorName,
+      ...(authorName && { authorName }),
     });
 
     let scopeCheckDispatched = false;
@@ -65,12 +65,12 @@ messageIngestRouter.post("/inbound", authMiddleware, zValidator("json", ingestMe
   const messageRecord = await messageService.ingest(workspaceId, projectId, userId, {
     message,
     source: "email_forward",
-    authorName,
+    ...(authorName && { authorName }),
   });
 
   let scopeCheckDispatched = false;
   try {
-    await dispatchCheckScopeJob(messageRecord.id, projectId, workspaceId);
+    await dispatchCheckScopeJob(messageRecord.id, projectId, workspaceId, message, userId);
     scopeCheckDispatched = true;
   } catch (err) {
     console.error("[MessageIngest/inbound] Failed to dispatch scope check job:", err);
@@ -99,12 +99,12 @@ messageIngestRouter.post(
     const messageRecord = await messageService.ingest(workspaceId, projectId, userId, {
       message,
       source: "manual_input",
-      authorName,
+      ...(authorName && { authorName }),
     });
 
     let scopeCheckDispatched = false;
     try {
-      await dispatchCheckScopeJob(messageRecord.id, projectId, workspaceId);
+      await dispatchCheckScopeJob(messageRecord.id, projectId, workspaceId, message, userId);
       scopeCheckDispatched = true;
     } catch (err) {
       console.error("[MessageIngest/manual] Failed to dispatch scope check job:", err);

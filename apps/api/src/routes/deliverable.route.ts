@@ -129,9 +129,11 @@ deliverableRouter.get("/:id/feedback", async (c) => {
 
 deliverableRouter.post("/:id/feedback", async (c) => {
   const userId = c.get("userId");
+  const workspaceId = c.get("workspaceId");
   const deliverableId = c.req.param("id");
   const body = await c.req.json();
   const item = await feedbackService.submit({
+    workspaceId,
     deliverableId,
     body: body.body,
     annotationJson: body.annotationJson,

@@ -1,6 +1,6 @@
 import { changeOrderRepository } from "../repositories/change-order.repository.js";
 import { NotFoundError } from "@novabots/types";
-import { db, writeAuditLog } from "@novabots/db";
+import { db, writeAuditLog, projects, sowClauses, eq, and } from "@novabots/db";
 import { sendEmail } from "../lib/email.js";
 import { ChangeOrderSentEmail } from "../emails/index.js";
 import { ChangeOrderAcceptedEmail } from "../emails/index.js";
@@ -229,9 +229,9 @@ export const changeOrderService = {
 
         const action = data.status === "sent" ? "send" : "update";
 
-        return db.transaction(async (trx) => {
-            const updated = await changeOrderRepository.update(workspaceId, id, updateData, trx as never);
-            if (!updated) throw new NotFoundError("ChangeOrder", id);
+        const updated = await db.transaction(async (trx) => {
+            const result = await changeOrderRepository.update(workspaceId, id, updateData, trx as never);
+            if (!result) throw new NotFoundError("ChangeOrder", id);
 
             await writeAuditLog(trx as never, {
                 workspaceId,
@@ -242,19 +242,19 @@ export const changeOrderService = {
                 metadata: { oldStatus, newStatus: data.status ?? oldStatus },
             });
 
-            return updated;
+            return result;
         });
 
         if (data.status === "sent" && data.clientEmail) {
             sendEmail({
                 to: data.clientEmail,
-                subject: `Change Order: ${co.title}`,
+                subject: `Change Order: ${updated.title}`,
                 react: React.createElement(ChangeOrderSentEmail, {
                     recipientName: data.clientName ?? "Client",
                     clientName: data.clientName ?? "Client",
-                    changeOrderTitle: co.title,
-                    description: co.description ?? "",
-                    pricing: co.amount != null ? `$${co.amount}` : "TBD",
+                    changeOrderTitle: updated.title,
+                    description: updated.description ?? "",
+                    pricing: updated.totalAmount != null ? `$${updated.totalAmount}` : "TBD",
                     status: "Sent",
                     viewChangeOrderUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/change-orders/${id}`,
                 }),
@@ -266,14 +266,14 @@ export const changeOrderService = {
         if (data.status === "accepted" && data.clientEmail) {
             sendEmail({
                 to: data.clientEmail,
-                subject: `Change Order Accepted: ${co.title}`,
+                subject: `Change Order Accepted: ${updated.title}`,
                 react: React.createElement(ChangeOrderAcceptedEmail, {
                     recipientName: data.clientName ?? "Client",
                     clientName: data.clientName ?? "Client",
-                    changeOrderTitle: co.title,
-                    description: co.description ?? "",
-                    pricing: co.amount != null ? `$${co.amount}` : "TBD",
-                    viewSowUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/projects/${co.projectId}/sow`,
+                    changeOrderTitle: updated.title,
+                    description: updated.description ?? "",
+                    pricing: updated.totalAmount != null ? `$${updated.totalAmount}` : "TBD",
+                    viewSowUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/projects/${updated.projectId}/sow`,
                 }),
             }).catch((err) =>
                 console.error("[ChangeOrderService] Failed to send ChangeOrderAcceptedEmail:", err),

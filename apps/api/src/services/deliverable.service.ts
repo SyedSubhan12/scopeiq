@@ -5,7 +5,7 @@ import { writeAuditLog, projects, clients, eq } from "@novabots/db";
 import { db } from "@novabots/db";
 import { NotFoundError, ValidationError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
-import { getUploadUrl, getDownloadUrl } from "../lib/storage.js";
+import { getUploadUrl, getDownloadUrl, validateMimeType } from "../lib/storage.js";
 import { sendEmail } from "../lib/email.js";
 import { DeliverableReadyEmail } from "../emails/index.js";
 import React from "react";
@@ -212,6 +212,7 @@ export const deliverableService = {
       );
 
     return updated;
+    });
   },
 
   async approve(
