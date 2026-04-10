@@ -1,9 +1,11 @@
 import asyncio
 import json
+import time
 import structlog
 from bullmq import Worker
 
 from app.config import settings
+from app.gemini_client import get_gemini_client  # noqa: F401 — imported to confirm singleton pattern
 from app.schemas.brief_schemas import BriefFieldInput
 from app.services.brief_scorer import BriefScorerService
 from app.services.callback_service import post_callback
@@ -18,9 +20,20 @@ async def process_score_brief(job, token):
 
     scorer = BriefScorerService()
 
-    # Brief fields should be pre-fetched and included in the job data
-    # by the API dispatcher to avoid direct DB access.
-    fields_data = job.data.get("fields", [])
+    # Fetch brief fields from database
+    pool = await get_db_pool()
+    start_ms = int(time.monotonic() * 1000)
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT field_key, field_label, field_type, value
+                FROM brief_fields
+                WHERE brief_id = $1
+                ORDER BY sort_order ASC
+                """,
+                brief_id,
+            )
 
     try:
         if not fields_data:
@@ -54,13 +67,28 @@ async def process_score_brief(job, token):
             for row in fields_data
         ]
 
-        result = await scorer.score(fields)
+        try:
+            result = await asyncio.wait_for(scorer.score(fields), timeout=30)
+        except asyncio.TimeoutError:
+            duration_ms = int(time.monotonic() * 1000) - start_ms
+            logger.error(
+                "score_brief_timeout",
+                brief_id=brief_id,
+                model=settings.GEMINI_MODEL,
+                duration_ms=duration_ms,
+                success=False,
+            )
+            return {"brief_id": brief_id, "score": 0, "status": "error", "flag_count": 0}
 
+        duration_ms = int(time.monotonic() * 1000) - start_ms
         logger.info(
             "brief_scored",
             brief_id=brief_id,
             score=result.score,
             flag_count=len(result.flags),
+            model=settings.GEMINI_MODEL,
+            duration_ms=duration_ms,
+            success=True,
         )
 
         # Determine status based on score
@@ -72,20 +100,24 @@ async def process_score_brief(job, token):
             "briefId": brief_id,
             "score": result.score,
             "summary": result.summary,
-            "flags": [
-                {
-                    "fieldKey": f.field_key,
-                    "reason": f.reason,
-                    "severity": f.severity,
-                    "suggestedQuestion": f.suggested_question,
-                }
-                for f in result.flags
-            ],
-            "status": new_status,
-            "flagCount": len(result.flags),
-        }
-
-        response = await post_callback("/api/ai-callback/brief-scored", callback_payload)
+            "flags": [f.model_dump() for f in result.flags],
+        })
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE briefs
+                SET scope_score = $1,
+                    scoring_result_json = $2::jsonb,
+                    status = $3,
+                    scored_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = $4
+                """,
+                result.score,
+                scoring_result,
+                new_status,
+                brief_id,
+            )
 
         return {
             "brief_id": brief_id,
@@ -95,10 +127,19 @@ async def process_score_brief(job, token):
             "flag_count": len(result.flags),
             "callback_response": response,
         }
-
-    except Exception as e:
-        logger.error("brief_scoring_failed", brief_id=brief_id, error=str(e))
+    except Exception as exc:
+        duration_ms = int(time.monotonic() * 1000) - start_ms
+        logger.error(
+            "score_brief_failed",
+            brief_id=brief_id,
+            error=str(exc),
+            model=settings.GEMINI_MODEL,
+            duration_ms=duration_ms,
+            success=False,
+        )
         raise
+    finally:
+        await pool.close()
 
 
 def start_worker():
@@ -116,5 +157,4 @@ def start_worker():
 
 
 if __name__ == "__main__":
-    worker = start_worker()
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(start_worker())
