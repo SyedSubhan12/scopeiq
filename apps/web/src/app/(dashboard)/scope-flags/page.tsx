@@ -2,8 +2,11 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { ScopePatternAlerts } from "@/components/scope-guard/ScopePatternAlerts";
+import { PageEnter } from "@/components/shared/PageEnter";
 import { ShieldAlert, Filter, FolderKanban, ChevronDown } from "lucide-react";
 import { Card, Badge, Skeleton, Button, useToast } from "@novabots/ui";
+import { AnimatePresence, motion } from "framer-motion";
 import { fetchWithAuth } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@novabots/ui";
@@ -38,6 +41,7 @@ export default function ScopeFlagsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
   const flags: any[] = data?.data ?? [];
   const projects: any[] = projectsData?.data ?? [];
@@ -69,7 +73,16 @@ export default function ScopeFlagsPage() {
   }
 
   return (
+    <PageEnter>
     <div className="space-y-6">
+      {/* Pattern alerts — FEAT-NEW-005 */}
+      <ScopePatternAlerts
+        flags={flags}
+        projects={projects}
+        dismissed={dismissedAlerts}
+        onDismiss={(id) => setDismissedAlerts((prev) => new Set([...prev, id]))}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -103,18 +116,29 @@ export default function ScopeFlagsPage() {
             return (
               <button
                 key={s}
+                type="button"
                 onClick={() => setStatusFilter(s)}
                 className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors",
+                  "relative overflow-hidden rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors",
                   statusFilter === s
-                    ? "bg-primary text-white"
+                    ? "text-white"
                     : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--border-subtle))]",
                 )}
               >
-                {s.replace(/_/g, " ")}
-                {count > 0 && (
-                  <span className="ml-1 text-[10px] opacity-70">({count})</span>
+                {statusFilter === s && (
+                  <motion.span
+                    layoutId="status-filter-active"
+                    className="absolute inset-0 rounded-full bg-primary"
+                    style={{ zIndex: 0 }}
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
                 )}
+                <span className="relative z-10">
+                  {s.replace(/_/g, " ")}
+                  {count > 0 && (
+                    <span className="ml-1 text-[10px] opacity-70">({count})</span>
+                  )}
+                </span>
               </button>
             );
           })}
@@ -126,15 +150,24 @@ export default function ScopeFlagsPage() {
             {SEVERITY_FILTERS.map((s) => (
               <button
                 key={s}
+                type="button"
                 onClick={() => setSeverityFilter(s)}
                 className={cn(
-                  "rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors",
+                  "relative overflow-hidden rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors",
                   severityFilter === s
-                    ? "bg-[rgb(var(--text-primary))] text-white"
+                    ? "text-white"
                     : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--border-subtle))]",
                 )}
               >
-                {s}
+                {severityFilter === s && (
+                  <motion.span
+                    layoutId="severity-filter-active"
+                    className="absolute inset-0 rounded-full bg-[rgb(var(--text-primary))]"
+                    style={{ zIndex: 0 }}
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">{s}</span>
               </button>
             ))}
           </div>
@@ -175,16 +208,27 @@ export default function ScopeFlagsPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map((flag: any) => (
-            <FlagCard
-              key={flag.id}
-              flag={flag}
-              onAction={(id, status) => handleAction(id, status)}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {filtered.map((flag: any) => (
+              <motion.div
+                key={flag.id}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -24, height: 0, marginBottom: 0 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <FlagCard
+                  flag={flag}
+                  onAction={(id, status) => handleAction(id, status)}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </div>
+    </PageEnter>
   );
 }
 

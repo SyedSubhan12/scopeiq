@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.useToast = exports.ToastProvider = exports.Skeleton = exports.Avatar = exports.DropdownItem = exports.DropdownMenu = exports.Dialog = exports.MetricCard = exports.CardContent = exports.CardTitle = exports.CardHeader = exports.Card = exports.Badge = exports.Select = exports.Textarea = exports.Input = exports.Button = exports.cn = void 0;
+exports.Tabs = exports.useToast = exports.ToastProvider = exports.Skeleton = exports.AvatarGroup = exports.Avatar = exports.DropdownItem = exports.DropdownMenu = exports.Dialog = exports.MetricCard = exports.CardFooter = exports.CardContent = exports.CardBody = exports.CardTitle = exports.CardHeader = exports.Card = exports.Badge = exports.Select = exports.Textarea = exports.Input = exports.Button = exports.cn = void 0;
 var utils_js_1 = require("./utils.js");
 Object.defineProperty(exports, "cn", { enumerable: true, get: function () { return utils_js_1.cn; } });
 var button_js_1 = require("./button.js");
@@ -17,7 +17,9 @@ var card_js_1 = require("./card.js");
 Object.defineProperty(exports, "Card", { enumerable: true, get: function () { return card_js_1.Card; } });
 Object.defineProperty(exports, "CardHeader", { enumerable: true, get: function () { return card_js_1.CardHeader; } });
 Object.defineProperty(exports, "CardTitle", { enumerable: true, get: function () { return card_js_1.CardTitle; } });
+Object.defineProperty(exports, "CardBody", { enumerable: true, get: function () { return card_js_1.CardBody; } });
 Object.defineProperty(exports, "CardContent", { enumerable: true, get: function () { return card_js_1.CardContent; } });
+Object.defineProperty(exports, "CardFooter", { enumerable: true, get: function () { return card_js_1.CardFooter; } });
 var metric_card_js_1 = require("./metric-card.js");
 Object.defineProperty(exports, "MetricCard", { enumerable: true, get: function () { return metric_card_js_1.MetricCard; } });
 var dialog_js_1 = require("./dialog.js");
@@ -27,10 +29,13 @@ Object.defineProperty(exports, "DropdownMenu", { enumerable: true, get: function
 Object.defineProperty(exports, "DropdownItem", { enumerable: true, get: function () { return dropdown_menu_js_1.DropdownItem; } });
 var avatar_js_1 = require("./avatar.js");
 Object.defineProperty(exports, "Avatar", { enumerable: true, get: function () { return avatar_js_1.Avatar; } });
+Object.defineProperty(exports, "AvatarGroup", { enumerable: true, get: function () { return avatar_js_1.AvatarGroup; } });
 var skeleton_js_1 = require("./skeleton.js");
 Object.defineProperty(exports, "Skeleton", { enumerable: true, get: function () { return skeleton_js_1.Skeleton; } });
 var toast_js_1 = require("./toast.js");
 Object.defineProperty(exports, "ToastProvider", { enumerable: true, get: function () { return toast_js_1.ToastProvider; } });
 Object.defineProperty(exports, "useToast", { enumerable: true, get: function () { return toast_js_1.useToast; } });
+var tabs_js_1 = require("./tabs.js");
+Object.defineProperty(exports, "Tabs", { enumerable: true, get: function () { return tabs_js_1.Tabs; } });
 // Typography exports temporarily removed — see apps/web/src/lib/typography.ts
 // export { Heading, H1, H2, H3, H4, Body, Label, Caption, Stat, Code } from "./typography.js";

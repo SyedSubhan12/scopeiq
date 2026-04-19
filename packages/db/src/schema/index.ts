@@ -24,4 +24,5 @@ export * from "./rate-card-items.schema";
 export * from "./audit-log.schema";
 export * from "./messages.schema";
 export * from "./invitations.schema";
+export * from "./brief-embeds.schema";
 export * from "./relations";

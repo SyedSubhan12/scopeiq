@@ -69,10 +69,34 @@ export function middleware(request: NextRequest) {
 }
 
 function checkSession(request: NextRequest): boolean {
-  return request.cookies.getAll().some(
-    (cookie) =>
-      cookie.name.includes("supabase") && cookie.name.includes("auth-token"),
+  const cookies = request.cookies.getAll();
+  
+  // Debug: log all cookies to see what's actually present
+  console.log('[middleware:checkSession] Checking cookies:', cookies.map(c => c.name));
+  
+  // Check for actual Supabase session cookies only.
+  // Do not treat the PKCE code-verifier cookie as an authenticated session.
+  const hasSession = cookies.some(
+    (cookie) => {
+      if (!cookie.name.startsWith("sb-")) {
+        return false;
+      }
+
+      if (cookie.name.endsWith("-code-verifier")) {
+        return false;
+      }
+
+      return (
+        cookie.name === "sb-access-token" ||
+        cookie.name === "sb-refresh-token" ||
+        cookie.name.endsWith("-auth-token") ||
+        cookie.name.includes("-auth-token.")
+      );
+    },
   );
+  
+  console.log('[middleware:checkSession] Session found:', hasSession);
+  return hasSession;
 }
 
 export const config = {

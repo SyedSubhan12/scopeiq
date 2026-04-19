@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Plus, FolderKanban, Search } from "lucide-react";
-import { Button, Badge, Card, Skeleton, Dialog, Input, Select, Textarea, useToast } from "@novabots/ui";
+import { Button, Card, Skeleton, Dialog, Input, Select, Textarea, useToast } from "@novabots/ui";
+import { AnimatedProjectCard } from "@/components/projects/AnimatedProjectCard";
+import { PageEnter } from "@/components/shared/PageEnter";
 import { useAssetsReady } from "@/hooks/useAssetsReady";
 import { getProjectsQueryOptions, useProjects, useCreateProject } from "@/hooks/useProjects";
 import { getClientsQueryOptions, useClients } from "@/hooks/useClients";
@@ -60,23 +61,24 @@ export default function ProjectsPage() {
   }
 
   return (
+    <PageEnter>
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">Projects</h1>
           <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
             Manage all your client projects
           </p>
         </div>
-        <Button size="md" onClick={() => setShowCreate(true)}>
+        <Button size="md" className="max-sm:w-full max-sm:justify-center" onClick={() => setShowCreate(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New Project
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="mb-4 flex items-center gap-4">
-        <div className="relative flex-1 max-w-xs">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--text-muted))]" />
           <input
             value={search}
@@ -85,7 +87,7 @@ export default function ProjectsPage() {
             className="w-full rounded-lg border border-[rgb(var(--border-default))] py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {["all", "active", "draft", "paused", "completed"].map((s) => (
             <button
               key={s}
@@ -110,33 +112,8 @@ export default function ProjectsPage() {
         </div>
       ) : filtered.length > 0 ? (
         <div className="space-y-3">
-          {filtered.map((project: { id: string; name: string; status: string; description?: string | null; client?: { name: string } | null; budget?: number | null; updatedAt?: string }) => (
-            <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card hoverable className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <FolderKanban className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-[rgb(var(--text-primary))]">{project.name}</h3>
-                    <p className="text-sm text-[rgb(var(--text-muted))]">
-                      {project.client?.name ?? "No client"}
-                      {project.description && ` \u2022 ${project.description.slice(0, 60)}`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {project.budget != null && (
-                    <span className="text-sm font-medium text-[rgb(var(--text-secondary))]">
-                      ${project.budget.toLocaleString()}
-                    </span>
-                  )}
-                  <Badge status={project.status as "active" | "draft" | "paused" | "completed"}>
-                    {project.status}
-                  </Badge>
-                </div>
-              </Card>
-            </Link>
+          {filtered.map((project: { id: string; name: string; status: string; description?: string | null; client?: { name: string } | null; budget?: number | null; updatedAt?: string }, i: number) => (
+            <AnimatedProjectCard key={project.id} project={project} index={i} />
           ))}
         </div>
       ) : (
@@ -221,5 +198,6 @@ export default function ProjectsPage() {
         </div>
       </Dialog>
     </div>
+    </PageEnter>
   );
 }

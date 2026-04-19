@@ -13,6 +13,7 @@ import {
   confirmUploadSchema,
   deliverableResponseSchema,
   deliverableDeleteResponseSchema,
+  approvalEventResponseSchema,
 } from "./deliverable.schemas.js";
 import { submitFeedbackSchema, feedbackResponseSchema } from "./feedback.schemas.js";
 
@@ -143,24 +144,36 @@ deliverableRouter.post("/:id/feedback", async (c) => {
   return c.json({ data: item }, 201);
 });
 
-deliverableRouter.patch("/:id/approve", authMiddleware, async (c) => {
-  const workspaceId = c.get("workspaceId");
-  const userId = c.get("userId");
-  const id = c.req.param("id");
-  const result = await deliverableService.approve(workspaceId, id, userId, "agency");
-  return c.json({ data: result });
+const approveBodySchema = z.object({
+  comment: z.string().optional(),
+});
+
+const rejectBodySchema = z.object({
+  comment: z.string().min(1),
 });
 
 deliverableRouter.patch(
-  "/:id/reject",
-  authMiddleware,
-  zValidator("json", z.object({ feedback: z.string().optional() })),
+  "/:id/approve",
+  zValidator("json", approveBodySchema),
   async (c) => {
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
     const id = c.req.param("id");
-    const { feedback } = c.req.valid("json");
-    const result = await deliverableService.requestRevision(workspaceId, id, userId, "agency", feedback ?? undefined);
-    return c.json({ data: result });
+    const { comment } = c.req.valid("json");
+    const result = await deliverableService.approve(workspaceId, id, userId, null, comment);
+    return c.json(approvalEventResponseSchema.parse({ data: result }));
+  },
+);
+
+deliverableRouter.patch(
+  "/:id/reject",
+  zValidator("json", rejectBodySchema),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const id = c.req.param("id");
+    const { comment } = c.req.valid("json");
+    const result = await deliverableService.requestRevision(workspaceId, id, userId, null, comment);
+    return c.json(approvalEventResponseSchema.parse({ data: result }));
   },
 );

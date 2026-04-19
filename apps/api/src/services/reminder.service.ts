@@ -20,7 +20,7 @@ let reminderQueue: Queue | null = null;
 
 export function getReminderQueue(): Queue {
   if (!reminderQueue) {
-    reminderQueue = new Queue("approval-reminders", { connection: getRedisConnection() });
+    reminderQueue = new Queue("reminders", { connection: getRedisConnection() });
   }
   return reminderQueue;
 }
@@ -239,13 +239,27 @@ export const reminderService = {
 
 /**
  * Start the BullMQ worker for approval reminder jobs.
+ *
+ * Handles two distinct job shapes on the "reminders" queue:
+ * 1. Per-deliverable step jobs: payload has a `step` field (ReminderJobData).
+ *    Produced by scheduleReminderSequence() and the step-advancing logic in
+ *    processReminderStep(). Handled by reminderService.processReminderStep().
+ * 2. Hourly cron sweep jobs: payload has a `triggered_at` field (dispatched by
+ *    scheduleHourlyReminders / dispatchSendReminderJob). Dynamically imports the
+ *    processReminders() sweep from send-reminder.job.ts to avoid a circular import.
  */
 export function startReminderWorker(): Worker {
   const worker = new Worker(
-    "approval-reminders",
+    "reminders",
     async (job) => {
-      const data = job.data as ReminderJobData;
-      return reminderService.processReminderStep(data);
+      const data = job.data as Record<string, unknown>;
+      // Cron sweep jobs carry `triggered_at`; per-deliverable step jobs carry `step`.
+      if ("step" in data) {
+        return reminderService.processReminderStep(data as unknown as ReminderJobData);
+      }
+      // Dynamic import breaks the compile-time circular reference.
+      const { processReminders } = await import("../jobs/send-reminder.job.js");
+      return processReminders();
     },
     {
       connection: getRedisConnection(),

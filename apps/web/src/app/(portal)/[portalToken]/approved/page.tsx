@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { PortalSessionProvider } from "@/providers/portal-session-provider";
 import { usePortalSession } from "@/hooks/usePortalSession";
 import { PortalHeader } from "@/components/portal/PortalHeader";
@@ -8,13 +10,43 @@ import { Button, Card } from "@novabots/ui";
 import { Skeleton } from "@novabots/ui";
 import {
   AlertCircle,
-  CheckCircle,
   ArrowLeft,
   FileCheck,
   Clock,
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+
+function AnimatedCheckmark() {
+  const circleRef = useRef<SVGCircleElement>(null);
+  const checkRef = useRef<SVGPathElement>(null);
+
+  useEffect(() => {
+    void import("animejs").then((mod) => {
+      const anime = (mod as { default: (p: unknown) => void }).default;
+      anime({
+        targets: circleRef.current,
+        strokeDashoffset: [(anime as any).setDashoffset, 0],
+        duration: 700,
+        easing: "easeOutQuad",
+      });
+      anime({
+        targets: checkRef.current,
+        strokeDashoffset: [(anime as any).setDashoffset, 0],
+        duration: 450,
+        delay: 550,
+        easing: "easeOutQuad",
+      });
+    });
+  }, []);
+
+  return (
+    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" className="mx-auto mb-6" aria-hidden>
+      <circle ref={circleRef} cx="40" cy="40" r="36" stroke="#10b981" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <path ref={checkRef} d="M24 40 L35 52 L56 28" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
 
 function ApprovedPageContent() {
   const session = usePortalSession();
@@ -60,20 +92,38 @@ function ApprovedPageContent() {
       />
 
       <main className="mx-auto max-w-4xl px-4 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        >
         <Card className="max-w-2xl mx-auto text-center py-12 px-8">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
-            <CheckCircle className="h-10 w-10 text-emerald-500" />
-          </div>
+          <AnimatedCheckmark />
 
-          <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">
+          <motion.h1
+            className="text-2xl font-bold text-[rgb(var(--text-primary))]"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9, duration: 0.35 }}
+          >
             Successfully Approved
-          </h1>
-          <p className="mt-3 text-[rgb(var(--text-muted))] leading-relaxed">
+          </motion.h1>
+          <motion.p
+            className="mt-3 text-[rgb(var(--text-muted))] leading-relaxed"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.05, duration: 0.35 }}
+          >
             Your approval has been recorded. Your agency has been notified and will
             proceed with the next phase of your project.
-          </p>
+          </motion.p>
 
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <motion.div
+            className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.15, duration: 0.4 }}
+          >
             <div className="rounded-xl bg-[rgb(var(--surface-subtle))] p-4">
               <FileCheck className="mx-auto h-6 w-6 text-[rgb(var(--text-muted))] mb-2" />
               <p className="text-xs font-bold text-[rgb(var(--text-primary))]">
@@ -101,9 +151,14 @@ function ApprovedPageContent() {
                 Expect updates in your portal
               </p>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <motion.div
+            className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.3, duration: 0.35 }}
+          >
             <Link href={`/portal/${session.token}`}>
               <Button size="lg" className="gap-2 w-full sm:w-auto">
                 <ArrowLeft className="h-4 w-4" />
@@ -115,8 +170,9 @@ function ApprovedPageContent() {
                 Review More Work
               </Button>
             </Link>
-          </div>
+          </motion.div>
         </Card>
+        </motion.div>
 
         <div className="mt-8 flex justify-center">
           <PoweredByBadge plan={workspace.plan} />

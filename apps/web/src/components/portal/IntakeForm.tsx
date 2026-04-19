@@ -126,8 +126,6 @@ export function IntakeForm({ brief, onSuccess, onStepChange, onValuesChange }: I
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [prediction, setPrediction] = useState<{ score: number; feedback: string; is_clear: boolean } | null>(null);
-  const [isPredicting, setIsPredicting] = useState(false);
   const [uploadingFieldKey, setUploadingFieldKey] = useState<string | null>(null);
   const [removingAttachmentId, setRemovingAttachmentId] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -177,7 +175,6 @@ export function IntakeForm({ brief, onSuccess, onStepChange, onValuesChange }: I
   const currentField = visibleFields[step] ?? null;
   const isReviewStep = step >= visibleFields.length;
   const currentValue = currentField ? values?.[currentField.key] : undefined;
-  const debouncedValue = useDebounce(currentValue, 700);
   const currentFieldAttachments = currentField ? (attachmentsByField[currentField.key] ?? []) : [];
   const lastSavedSignatureRef = useRef(JSON.stringify(defaultValues));
 
@@ -273,51 +270,6 @@ export function IntakeForm({ brief, onSuccess, onStepChange, onValuesChange }: I
 
     return () => controller.abort();
   }, [API_BASE_URL, brief.id, debouncedDraftValues, submitted, submitting, token]);
-
-  useEffect(() => {
-    if (!currentField || (currentField.type !== "text" && currentField.type !== "textarea")) {
-      setPrediction(null);
-      return;
-    }
-
-    const value = Array.isArray(debouncedValue) ? debouncedValue.join(", ") : (debouncedValue ?? "");
-    if (value.trim().length < 20) {
-      setPrediction(null);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    const checkClarity = async () => {
-      setIsPredicting(true);
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/v1/ai/predict-clarity`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            field_label: currentField.label,
-            field_value: value,
-          }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) return;
-        const data = await response.json();
-        setPrediction(data);
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setPrediction(null);
-        }
-      } finally {
-        setIsPredicting(false);
-      }
-    };
-
-    void checkClarity();
-
-    return () => controller.abort();
-  }, [API_BASE_URL, currentField, debouncedValue]);
 
   const goNext = async () => {
     if (!currentField) {
@@ -838,40 +790,6 @@ export function IntakeForm({ brief, onSuccess, onStepChange, onValuesChange }: I
                       </div>
                     )}
 
-                    {prediction ? (
-                      <div
-                        className={cn(
-                          "rounded-2xl border p-4 text-sm leading-6",
-                          prediction.is_clear
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                            : "border-amber-200 bg-amber-50 text-amber-900",
-                        )}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={cn(
-                              "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white",
-                              prediction.is_clear ? "bg-emerald-500" : "bg-amber-500",
-                            )}
-                          >
-                            {prediction.score}
-                          </div>
-                          <div>
-                            <p className="font-medium">
-                              {prediction.is_clear ? "Clear enough to move forward" : "This answer could use a bit more detail"}
-                            </p>
-                            <p className="mt-1">{prediction.feedback}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {isPredicting ? (
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-[rgb(var(--text-muted))]">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Checking clarity
-                      </div>
-                    ) : null}
                   </div>
                 </motion.div>
               ) : null}

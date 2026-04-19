@@ -57,3 +57,10 @@ changeOrderRouter.patch(
         return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }));
     },
 );
+
+changeOrderRouter.get("/:id/signed-pdf", async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const id = c.req.param("id");
+    const result = await changeOrderService.getSignedPdfUrl(workspaceId, id);
+    return c.json({ data: result });
+});

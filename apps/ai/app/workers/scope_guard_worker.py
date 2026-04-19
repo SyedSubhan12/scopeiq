@@ -12,6 +12,47 @@ from app.services.callback_service import post_callback
 
 logger = structlog.get_logger()
 
+# Sprint 4 FEAT-SG-002: Scope Flag Detection confidence tuning.
+# Strategic doc targets: <5s p95 latency, drop low-confidence noise below 0.30,
+# map severity to confidence buckets so UX matches AI certainty.
+CONFIDENCE_MIN = 0.30  # Below this is noise — never flag
+CONFIDENCE_HIGH = 0.80
+CONFIDENCE_MEDIUM = 0.50
+SLA_LATENCY_MS = 5000
+
+# Default scope-guard confidence threshold when workspace has no override.
+# Workspace admin can raise/lower this via the AI policy settings.
+DEFAULT_SCOPE_GUARD_THRESHOLD = 0.60
+
+
+def _resolve_scope_guard_threshold(job_data: dict) -> float:
+    """Return the effective scope-guard confidence threshold.
+
+    Priority:
+    1. job.data["workspaceContext"]["scopeGuardThreshold"] — workspace admin setting (decimal string)
+    2. DEFAULT_SCOPE_GUARD_THRESHOLD                       — env fallback
+    """
+    workspace_ctx: dict = job_data.get("workspaceContext") or {}
+    raw = workspace_ctx.get("scopeGuardThreshold")
+    if raw is not None:
+        try:
+            value = float(raw)
+            if 0.0 <= value <= 1.0:
+                return value
+        except (TypeError, ValueError):
+            pass
+    return DEFAULT_SCOPE_GUARD_THRESHOLD
+
+
+def severity_for_confidence(confidence: float, fallback: str) -> str:
+    if confidence >= CONFIDENCE_HIGH:
+        return "high"
+    if confidence >= CONFIDENCE_MEDIUM:
+        return "medium"
+    if confidence >= CONFIDENCE_MIN:
+        return "low"
+    return fallback
+
 
 async def get_db_pool():
     return await asyncpg.create_pool(settings.DATABASE_URL, min_size=1, max_size=5)
@@ -20,6 +61,9 @@ async def get_db_pool():
 async def process_scope_check(job, token):
     """Process a scope check job: input text vs. project SOW."""
     start_time = time.monotonic()
+
+    job_data: dict = dict(job.data)
+    scope_guard_threshold: float = _resolve_scope_guard_threshold(job_data)
 
     message_id = job.data.get("message_id")
     project_id = job.data.get("project_id")
@@ -93,9 +137,18 @@ async def process_scope_check(job, token):
                 success=True,
             )
 
-            # 3. Confidence threshold: only flag if >= 0.60
-            if result.is_deviation and result.confidence >= 0.60:
+            # 3. Sprint 4 confidence tuning: drop noise below CONFIDENCE_MIN,
+            #    bucket severity by confidence so UX matches AI certainty.
+            # Also respect workspace-level scopeGuardThreshold — flags are only
+            # created when confidence meets or exceeds the workspace admin's setting.
+            effective_min = max(CONFIDENCE_MIN, scope_guard_threshold)
+            if result.is_deviation and result.confidence >= effective_min:
                 flag_id = str(uuid4())
+                tuned_severity = severity_for_confidence(
+                    result.confidence,
+                    fallback=result.suggested_severity,
+                )
+                sla_ok = duration_ms <= SLA_LATENCY_MS
                 # Use Pydantic attribute access (not .get()) — result is a ScopeAnalysisResult model
                 await conn.execute(
                     """
@@ -109,16 +162,34 @@ async def process_scope_check(job, token):
                     project_id,
                     "AI Detection: Possible Scope Deviation",
                     result.reasoning,
-                    result.suggested_severity,
+                    tuned_severity,
                     "pending",
                     "ai_audit",
                     json.dumps({
                         "confidence": result.confidence,
+                        "ai_severity": result.suggested_severity,
                         "matched_clause_id": result.matched_clause_id,
                         "original_request": input_text,
+                        "detection_latency_ms": duration_ms,
+                        "sla_ok": sla_ok,
                     }),
                 )
-                logger.info("scope_flag_created", flag_id=flag_id, confidence=result.confidence)
+                logger.info(
+                    "scope_flag_created",
+                    flag_id=flag_id,
+                    confidence=result.confidence,
+                    severity=tuned_severity,
+                    detection_latency_ms=duration_ms,
+                    sla_ok=sla_ok,
+                )
+            elif result.is_deviation:
+                logger.info(
+                    "scope_flag_dropped_low_confidence",
+                    project_id=project_id,
+                    confidence=result.confidence,
+                    effective_min=effective_min,
+                    scope_guard_threshold=scope_guard_threshold,
+                )
 
             return {
                 "is_deviation": result.is_deviation,

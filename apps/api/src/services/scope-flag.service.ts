@@ -1,8 +1,30 @@
 import { scopeFlagRepository } from "../repositories/scope-flag.repository.js";
 import { NotFoundError } from "@novabots/types";
-import { db, writeAuditLog, projects, sowClauses, eq, and, isNull } from "@novabots/db";
+import { db, writeAuditLog, projects, sowClauses, workspaces, eq, and, isNull } from "@novabots/db";
 import type { FlagStatus } from "@novabots/db";
 import { dispatchGenerateChangeOrderJob } from "../jobs/generate-change-order.job.js";
+
+const DEFAULT_SLA_HOURS = 48;
+
+/**
+ * Return the SLA deadline for a new scope flag.
+ * Reads `settingsJson.scopeFlagSlaHours` from the workspace; defaults to 48 h.
+ */
+export async function computeSlaDeadline(workspaceId: string, fromDate: Date = new Date()): Promise<Date> {
+    const [ws] = await db
+        .select({ settingsJson: workspaces.settingsJson })
+        .from(workspaces)
+        .where(eq(workspaces.id, workspaceId))
+        .limit(1);
+
+    const settings = (ws?.settingsJson ?? {}) as Record<string, unknown>;
+    const hours =
+        typeof settings["scopeFlagSlaHours"] === "number"
+            ? settings["scopeFlagSlaHours"]
+            : DEFAULT_SLA_HOURS;
+
+    return new Date(fromDate.getTime() + hours * 60 * 60 * 1000);
+}
 
 export const scopeFlagService = {
     async list(workspaceId: string, projectId?: string) {
@@ -69,6 +91,26 @@ export const scopeFlagService = {
 
     async countPending(workspaceId: string) {
         return scopeFlagRepository.countByWorkspace(workspaceId);
+    },
+
+    async listOpenSortedByBreach(workspaceId: string) {
+        const data = await scopeFlagRepository.listOpenSortedByBreach(workspaceId);
+        return { data };
+    },
+
+    async markBreached(id: string, workspaceId: string) {
+        await db.transaction(async (trx) => {
+            await scopeFlagRepository.markSlaBreached(id, workspaceId, trx as typeof db);
+            await writeAuditLog(trx as never, {
+                workspaceId,
+                actorId: null,
+                actorType: "system",
+                entityType: "scope_flag",
+                entityId: id,
+                action: "update",
+                metadata: { slaBreached: true },
+            });
+        });
     },
 
     async matchToSOWClause(workspaceId: string, flagId: string) {

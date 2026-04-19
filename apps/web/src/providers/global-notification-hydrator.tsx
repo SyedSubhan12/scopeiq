@@ -35,7 +35,7 @@ export function GlobalNotificationHydrator() {
     tasks: [() => queryClient.ensureQueryData(getNotificationsQueryOptions(10))],
   });
 
-  const { data } = useNotifications(10);
+  const { data } = useNotifications(10, shouldHydrate);
 
   useEffect(() => {
     if (!shouldHydrate || !data?.data) {

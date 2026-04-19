@@ -1,7 +1,8 @@
 import { db, writeAuditLog, projects, statementsOfWork, sowClauses, eq, and, isNull, gt, desc } from "@novabots/db";
 import { NotFoundError, ValidationError } from "@novabots/types";
 import { dispatchParseSowJob } from "../jobs/parse-sow.job.js";
-import type { ClauseType } from "@novabots/db";
+import { getDownloadUrl } from "../lib/storage.js";
+import type { ClauseType, SowStatus } from "@novabots/db";
 
 interface CreateSowInput {
   projectId: string;
@@ -52,6 +53,7 @@ export const sowService = {
         .values({
           workspaceId,
           title: data.title,
+          status: "draft" as SowStatus,
           fileUrl: data.fileUrl ?? null,
           fileKey: data.fileKey ?? null,
           fileSizeBytes: data.fileSizeBytes ?? null,
@@ -93,7 +95,7 @@ export const sowService = {
         entityType: "statement_of_work",
         entityId: sow.id,
         action: "create",
-        metadata: { projectId: data.projectId, title: data.title },
+        metadata: { projectId: data.projectId, title: data.title, status: "draft" },
       });
 
       const clauses = await trx
@@ -104,7 +106,7 @@ export const sowService = {
 
       // Dispatch parse job outside the transaction (best-effort background task)
       if (data.rawText && data.rawText.length > 0) {
-        dispatchParseSowJob(sow.id, data.projectId, data.rawText).catch((err) =>
+        dispatchParseSowJob(sow.id, data.projectId, { rawText: data.rawText }).catch((err) =>
           console.error("[SOW] Failed to dispatch parse-sow job:", err),
         );
       }
@@ -140,6 +142,7 @@ export const sowService = {
         .values({
           workspaceId,
           title: data.title,
+          status: "draft" as SowStatus,
           fileUrl: data.fileUrl,
           fileKey: data.fileKey,
           fileSizeBytes: data.fileSizeBytes,
@@ -161,11 +164,17 @@ export const sowService = {
         entityType: "statement_of_work",
         entityId: sow.id,
         action: "create",
-        metadata: { projectId: data.projectId, fileUrl: data.fileUrl },
+        metadata: { projectId: data.projectId, fileUrl: data.fileUrl, status: "draft" },
       });
 
-      // Dispatch parse job outside the transaction (best-effort background task)
-      dispatchParseSowJob(sow.id, data.projectId, "").catch((err) =>
+      // Dispatch parse job outside the transaction — worker fetches PDF from
+      // storage and extracts text with PyMuPDF when raw_text is absent.
+      getDownloadUrl(data.fileKey).then((storageUrl) => {
+        return dispatchParseSowJob(sow.id, data.projectId, {
+          objectKey: data.fileKey,
+          storageUrl,
+        });
+      }).catch((err) =>
         console.error("[SOW] Failed to dispatch parse-sow job:", err),
       );
 
@@ -213,7 +222,7 @@ export const sowService = {
 
       await trx
         .update(statementsOfWork)
-        .set({ parsedAt: new Date(), updatedAt: new Date() })
+        .set({ status: "active" as SowStatus, parsedAt: new Date(), updatedAt: new Date() })
         .where(eq(statementsOfWork.id, sowId));
 
       await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
@@ -222,7 +231,7 @@ export const sowService = {
         entityType: "statement_of_work",
         entityId: sowId,
         action: "update",
-        metadata: { action: "activate", clauseCount: data.clauses.length },
+        metadata: { action: "activate", clauseCount: data.clauses.length, status: "active" },
       });
 
       const clauses = await trx
@@ -495,4 +504,49 @@ export const sowService = {
       return updated;
     });
   },
+
+  async getActiveRevisionLimitForProject(
+    workspaceId: string,
+    projectId: string,
+  ): Promise<number | null> {
+    const rows = await db
+      .select({ originalText: sowClauses.originalText })
+      .from(projects)
+      .innerJoin(
+        statementsOfWork,
+        and(
+          eq(statementsOfWork.id, projects.sowId),
+          eq(statementsOfWork.workspaceId, workspaceId),
+          eq(statementsOfWork.status, "active"),
+          isNull(statementsOfWork.deletedAt),
+        ),
+      )
+      .innerJoin(
+        sowClauses,
+        and(
+          eq(sowClauses.sowId, statementsOfWork.id),
+          eq(sowClauses.clauseType, "revision_limit"),
+        ),
+      )
+      .where(
+        and(
+          eq(projects.id, projectId),
+          eq(projects.workspaceId, workspaceId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .orderBy(sowClauses.sortOrder)
+      .limit(1);
+
+    const text = rows[0]?.originalText;
+    if (!text) return null;
+    return parseRevisionLimitFromText(text);
+  },
 };
+
+export function parseRevisionLimitFromText(text: string): number | null {
+  const match = text.match(/(\d+)\s*(?:rounds?|revisions?)/i);
+  if (!match || !match[1]) return null;
+  const n = parseInt(match[1], 10);
+  return Number.isFinite(n) && n > 0 && n < 100 ? n : null;
+}

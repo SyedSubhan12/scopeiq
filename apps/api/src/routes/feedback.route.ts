@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { randomUUID } from "node:crypto";
+import { db, writeAuditLog } from "@novabots/db";
 import { authMiddleware } from "../middleware/auth.js";
 import { feedbackService } from "../services/feedback.service.js";
 import {
@@ -8,6 +10,8 @@ import {
   resolveFeedbackSchema,
   feedbackResponseSchema,
   feedbackDeleteResponseSchema,
+  submitNpsSchema,
+  npsResponseSchema,
 } from "./feedback.schemas.js";
 
 export const feedbackRouter = new Hono();
@@ -64,3 +68,37 @@ feedbackRouter.delete("/:id", async (c) => {
   await feedbackService.delete(id, workspaceId, userId);
   return c.json(feedbackDeleteResponseSchema.parse({ message: "Feedback deleted" }));
 });
+
+/**
+ * POST /v1/feedback/nps — Sprint 6 NPS prompt
+ * Stores the rating in the audit log (no new table needed) with
+ * entityType='nps_feedback' so we can slice it later for NPS >40 target.
+ */
+feedbackRouter.post(
+  "/nps",
+  zValidator("json", submitNpsSchema),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const { score, comment, surface } = c.req.valid("json");
+
+    const category =
+      score >= 9 ? "promoter" : score >= 7 ? "passive" : "detractor";
+
+    await writeAuditLog(db, {
+      workspaceId,
+      actorId: userId ?? null,
+      entityType: "nps_feedback",
+      entityId: randomUUID(),
+      action: "create",
+      metadata: {
+        score,
+        category,
+        comment: comment ?? null,
+        surface: surface ?? null,
+      },
+    });
+
+    return c.json(npsResponseSchema.parse({ ok: true, category }));
+  },
+);

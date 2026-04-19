@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@novabots/ui";
-import { Building, Users, CreditCard, Bell, Palette } from "lucide-react";
+import { Building, Users, CreditCard, Bell, Palette, Plug } from "lucide-react";
 
 const NAV = [
     { href: "/settings", label: "General", icon: Building },
@@ -11,6 +11,7 @@ const NAV = [
     { href: "/settings/team", label: "Team", icon: Users },
     { href: "/settings/rate-card", label: "Rate Card", icon: CreditCard },
     { href: "/settings/reminders", label: "Reminders", icon: Bell },
+    { href: "/settings/integrations", label: "Integrations", icon: Plug },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

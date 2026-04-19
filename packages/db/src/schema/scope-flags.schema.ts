@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, jsonb, index, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, jsonb, index, doublePrecision, boolean } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { flagSeverityEnum, flagStatusEnum } from './enums';
 import { workspaces } from './workspaces.schema';
@@ -26,6 +26,8 @@ export const scopeFlags = pgTable(
     resolvedBy: uuid("resolved_by"),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+    slaDeadline: timestamp("sla_deadline", { withTimezone: true }),
+    slaBreached: boolean("sla_breached").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -36,6 +38,9 @@ export const scopeFlags = pgTable(
       .where(sql`status = 'pending'`),
     workspaceIdx: index("idx_scope_flags_workspace").on(table.workspaceId),
     workspaceStatusIdx: index("idx_scope_flags_workspace_status").on(table.workspaceId, table.status),
+    slaBreachIdx: index("idx_scope_flags_sla_breach")
+      .on(table.slaDeadline)
+      .where(sql`status = 'open' OR status = 'pending'`),
   }),
 );
 

@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { authMiddleware } from "../middleware/auth.js";
 import { workspaceService } from "../services/workspace.service.js";
-import { updateWorkspaceSchema } from "./workspace.schemas.js";
+import { updateWorkspaceSchema, updateAiPolicySchema } from "./workspace.schemas.js";
 import { getUploadUrl, validateMimeType } from "../lib/storage.js";
+import { stripUndefined } from "../lib/strip-undefined.js";
 import { z } from "zod";
 
 const onboardingStepSchema = z.object({
@@ -52,6 +53,18 @@ workspaceRouter.patch(
       step,
       complete,
     );
+    return c.json({ data: workspace });
+  },
+);
+
+workspaceRouter.patch(
+  "/current/ai-policy",
+  zValidator("json", updateAiPolicySchema),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const body = stripUndefined(c.req.valid("json")) as Parameters<typeof workspaceService.updateAiPolicy>[2];
+    const workspace = await workspaceService.updateAiPolicy(workspaceId, userId, body);
     return c.json({ data: workspace });
   },
 );

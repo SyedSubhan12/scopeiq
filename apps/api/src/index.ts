@@ -34,7 +34,15 @@ import { dashboardRouter } from "./routes/dashboard.route.js";
 import webhookStripe from "./routes/webhook-stripe.route.js";
 import { resendWebhookRouter } from "./routes/resend-webhook.route.js";
 import { env } from "./lib/env.js";
-import { scheduleHourlyReminders, startReminderWorker } from "./jobs/send-reminder.job.js";
+import { scheduleHourlyReminders } from "./jobs/send-reminder.job.js";
+import { startReminderWorker } from "./services/reminder.service.js";
+import { startScopeFlagAlertWorker } from "./services/scope-flag-alert.service.js";
+import { startBriefScoringWorker } from "./services/brief-scoring-worker.service.js";
+import { startClarificationEmailWorker } from "./services/clarification-email.service.js";
+import { startDomainVerificationWorker } from "./jobs/verify-domain.job.js";
+import { startSlaBreachWorker, scheduleSlaBreachSweep } from "./jobs/scope-flag-sla.job.js";
+import { briefEmbedRouter } from "./routes/brief-embed.route.js";
+import { publicBriefEmbedRouter } from "./routes/public-brief-embed.route.js";
 import { ensureBucketExists } from "./lib/storage.js";
 import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
 
@@ -70,8 +78,12 @@ v1.route("/ai", aiRouter);
 v1.route("/billing", billingRouter);
 v1.route("/dashboard", dashboardRouter);
 v1.route("/sow", sowRouter);
+v1.route("/brief-embeds", briefEmbedRouter);
 
 app.route("/v1", v1);
+
+// Public embed endpoints (open CORS, rate-limited)
+app.route("/public/brief-embed", publicBriefEmbedRouter);
 
 // Public Stripe webhook (outside /v1, no auth)
 app.route("/webhooks/stripe", webhookStripe);
@@ -109,14 +121,30 @@ ensureBucketExists().catch((err) => {
     console.error("[Startup] Failed to ensure storage bucket exists:", err);
 });
 
-// Start BullMQ worker to process reminder jobs
-startReminderWorker().catch((err) => {
-    console.error("[Startup] Failed to start reminder worker:", err);
-});
+// Start BullMQ worker that processes per-deliverable reminder steps and auto-approvals
+startReminderWorker();
 
 // Register hourly reminder cron after server starts
 scheduleHourlyReminders().catch((err) => {
     console.error("[Startup] Failed to schedule reminders:", err);
+});
+
+// Start scope flag alert worker (delayed 2-hour email fallback)
+startScopeFlagAlertWorker();
+
+// Start brief scoring worker (BullMQ AI gateway, Rule 3)
+startBriefScoringWorker();
+
+// Start clarification email worker
+startClarificationEmailWorker();
+
+// Start domain verification polling worker (DNS TXT check w/ backoff)
+startDomainVerificationWorker();
+
+// Start SLA breach sweep worker + register 15-min repeating cron
+startSlaBreachWorker();
+scheduleSlaBreachSweep().catch((err) => {
+    console.error("[Startup] Failed to schedule SLA breach sweep:", err);
 });
 
 export default app;

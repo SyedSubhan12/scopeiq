@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart2,
   ChevronLeft,
@@ -16,6 +17,8 @@ import {
   LayoutDashboard,
   LogOut,
   PanelLeftClose,
+  Pin,
+  PinOff,
   Settings,
   ShieldAlert,
   Users,
@@ -75,51 +78,40 @@ function SidebarLink({
   const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 
   return (
-    <Link
-      href={item.href}
-      aria-current={isActive ? "page" : undefined}
-      title={!expanded ? item.label : undefined}
-      {...(onNavigate ? { onClick: onNavigate } : {})}
-      className={cn(
-        "group flex items-center rounded-2xl border text-sm font-medium transition-all duration-200",
-        expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-3",
-        isActive
-          ? "border-primary/15 bg-primary-light text-[rgb(var(--primary-dark))] shadow-[0_10px_30px_-24px_rgba(15,110,86,0.9)]"
-          : "border-transparent text-[rgb(var(--text-secondary))] hover:border-[rgb(var(--border-subtle))] hover:bg-white hover:text-[rgb(var(--text-primary))]",
-      )}
-    >
-      <span className="relative inline-flex shrink-0 items-center justify-center">
-        <item.icon
-          className={cn(
-            "h-5 w-5 shrink-0 transition-transform duration-200",
-            isActive
-              ? "text-[rgb(var(--primary))]"
-              : "text-[rgb(var(--text-secondary))] group-hover:scale-105 group-hover:text-[rgb(var(--text-primary))]",
-          )}
-          aria-hidden
-        />
-        {!expanded && item.count !== undefined && item.count > 0 ? (
-          <span
-            data-testid={
-              item.href === "/change-orders"
-                ? "sidebar-change-order-count"
-                : item.href === "/scope-flags"
-                  ? "sidebar-scope-flag-count"
-                  : undefined
-            }
+    <div className="sidebar-tooltip-wrapper">
+      <Link
+        href={item.href}
+        aria-current={isActive ? "page" : undefined}
+        data-tooltip={item.label}
+        {...(onNavigate ? { onClick: onNavigate } : {})}
+        className={cn(
+          "nav-shimmer relative group flex items-center rounded-2xl border text-sm font-medium transition-colors duration-200",
+          expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-3",
+          isActive
+            ? "border-primary/15 text-[rgb(var(--primary-dark))] shadow-[0_10px_30px_-24px_rgba(15,110,86,0.9)]"
+            : "border-transparent text-[rgb(var(--text-secondary))] hover:border-[rgb(var(--border-subtle))] hover:bg-white hover:text-[rgb(var(--text-primary))]",
+        )}
+      >
+        {/* Sliding active background — shares layoutId across all nav items */}
+        {isActive && (
+          <motion.span
+            layoutId="sidebar-active-pill"
+            className="absolute inset-0 rounded-2xl bg-primary-light"
+            style={{ zIndex: 0 }}
+            transition={{ type: "spring", stiffness: 340, damping: 30 }}
+          />
+        )}
+        <span className="relative z-10 inline-flex shrink-0 items-center justify-center">
+          <item.icon
             className={cn(
-              "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none text-white",
-              item.urgent ? "bg-status-red" : "bg-primary",
+              "h-5 w-5 shrink-0 transition-transform duration-200",
+              isActive
+                ? "text-[rgb(var(--primary))]"
+                : "text-[rgb(var(--text-secondary))] group-hover:scale-105 group-hover:text-[rgb(var(--text-primary))]",
             )}
-          >
-            {item.count > 9 ? "9+" : item.count}
-          </span>
-        ) : null}
-      </span>
-      {expanded ? (
-        <>
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          {item.count !== undefined && item.count > 0 ? (
+            aria-hidden
+          />
+          {!expanded && item.count !== undefined && item.count > 0 ? (
             <span
               data-testid={
                 item.href === "/change-orders"
@@ -129,20 +121,48 @@ function SidebarLink({
                     : undefined
               }
               className={cn(
-                "rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
-                item.urgent
-                  ? "bg-status-red text-white"
-                  : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-secondary))]",
+                "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none text-white",
+                item.urgent ? "bg-status-red" : "bg-primary",
               )}
             >
-              {item.count}
+              {item.count > 9 ? "9+" : item.count}
             </span>
           ) : null}
-        </>
-      ) : null}
-    </Link>
+        </span>
+        {expanded ? (
+          <>
+            <span className="relative z-10 min-w-0 flex-1 truncate">{item.label}</span>
+            {item.count !== undefined && item.count > 0 ? (
+              <span
+                data-testid={
+                  item.href === "/change-orders"
+                    ? "sidebar-change-order-count"
+                    : item.href === "/scope-flags"
+                      ? "sidebar-scope-flag-count"
+                      : undefined
+                }
+                className={cn(
+                  "relative z-10 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
+                  item.urgent
+                    ? "bg-status-red text-white"
+                    : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-secondary))]",
+                )}
+              >
+                {item.count}
+              </span>
+            ) : null}
+          </>
+        ) : null}
+      </Link>
+      <span className="sidebar-tooltip" aria-hidden="true">{item.label}</span>
+    </div>
   );
 }
+
+const navStagger = {
+  container: { hidden: {}, show: { transition: { staggerChildren: 0.045, delayChildren: 0.05 } } },
+  item: { hidden: { opacity: 0, x: -8 }, show: { opacity: 1, x: 0, transition: { duration: 0.22 } } },
+};
 
 function SidebarPanel({
   pathname,
@@ -193,50 +213,73 @@ function SidebarPanel({
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-6 px-3 py-4">
+        <div
+          className={cn(
+            "space-y-6 px-3 py-4",
+            expanded ? "sidebar-expanded-mode" : "sidebar-collapsed-mode",
+          )}
+        >
           <section className="space-y-2">
             <SidebarSectionLabel expanded={expanded}>Workspace</SidebarSectionLabel>
-            <div className="space-y-1.5">
+            <motion.div
+              className="space-y-1.5"
+              variants={navStagger.container}
+              initial="hidden"
+              animate="show"
+            >
               {mainItems.map((item) => (
-                <SidebarLink
-                  key={item.href}
-                  item={item}
-                  pathname={pathname}
-                  expanded={expanded}
-                  onNavigate={onNavigate}
-                />
+                <motion.div key={item.href} variants={navStagger.item}>
+                  <SidebarLink
+                    item={item}
+                    pathname={pathname}
+                    expanded={expanded}
+                    onNavigate={onNavigate}
+                  />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </section>
 
           <section className="space-y-2">
             <SidebarSectionLabel expanded={expanded}>Insights</SidebarSectionLabel>
-            <div className="space-y-1.5">
+            <motion.div
+              className="space-y-1.5"
+              variants={navStagger.container}
+              initial="hidden"
+              animate="show"
+            >
               {insightItems.map((item) => (
-                <SidebarLink
-                  key={item.href}
-                  item={item}
-                  pathname={pathname}
-                  expanded={expanded}
-                  onNavigate={onNavigate}
-                />
+                <motion.div key={item.href} variants={navStagger.item}>
+                  <SidebarLink
+                    item={item}
+                    pathname={pathname}
+                    expanded={expanded}
+                    onNavigate={onNavigate}
+                  />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </section>
 
           <section className="space-y-2">
             <SidebarSectionLabel expanded={expanded}>Support</SidebarSectionLabel>
-            <div className="space-y-1.5">
+            <motion.div
+              className="space-y-1.5"
+              variants={navStagger.container}
+              initial="hidden"
+              animate="show"
+            >
               {supportItems.map((item) => (
-                <SidebarLink
-                  key={item.href}
-                  item={item}
-                  pathname={pathname}
-                  expanded={expanded}
-                  onNavigate={onNavigate}
-                />
+                <motion.div key={item.href} variants={navStagger.item}>
+                  <SidebarLink
+                    item={item}
+                    pathname={pathname}
+                    expanded={expanded}
+                    onNavigate={onNavigate}
+                  />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </section>
         </div>
       </ScrollArea>
@@ -270,29 +313,34 @@ function SidebarPanel({
             </Link>
           </div>
         ) : (
-          <Link
-            href="/settings/billing"
-            title="Manage plan"
-            {...(onNavigate ? { onClick: onNavigate } : {})}
-            className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] text-white transition-colors hover:bg-[rgb(var(--primary))]"
-          >
-            <Zap className="h-4 w-4" aria-hidden />
-          </Link>
+          <div className="sidebar-tooltip-wrapper sidebar-collapsed-mode">
+            <Link
+              href="/settings/billing"
+              aria-label="Manage plan"
+              {...(onNavigate ? { onClick: onNavigate } : {})}
+              className="nav-shimmer mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] text-white transition-colors hover:bg-[rgb(var(--primary))]"
+            >
+              <Zap className="h-4 w-4" aria-hidden />
+            </Link>
+            <span className="sidebar-tooltip" aria-hidden="true">Manage plan</span>
+          </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => void onLogout()}
-          className={cn(
-            "mt-3 flex w-full items-center rounded-2xl text-sm font-medium text-[rgb(var(--text-secondary))] transition-colors hover:bg-[rgb(var(--surface-subtle))] hover:text-[rgb(var(--text-primary))]",
-            expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-3",
-          )}
-          aria-label="Log out"
-          title={!expanded ? "Log out" : undefined}
-        >
-          <LogOut className="h-5 w-5 shrink-0" aria-hidden />
-          {expanded ? <span>Log out</span> : null}
-        </button>
+        <div className={cn("sidebar-tooltip-wrapper", expanded ? "sidebar-expanded-mode" : "sidebar-collapsed-mode")}>
+          <button
+            type="button"
+            onClick={() => void onLogout()}
+            className={cn(
+              "nav-shimmer mt-3 flex w-full items-center rounded-2xl text-sm font-medium text-[rgb(var(--text-secondary))] transition-colors hover:bg-[rgb(var(--surface-subtle))] hover:text-[rgb(var(--text-primary))]",
+              expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-3",
+            )}
+            aria-label="Log out"
+          >
+            <LogOut className="h-5 w-5 shrink-0" aria-hidden />
+            {expanded ? <span>Log out</span> : null}
+          </button>
+          <span className="sidebar-tooltip" aria-hidden="true">Log out</span>
+        </div>
       </div>
     </>
   );
@@ -372,12 +420,28 @@ export function Sidebar() {
         <aside
           aria-label="Application sidebar"
           className={cn(
-            "flex h-full flex-col border-r border-[rgb(var(--border-subtle))] bg-white/95 shadow-[16px_0_40px_-36px_rgba(15,23,42,0.5)] backdrop-blur-xl transition-[width] duration-200 ease-out",
+            "relative flex h-full flex-col border-r border-[rgb(var(--border-subtle))] bg-white/95 shadow-[16px_0_40px_-36px_rgba(15,23,42,0.5)] backdrop-blur-xl transition-[width] duration-200 ease-out",
             COLLAPSED_WIDTH,
             expanded && EXPANDED_WIDTH,
           )}
         >
-
+          {/* Pin toggle — appears on hover */}
+          <button
+            type="button"
+            onClick={() => setSidebarPinned(!sidebarPinned)}
+            className={cn(
+              "sidebar-pin-toggle",
+              sidebarPinned && "pinned opacity-100",
+            )}
+            aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar open"}
+            title={sidebarPinned ? "Unpin sidebar" : "Pin sidebar open"}
+          >
+            {sidebarPinned ? (
+              <PinOff aria-hidden />
+            ) : (
+              <Pin aria-hidden />
+            )}
+          </button>
 
           <SidebarPanel
             pathname={pathname}
@@ -393,74 +457,87 @@ export function Sidebar() {
         </aside>
       </div>
 
-      <div
-        className={cn(
-          "fixed inset-0 z-50 lg:hidden",
-          mobileSidebarOpen ? "pointer-events-auto" : "pointer-events-none",
-        )}
-        aria-hidden={!mobileSidebarOpen}
-      >
-        <button
-          type="button"
-          className={cn(
-            "absolute inset-0 bg-slate-950/38 backdrop-blur-sm transition-opacity",
-            mobileSidebarOpen ? "opacity-100" : "opacity-0",
-          )}
-          onClick={() => setMobileSidebarOpen(false)}
-          aria-label="Close navigation"
-        />
+      <AnimatePresence>
+        {mobileSidebarOpen && (
+          <motion.div
+            key="mobile-drawer"
+            className="fixed inset-0 z-50 lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            {/* Backdrop */}
+            <motion.button
+              type="button"
+              className="absolute inset-0 bg-slate-950/38 backdrop-blur-sm"
+              onClick={() => setMobileSidebarOpen(false)}
+              aria-label="Close navigation"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
 
-        <aside
-          aria-label="Mobile navigation"
-          className={cn(
-            "relative z-10 flex h-full w-[min(88vw,320px)] flex-col border-r border-[rgb(var(--border-subtle))] bg-white shadow-[16px_0_48px_-28px_rgba(15,23,42,0.55)] transition-transform duration-200 ease-out",
-            mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
-          )}
-        >
-          <div className="flex items-center justify-between border-b border-[rgb(var(--border-subtle))] px-3 py-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] font-serif text-sm font-bold tracking-[0.18em] text-white">
-                SQ
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">{workspaceName}</p>
-                <p className="text-xs text-[rgb(var(--text-muted))]">
-                  {session ? "Signed in" : "Workspace shell"}
-                </p>
+            {/* Drawer */}
+            <motion.aside
+              aria-label="Mobile navigation"
+              className="relative z-10 flex h-full w-[min(88vw,320px)] flex-col border-r border-[rgb(var(--border-subtle))] bg-white shadow-[16px_0_48px_-28px_rgba(15,23,42,0.55)]"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            >
+              <div className="flex items-center justify-between border-b border-[rgb(var(--border-subtle))] px-3 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] font-serif text-sm font-bold tracking-[0.18em] text-white">
+                    SQ
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">{workspaceName}</p>
+                    <p className="text-xs text-[rgb(var(--text-muted))]">
+                      {session ? "Signed in" : "Workspace shell"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgb(var(--border-subtle))] text-[rgb(var(--text-secondary))] transition-colors hover:text-[rgb(var(--text-primary))]"
+                  aria-label="Close navigation"
+                >
+                  <X className="h-5 w-5" aria-hidden />
+                </button>
               </div>
-            </div>
-            <button
+
+              <SidebarPanel
+                pathname={pathname}
+                expanded={true}
+                workspaceName={workspaceName}
+                plan={plan}
+                mainItems={mainItems}
+                insightItems={insightItems}
+                supportItems={supportItems}
+                onNavigate={() => setMobileSidebarOpen(false)}
+                onLogout={handleLogout}
+              />
+            </motion.aside>
+
+            {/* FAB close */}
+            <motion.button
               type="button"
               onClick={() => setMobileSidebarOpen(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgb(var(--border-subtle))] text-[rgb(var(--text-secondary))] transition-colors hover:text-[rgb(var(--text-primary))]"
+              className="absolute bottom-5 right-5 flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--primary-dark))] text-white shadow-lg"
               aria-label="Close navigation"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ delay: 0.15, type: "spring", damping: 20 }}
             >
-              <X className="h-5 w-5" aria-hidden />
-            </button>
-          </div>
-
-          <SidebarPanel
-            pathname={pathname}
-            expanded={true}
-            workspaceName={workspaceName}
-            plan={plan}
-            mainItems={mainItems}
-            insightItems={insightItems}
-            supportItems={supportItems}
-            onNavigate={() => setMobileSidebarOpen(false)}
-            onLogout={handleLogout}
-          />
-        </aside>
-
-        <button
-          type="button"
-          onClick={() => setMobileSidebarOpen(false)}
-          className="absolute bottom-5 right-5 flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--primary-dark))] text-white shadow-lg"
-          aria-label="Close navigation"
-        >
-          <PanelLeftClose className="h-5 w-5" aria-hidden />
-        </button>
-      </div>
+              <PanelLeftClose className="h-5 w-5" aria-hidden />
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

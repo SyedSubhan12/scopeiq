@@ -24,6 +24,8 @@ export const scopeFlagSchema = z.object({
   resolvedBy: z.string().uuid().nullable(),
   resolvedAt: z.coerce.date().nullable(),
   snoozedUntil: z.coerce.date().nullable(),
+  slaDeadline: z.coerce.date().nullable(),
+  slaBreached: z.boolean(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });

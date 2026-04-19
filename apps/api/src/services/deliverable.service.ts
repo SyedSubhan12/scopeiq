@@ -9,6 +9,8 @@ import { getUploadUrl, getDownloadUrl, validateMimeType } from "../lib/storage.j
 import { sendEmail } from "../lib/email.js";
 import { DeliverableReadyEmail } from "../emails/index.js";
 import React from "react";
+import { reminderService } from "./reminder.service.js";
+import { sowService } from "./sow.service.js";
 
 export const deliverableService = {
   async list(
@@ -40,6 +42,11 @@ export const deliverableService = {
       dueDate?: string | undefined;
     },
   ) {
+    const sowRevisionLimit =
+      data.maxRevisions === undefined
+        ? await sowService.getActiveRevisionLimitForProject(workspaceId, data.projectId)
+        : null;
+
     return db.transaction(async (trx) => {
       const deliverable = await deliverableRepository.create({
         workspaceId,
@@ -49,7 +56,7 @@ export const deliverableService = {
         type: (data.type as "file" | "figma" | "loom" | "youtube" | "link") ?? "file",
         externalUrl: data.externalUrl ?? null,
         metadata: data.metadata ?? null,
-        maxRevisions: data.maxRevisions ?? 3,
+        maxRevisions: data.maxRevisions ?? sowRevisionLimit ?? 3,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         revisionRound: 0,
       }, trx as never);
@@ -178,7 +185,7 @@ export const deliverableService = {
         fileKey: data.objectKey,
         fileUrl,
         originalName: data.originalName ?? null,
-        status: "delivered",
+        status: "in_review",
         uploadedBy: actorId,
         reviewStartedAt: new Date(),
         currentRevisionId: revision.id,
@@ -211,7 +218,14 @@ export const deliverableService = {
         console.error("[DeliverableService] Failed to send DeliverableReadyEmail:", err),
       );
 
-    return updated;
+      // Schedule the 3-step reminder sequence now that the deliverable is in review.
+      await reminderService.scheduleReminderSequence(
+        deliverable.projectId,
+        deliverableId,
+        workspaceId,
+      );
+
+      return updated;
     });
   },
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, GitCompareArrows, ShieldAlert } from "lucide-react";
@@ -9,6 +9,9 @@ import { BriefModuleHeader } from "@/components/briefs/shared/brief-module-heade
 import { BriefRouteNotFoundState } from "@/components/briefs/shared/route-state";
 import { ScorePill } from "@/components/briefs/shared/score-pill";
 import { StatusBadge } from "@/components/briefs/shared/status-badge";
+import { BriefScoreCard } from "@/components/brief/BriefScoreCard";
+import { BriefHoldBanner } from "@/components/brief/BriefHoldBanner";
+import { BriefVersionHistory } from "@/components/briefs/submissions/BriefVersionHistory";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import {
   useAssignBriefReviewer,
@@ -128,52 +131,13 @@ export function SubmissionReviewView({ brief, isLoading }: SubmissionReviewViewP
   const [decisionReason, setDecisionReason] = useState("");
   const [activeFieldKey, setActiveFieldKey] = useState<string | null>(null);
   const [clarificationDrafts, setClarificationDrafts] = useState<ClarificationDraft[]>([]);
-  const [selectedBaseVersionId, setSelectedBaseVersionId] = useState<string>("");
-  const [selectedCompareVersionId, setSelectedCompareVersionId] = useState<string>("");
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
-
-  const groupedFlags = useMemo(() => {
-    const source = brief?.flags ?? [];
-    return {
-      high: source.filter((flag) => flag.severity === "high"),
-      medium: source.filter((flag) => flag.severity === "medium"),
-      low: source.filter((flag) => flag.severity === "low"),
-    };
-  }, [brief?.flags]);
 
   const decisionMeta = pendingAction ? DECISION_COPY[pendingAction] : null;
   const availableVersions = versionsQuery.data?.data ?? currentBriefVersions(brief);
   const reviewers = workspaceUsers.data?.data ?? [];
   const assignedReviewer =
     reviewers.find((user) => user.id === brief?.reviewerId) ?? null;
-
-  const selectedBaseVersion =
-    availableVersions.find((version) => version.id === selectedBaseVersionId) ??
-    availableVersions[0] ??
-    null;
-  const selectedCompareVersion =
-    availableVersions.find((version) => version.id === selectedCompareVersionId) ??
-    availableVersions[1] ??
-    null;
-
-  const diffRows = useMemo(() => {
-    if (!selectedBaseVersion || !selectedCompareVersion) return [];
-
-    const compareMap = new Map(
-      selectedCompareVersion.answers.map((answer) => [answer.fieldKey, answer]),
-    );
-
-    return selectedBaseVersion.answers.map((baseAnswer) => {
-      const compareAnswer = compareMap.get(baseAnswer.fieldKey);
-      return {
-        fieldKey: baseAnswer.fieldKey,
-        label: baseAnswer.fieldLabel,
-        before: baseAnswer.value ?? "—",
-        after: compareAnswer?.value ?? "—",
-        changed: (baseAnswer.value ?? "") !== (compareAnswer?.value ?? ""),
-      };
-    });
-  }, [selectedBaseVersion, selectedCompareVersion]);
 
   async function handleDecision() {
     if (!brief || !decisionMeta) return;
@@ -370,14 +334,10 @@ export function SubmissionReviewView({ brief, isLoading }: SubmissionReviewViewP
 
       {tab === "review" &&
       (currentBrief.status === "clarification_needed" || currentBrief.status === "rejected") ? (
-        <Card className="rounded-3xl border-amber-200 bg-amber-50 p-5">
-          <p className="text-sm font-semibold text-amber-800">
-            This brief is not ready for kickoff yet.
-          </p>
-          <p className="mt-1 text-sm leading-6 text-amber-700">
-            The current score and flags suggest missing detail or ambiguous scope. Review the flagged answers before approving.
-          </p>
-        </Card>
+        <BriefHoldBanner
+          score={currentBrief.scopeScore ?? 0}
+          onOverride={canOverride ? () => openDecision("override") : undefined}
+        />
       ) : null}
 
       {tab === "review" ? (
@@ -436,22 +396,15 @@ export function SubmissionReviewView({ brief, isLoading }: SubmissionReviewViewP
               </p>
 
               <div className="mt-5 space-y-3">
-                <div className="rounded-2xl border border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-subtle))] px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
-                    Clarity score
-                  </p>
-                  <div className="mt-2">
-                    <ScorePill score={currentBrief.scopeScore} />
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-subtle))] px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
-                    Summary
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-[rgb(var(--text-secondary))]">
-                    {currentBrief.scoringResultJson?.summary || "No score summary available yet."}
-                  </p>
-                </div>
+                <BriefScoreCard
+                  score={currentBrief.scopeScore}
+                  summary={currentBrief.scoringResultJson?.summary as string | undefined}
+                  flags={currentBrief.flags?.map((f) => ({
+                    id: f.id,
+                    message: f.message,
+                    severity: f.severity,
+                  }))}
+                />
                 <div className="rounded-2xl border border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-subtle))] px-4 py-4">
                   <label className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
                     Reviewer
@@ -478,60 +431,6 @@ export function SubmissionReviewView({ brief, isLoading }: SubmissionReviewViewP
               </div>
             </Card>
 
-            <Card className="rounded-3xl p-5 sm:p-6">
-              <h2 className="text-lg font-semibold text-[rgb(var(--text-primary))]">
-                Ambiguity flags
-              </h2>
-              <p className="mt-1 text-sm text-[rgb(var(--text-secondary))]">
-                Review what is unclear before the project proceeds.
-              </p>
-
-              <div className="mt-5 space-y-4">
-                {(["high", "medium", "low"] as const).map((severity) => {
-                  const items = groupedFlags[severity];
-                  if (items.length === 0) return null;
-
-                  return (
-                    <div key={severity} className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
-                        {severity} severity
-                      </p>
-                      {items.map((flag) => (
-                        <div
-                          key={flag.id}
-                          className="rounded-2xl border border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-subtle))] px-4 py-4"
-                        >
-                          <p className="text-sm font-medium text-[rgb(var(--text-primary))]">
-                            {flag.message}
-                          </p>
-                          {flag.fieldKey ? (
-                            <button
-                              type="button"
-                              onClick={() => jumpToField(flag.fieldKey)}
-                              className="mt-1 text-left text-xs text-[rgb(var(--text-muted))] underline-offset-4 hover:text-[rgb(var(--text-primary))] hover:underline"
-                            >
-                              Field: {flag.fieldKey}
-                            </button>
-                          ) : null}
-                          {flag.suggestedQuestion ? (
-                            <div className="mt-3 rounded-xl bg-white px-3 py-3 text-sm leading-6 text-[rgb(var(--text-secondary))]">
-                              <span className="font-medium text-[rgb(var(--text-primary))]">
-                                Suggested clarification:
-                              </span>{" "}
-                              {flag.suggestedQuestion}
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-
-                {currentBrief.flags.length === 0 ? (
-                  <p className="text-sm text-[rgb(var(--text-muted))]">No flags were returned.</p>
-                ) : null}
-              </div>
-            </Card>
           </div>
         </div>
       ) : null}
@@ -552,85 +451,10 @@ export function SubmissionReviewView({ brief, isLoading }: SubmissionReviewViewP
                 </p>
               </div>
             </div>
-            {versionsQuery.isLoading ? (
-              <Skeleton className="h-72 w-full rounded-2xl" />
-            ) : availableVersions.length < 2 ? (
-              <div className="rounded-2xl border border-dashed border-[rgb(var(--border-subtle))] px-4 py-8 text-sm text-[rgb(var(--text-muted))]">
-                Version history will appear here after the brief is resubmitted.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-[rgb(var(--text-primary))]">
-                      Base version
-                    </label>
-                    <select
-                      className="h-11 w-full rounded-2xl border border-[rgb(var(--border-default))] bg-white px-3 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
-                      value={selectedBaseVersion?.id ?? ""}
-                      onChange={(event) => setSelectedBaseVersionId(event.target.value)}
-                    >
-                      {availableVersions.map((version) => (
-                        <option key={version.id} value={version.id}>
-                          v{version.versionNumber} · {new Date(version.createdAt).toLocaleDateString()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-[rgb(var(--text-primary))]">
-                      Compare with
-                    </label>
-                    <select
-                      className="h-11 w-full rounded-2xl border border-[rgb(var(--border-default))] bg-white px-3 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
-                      value={selectedCompareVersion?.id ?? ""}
-                      onChange={(event) => setSelectedCompareVersionId(event.target.value)}
-                    >
-                      {availableVersions.map((version) => (
-                        <option key={version.id} value={version.id}>
-                          v{version.versionNumber} · {new Date(version.createdAt).toLocaleDateString()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {diffRows.map((row) => (
-                    <div
-                      key={row.fieldKey}
-                      className={`rounded-2xl border px-4 py-4 ${
-                        row.changed
-                          ? "border-primary/20 bg-primary/5"
-                          : "border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-subtle))]"
-                      }`}
-                    >
-                      <p className="text-sm font-medium text-[rgb(var(--text-primary))]">
-                        {row.label}
-                      </p>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
-                            Before
-                          </p>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[rgb(var(--text-secondary))]">
-                            {row.before}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
-                            After
-                          </p>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[rgb(var(--text-secondary))]">
-                            {row.after}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <BriefVersionHistory
+              versions={availableVersions}
+              isLoading={versionsQuery.isLoading}
+            />
           </Card>
 
           <Card className="rounded-3xl p-6">

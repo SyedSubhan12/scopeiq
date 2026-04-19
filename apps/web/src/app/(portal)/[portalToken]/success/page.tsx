@@ -1,13 +1,45 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { PortalSessionProvider } from "@/providers/portal-session-provider";
 import { usePortalSession } from "@/hooks/usePortalSession";
 import { PortalHeader } from "@/components/portal/PortalHeader";
 import { PoweredByBadge } from "@/components/portal/PoweredByBadge";
 import { Button, Card, Skeleton } from "@novabots/ui";
-import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+
+function AnimatedCheckmark({ color }: { color: string }) {
+  const circleRef = useRef<SVGCircleElement>(null);
+  const checkRef = useRef<SVGPathElement>(null);
+
+  useEffect(() => {
+    void import("animejs").then((mod) => {
+      const anime = (mod as { default: (p: unknown) => void }).default;
+      anime({
+        targets: circleRef.current,
+        strokeDashoffset: [(anime as any).setDashoffset, 0],
+        duration: 700,
+        easing: "easeOutQuad",
+      });
+      anime({
+        targets: checkRef.current,
+        strokeDashoffset: [(anime as any).setDashoffset, 0],
+        duration: 450,
+        delay: 550,
+        easing: "easeOutQuad",
+      });
+    });
+  }, []);
+
+  return (
+    <svg width="64" height="64" viewBox="0 0 80 80" fill="none" className="mx-auto mb-5" aria-hidden>
+      <circle ref={circleRef} cx="40" cy="40" r="36" stroke={color} strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <path ref={checkRef} d="M24 40 L35 52 L56 28" stroke={color} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
 
 function SuccessPageContent() {
   const session = usePortalSession();
@@ -60,24 +92,44 @@ function SuccessPageContent() {
       />
 
       <main className="mx-auto max-w-4xl px-4 py-16">
-        <Card className="mx-auto max-w-2xl rounded-[32px] px-8 py-14 text-center shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
-          <div
-            className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ backgroundColor: `${portalBrandColor}18` }}
-          >
-            <CheckCircle2 className="h-8 w-8" style={{ color: portalBrandColor }} />
-          </div>
-          <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">{heading}</h1>
-          <p className="mt-3 text-sm leading-7 text-[rgb(var(--text-secondary))]">{message}</p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link href={`/portal/${session.token}`}>
-              <Button>Back to portal</Button>
-            </Link>
-            <Link href={`/${session.token}/brief`}>
-              <Button variant="secondary">View brief</Button>
-            </Link>
-          </div>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Card className="mx-auto max-w-2xl rounded-[32px] px-8 py-14 text-center shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
+            <AnimatedCheckmark color={portalBrandColor} />
+            <motion.h1
+              className="text-2xl font-bold text-[rgb(var(--text-primary))]"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9, duration: 0.35 }}
+            >
+              {heading}
+            </motion.h1>
+            <motion.p
+              className="mt-3 text-sm leading-7 text-[rgb(var(--text-secondary))]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.05, duration: 0.35 }}
+            >
+              {message}
+            </motion.p>
+            <motion.div
+              className="mt-8 flex flex-wrap justify-center gap-3"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.2, duration: 0.35 }}
+            >
+              <Link href={`/portal/${session.token}`}>
+                <Button>Back to portal</Button>
+              </Link>
+              <Link href={`/${session.token}/brief`}>
+                <Button variant="secondary">View brief</Button>
+              </Link>
+            </motion.div>
+          </Card>
+        </motion.div>
 
         <div className="mt-8 flex justify-center">
           <PoweredByBadge plan={session.workspace.plan} />

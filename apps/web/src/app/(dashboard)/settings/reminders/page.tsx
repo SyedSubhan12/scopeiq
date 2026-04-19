@@ -51,10 +51,14 @@ interface ReminderConfig {
   autoApproveOnSilence: boolean;
 }
 
-const DEFAULT_CONFIG: ReminderConfig = {
-  steps: [{ hours: 48 }, { hours: 96 }, { hours: 168 }],
+const DEFAULT_CONFIG = {
+  steps: [{ hours: 48 }, { hours: 96 }, { hours: 168 }] as [
+    { hours: number },
+    { hours: number },
+    { hours: number },
+  ],
   autoApproveOnSilence: true,
-};
+} as const;
 
 function formatDuration(hours: number): string {
   if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""}`;

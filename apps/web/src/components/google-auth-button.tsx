@@ -1,15 +1,17 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { Micro } from "@/animations/utils/micro-interactions";
 
 export function GoogleAuthButton({ label = "Continue with Google" }: { label?: string }) {
     const [isLoading, setIsLoading] = useState(false);
+    const btnRef = useRef<HTMLButtonElement>(null);
 
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         try {
-            const siteUrl = process.env.NEXT_PUBLIC_WEB_URL || window.location.origin;
+            const siteUrl = window.location.origin;
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
@@ -29,10 +31,13 @@ export function GoogleAuthButton({ label = "Continue with Google" }: { label?: s
 
     return (
         <button
+            ref={btnRef}
             onClick={handleGoogleLogin}
             disabled={isLoading}
+            onMouseDown={() => btnRef.current && Micro.buttonPress(btnRef.current)}
+            onMouseUp={() => btnRef.current && Micro.buttonRelease(btnRef.current)}
             type="button"
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-[rgb(var(--border-default))] bg-white px-4 py-2.5 text-sm font-medium text-[rgb(var(--text-secondary))] transition-all hover:bg-[rgb(var(--surface-subtle))] hover:shadow-sm disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-gray-100 bg-white px-4 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 hover:border-gray-200 shadow-sm disabled:opacity-50"
         >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path
@@ -56,3 +61,4 @@ export function GoogleAuthButton({ label = "Continue with Google" }: { label?: s
         </button>
     );
 }
+

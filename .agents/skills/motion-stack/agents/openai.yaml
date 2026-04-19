@@ -1,0 +1,4 @@
+interface:
+  display_name: "Motion Stack"
+  short_description: "GSAP, Lenis, Anime.js, Barba.js workflows"
+  default_prompt: "Use $motion-stack to build motion with GSAP, Lenis, Anime.js, and Barba.js."

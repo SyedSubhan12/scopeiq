@@ -118,7 +118,7 @@ export function ScopeFlagDetail({ flag, open, onClose, projectId }: ScopeFlagDet
         projectId,
         scopeFlagId: flag.id,
         title: flag.title || "Scope Change Request",
-        description: flag.description ?? undefined,
+        ...(flag.description ? { description: flag.description } : {}),
       });
       await updateFlag.mutateAsync({ status: "change_order_sent" });
       toast("success", "Change order created from flag");

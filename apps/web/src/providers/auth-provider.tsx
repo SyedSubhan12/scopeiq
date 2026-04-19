@@ -93,19 +93,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export const useAuth = () => useContext(AuthContext);
 
 /**
- * Syncs session state. The httpOnly auth cookie is set server-side via the
- * /auth/callback route handler — we must not write it from client JS.
- * This function is kept as a no-op placeholder so call sites remain unchanged.
+ * The shared Supabase browser client now keeps auth cookies in sync for us.
+ * This no-op remains only to preserve existing call sites.
  */
 function syncSessionToCookie(_session: Session | null) {
-    // The sb-supabase-auth-token cookie is httpOnly and is written/refreshed
-    // server-side. Client JS cannot and must not write it.
+    // Intentionally empty.
 }
 
 function clearAuthCookie() {
-    // httpOnly cookies cannot be cleared from JS — the server-side logout
-    // route is responsible for expiring sb-supabase-auth-token.
-    // Clear only the non-httpOnly onboarding hint cookie.
+    // Supabase clears its own auth cookies during sign-out.
+    // Clear only the onboarding hint cookie we manage locally.
     const secure =
         typeof window !== "undefined" && window.location.protocol === "https:";
     const secureAttr = secure ? "; Secure" : "";

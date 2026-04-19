@@ -10,6 +10,15 @@ import { NotFoundError, ValidationError } from "@novabots/types";
 vi.mock("../../repositories/deliverable.repository.js");
 vi.mock("../../repositories/deliverable-revision.repository.js");
 vi.mock("../../repositories/approval-event.repository.js");
+vi.mock("../reminder.service.js", () => ({
+    reminderService: {
+        scheduleReminderSequence: vi.fn().mockResolvedValue(undefined),
+        processReminderStep: vi.fn().mockResolvedValue({ action: "sent_gentle_nudge" }),
+        autoApproveAfterSilence: vi.fn().mockResolvedValue({ action: "auto_approved" }),
+    },
+    getReminderQueue: vi.fn(),
+    startReminderWorker: vi.fn(),
+}));
 vi.mock("@novabots/db", () => ({
     db: {
         transaction: vi.fn((fn) => fn({})),

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "skeleton", "label": "skeleton.tsx", "file_type": "code", "source_file": "packages/ui/src/skeleton.tsx", "source_location": "L1"}], "edges": [{"source": "skeleton", "target": "utils_js", "relation": "imports_from", "confidence": "EXTRACTED", "source_file": "packages/ui/src/skeleton.tsx", "source_location": "L1", "weight": 1.0}]}

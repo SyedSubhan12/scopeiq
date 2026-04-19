@@ -8,29 +8,6 @@ import {
   scopeFlagsQueryKey,
 } from "./query-keys";
 
-export interface ScopeFlag {
-  id: string;
-  workspaceId: string;
-  projectId: string;
-  sowClauseId: string | null;
-  messageText: string;
-  confidence: number;
-  severity: "low" | "medium" | "high";
-  status: "pending" | "confirmed" | "dismissed" | "snoozed" | "change_order_sent" | "resolved";
-  title: string;
-  description: string | null;
-  suggestedResponse: string | null;
-  aiReasoning: string | null;
-  matchingClausesJson?: unknown[] | null;
-  evidence?: Record<string, unknown> | null;
-  flaggedBy: string | null;
-  resolvedBy: string | null;
-  resolvedAt: string | null;
-  snoozedUntil: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type ScopeFlagSeverity = "high" | "medium" | "low";
 export type ScopeFlagStatus =
   | "pending"
@@ -42,19 +19,27 @@ export type ScopeFlagStatus =
 
 export interface ScopeFlag {
   id: string;
+  workspaceId?: string;
   projectId: string;
   sowClauseId?: string | null;
-  title?: string | null;
-  description?: string | null;
+  messageText?: string;
+  confidence?: number;
   severity: ScopeFlagSeverity;
   status: ScopeFlagStatus;
+  title?: string | null;
+  description?: string | null;
+  suggestedResponse?: string | null;
   aiReasoning?: string | null;
   reason?: string | null;
+  matchingClausesJson?: unknown[] | null;
   evidence?: Record<string, unknown> | null;
   metadata?: Record<string, unknown> | null;
-  createdAt: string;
+  flaggedBy?: string | null;
+  resolvedBy?: string | null;
   resolvedAt?: string | null;
   snoozedUntil?: string | null;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export function getScopeFlagsQueryOptions(projectId?: string) {

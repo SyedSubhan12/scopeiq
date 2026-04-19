@@ -10,6 +10,7 @@ export interface WorkspaceRecord {
   logoUrl?: string | null;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
+  reminderSettings?: unknown;
 }
 
 export function getWorkspaceQueryOptions() {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, Plus, RefreshCcw } from "lucide-react";
+import { AlertCircle, ArrowRight, Plus, RefreshCcw, ShieldAlert } from "lucide-react";
 import { Button, Skeleton } from "@novabots/ui";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useAuth } from "@/providers/auth-provider";
@@ -9,6 +9,11 @@ import { MetricCardGrid } from "./MetricCardGrid";
 import { RecentActivity } from "./RecentActivity";
 import { ScopeFlagsSummary } from "./ScopeFlagsSummary";
 import { UpcomingDeadlines } from "./UpcomingDeadlines";
+import { RevenueProtectionWidget } from "./RevenueProtectionWidget";
+import { ProgressiveConfigChecklist } from "./ProgressiveConfigChecklist";
+import { DataFlywheelWidget } from "./DataFlywheelWidget";
+import { ScrollRevealSection } from "./ScrollRevealSection";
+import { ScopeFlagSlaWidget } from "@/components/dashboard/ScopeFlagSlaWidget";
 
 function DashboardSkeleton() {
   return (
@@ -98,8 +103,35 @@ export function DashboardOverview() {
 
   const dashboard = data.data;
 
+  const urgentFlagCount = dashboard.urgentFlags?.length ?? 0;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Scope flags alert banner */}
+      {urgentFlagCount > 0 && (
+        <Link
+          href="/scope-flags"
+          className="group flex items-center justify-between gap-3 rounded-xl border border-[rgb(var(--status-red))]/20 bg-[rgb(var(--status-red))]/5 px-4 py-3 transition-colors hover:bg-[rgb(var(--status-red))]/10 animate-fadeInDown"
+          aria-label={`${urgentFlagCount} scope flag${urgentFlagCount !== 1 ? "s" : ""} need attention`}
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--status-red))]/10">
+              <ShieldAlert className="h-4 w-4 text-[rgb(var(--status-red))]" aria-hidden />
+            </span>
+            <p className="text-sm font-medium text-[rgb(var(--text-primary))]">
+              <span className="font-semibold text-[rgb(var(--status-red))]">
+                {urgentFlagCount} scope flag{urgentFlagCount !== 1 ? "s" : ""}
+              </span>{" "}
+              need{urgentFlagCount === 1 ? "s" : ""} your attention
+            </p>
+          </div>
+          <ArrowRight
+            className="h-4 w-4 shrink-0 text-[rgb(var(--status-red))]/60 transition-transform group-hover:translate-x-0.5"
+            aria-hidden
+          />
+        </Link>
+      )}
+
       {/* Welcome header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -121,14 +153,42 @@ export function DashboardOverview() {
       {/* Metric Cards */}
       <MetricCardGrid metrics={dashboard.metrics} />
 
-      {/* Two-column layout: Activity + Flags/Deadlines */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <RecentActivity activities={dashboard.recentActivity} />
-        <div className="space-y-6">
-          <ScopeFlagsSummary flags={dashboard.urgentFlags} />
-          <UpcomingDeadlines deadlines={dashboard.upcomingDeadlines} />
+      {/* Revenue Protection + Setup Checklist */}
+      <ScrollRevealSection delay={0.05}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <RevenueProtectionWidget dashboard={dashboard} />
+          </div>
+          <div>
+            <ProgressiveConfigChecklist />
+          </div>
         </div>
-      </div>
+      </ScrollRevealSection>
+
+      {/* Two-column layout: Activity + Flags/Deadlines */}
+      <ScrollRevealSection delay={0.08}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <RecentActivity activities={dashboard.recentActivity} />
+          <div className="space-y-6">
+            <ScopeFlagsSummary flags={dashboard.urgentFlags} />
+            <UpcomingDeadlines deadlines={dashboard.upcomingDeadlines} />
+          </div>
+        </div>
+      </ScrollRevealSection>
+
+      {/* SLA Status — open scope flags sorted by breach urgency */}
+      <ScrollRevealSection delay={0.09}>
+        <ScopeFlagSlaWidget />
+      </ScrollRevealSection>
+
+      {/* Data Flywheel — platform benchmarks */}
+      <ScrollRevealSection delay={0.1}>
+        <DataFlywheelWidget
+          metrics={{
+            flagsPerMonth: dashboard.metrics.pendingScopeFlags,
+          }}
+        />
+      </ScrollRevealSection>
     </div>
   );
 }

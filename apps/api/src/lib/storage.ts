@@ -93,6 +93,25 @@ export async function getUploadUrl(
   });
 }
 
+/**
+ * Upload raw bytes directly from the server (e.g. server-generated PDFs).
+ * Use presigned URLs only for client-initiated uploads per Rule 5.
+ */
+export async function putBytes(
+  key: string,
+  body: Uint8Array,
+  contentType: string,
+): Promise<void> {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+}
+
 export async function getDownloadUrl(key: string, expiresIn = 3600): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: bucket,

@@ -53,11 +53,18 @@ portalChangeOrderRouter.post(
       return c.json({ error: "Change order is not in a state that can be accepted" }, 400);
     }
 
+    // Capture the client IP for the signed PDF artifact
+    const signerIp =
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+      c.req.header("cf-connecting-ip") ??
+      "unknown";
+
     const acceptInput: Parameters<typeof changeOrderService.acceptWithFullTransaction>[0] = {
       changeOrderId: id,
       workspaceId,
       projectId,
       signatureName,
+      signerIp,
     };
 
     if (revisionLimitAdjustment !== undefined) {

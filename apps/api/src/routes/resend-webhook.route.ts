@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { db, messages, projects, eq, and, isNull } from "@novabots/db";
+import { db, messages, projects, eq, and, isNull, writeAuditLog } from "@novabots/db";
 import { dispatchCheckScopeJob } from "../jobs/check-scope.job.js";
 import { ValidationError } from "@novabots/types";
 
@@ -79,20 +79,46 @@ resendWebhookRouter.post("/", async (c) => {
     }
 
     const messageBody = html ?? text ?? subject ?? "";
-    const [messageRecord] = await db
-      .insert(messages)
-      .values({
-        workspaceId: project.workspaceId,
-        projectId: project.id,
-        authorName: from ?? null,
-        source: "email_forward",
-        body: messageBody,
-      })
-      .returning();
 
-    if (!messageRecord) {
-      throw new ValidationError("Failed to create message from inbound email");
-    }
+    // FLAW-007 (Rule 6 / SECURITY): The original code inserted into `messages`
+    // without calling writeAuditLog(), violating the non-negotiable rule that
+    // every mutation must write an audit log row in the same transaction.
+    // Fixed: both the insert and writeAuditLog are now executed inside a single
+    // db.transaction() so they are atomically committed or rolled back together.
+    const messageRecord = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(messages)
+        .values({
+          workspaceId: project.workspaceId,
+          projectId: project.id,
+          authorName: from ?? null,
+          source: "email_forward",
+          body: messageBody,
+        })
+        .returning();
+
+      if (!inserted) {
+        throw new ValidationError("Failed to create message from inbound email");
+      }
+
+      await writeAuditLog(tx, {
+        workspaceId: project.workspaceId,
+        actorType: "system",
+        actorId: "resend-webhook",
+        entityType: "message",
+        entityId: inserted.id,
+        action: "create",
+        metadata: {
+          source: "resend-webhook",
+          from: from ?? null,
+          to: to ?? null,
+          subject: subject ?? null,
+          projectId: project.id,
+        },
+      });
+
+      return inserted;
+    });
 
     try {
       await dispatchCheckScopeJob(messageRecord.id, project.id, project.workspaceId, messageBody, null);
