@@ -42,6 +42,7 @@ import { startClarificationEmailWorker } from "./services/clarification-email.se
 import { startDomainVerificationWorker } from "./jobs/verify-domain.job.js";
 import { startSlaBreachWorker, scheduleSlaBreachSweep } from "./jobs/scope-flag-sla.job.js";
 import { briefEmbedRouter } from "./routes/brief-embed.route.js";
+import { oembedRouter } from "./routes/oembed.route.js";
 import { publicBriefEmbedRouter } from "./routes/public-brief-embed.route.js";
 import { ensureBucketExists } from "./lib/storage.js";
 import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
@@ -79,6 +80,7 @@ v1.route("/billing", billingRouter);
 v1.route("/dashboard", dashboardRouter);
 v1.route("/sow", sowRouter);
 v1.route("/brief-embeds", briefEmbedRouter);
+v1.route("/oembed", oembedRouter);
 
 app.route("/v1", v1);
 

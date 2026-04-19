@@ -3,9 +3,9 @@ import { randomBytes } from "crypto";
 import { db, writeAuditLog } from "@novabots/db";
 import { workspaceRepository } from "../repositories/workspace.repository.js";
 import { NotFoundError, ValidationError } from "@novabots/types";
-// Enterprise plan gating for custom domains: enforce plan check here when billing tiers are live
 
 const VERIFICATION_TXT_PREFIX = "scopeiq-verify=";
+const DOMAIN_VERIFICATION_ALLOWED_PLANS = new Set(["studio", "agency"]);
 
 // Max total attempts before the worker gives up (≈24 h with exponential back-off)
 const MAX_VERIFICATION_ATTEMPTS = 10;
@@ -50,6 +50,12 @@ export const domainService = {
     if (!workspace.customDomain) {
       throw new ValidationError(
         "A custom domain must be set on the workspace before requesting verification",
+      );
+    }
+
+    if (!DOMAIN_VERIFICATION_ALLOWED_PLANS.has(workspace.plan)) {
+      throw new ValidationError(
+        "Custom domain verification requires the Studio or Agency plan",
       );
     }
 

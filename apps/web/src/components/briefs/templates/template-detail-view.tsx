@@ -281,7 +281,7 @@ export function TemplateDetailView({
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
       void persist(nextName, nextDescription, nextFields, nextBranding, nextIsDefault);
-    }, 900);
+    }, 500);
   }
 
   const handleFieldsChange = (nextFields: BriefField[]) => {
