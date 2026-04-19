@@ -1,8 +1,13 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { MotionValue, motion, useReducedMotion, useTransform } from "framer-motion";
+import gsap from "gsap/dist/gsap";
+import { ScrollTrigger } from "gsap/dist/ScrollTrigger";
 import { LottieFromPublic } from "@/components/shared/lottie/LottieFromPublic";
 import { LANDING_LOTTIE } from "@/components/shared/lottie/app-lottie-paths";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const floatTransition = {
   duration: 5.5,
@@ -33,9 +38,31 @@ function FloatingSlot({
   shouldAnimate = true,
 }: FloatingSlotProps) {
   const parallaxY = useTransform(scrollYProgress ?? motionValueFallback, [0, 1], [0, depth * 110]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Enhanced parallax with GSAP for smoother scroll-based animation
+  useEffect(() => {
+    if (!containerRef.current || !shouldAnimate) return;
+
+    const tween = gsap.to(containerRef.current, {
+      scrollTrigger: {
+        trigger: containerRef.current,
+        scrub: 0.5, // Smooth sync with scroll
+        markers: false,
+      },
+      y: depth * 80,
+      ease: "power1.out",
+    });
+
+    return () => {
+      tween.scrollTrigger?.kill();
+      tween.kill();
+    };
+  }, [depth, shouldAnimate]);
 
   return (
     <motion.div
+      ref={containerRef}
       className={`pointer-events-none absolute z-0 select-none ${className}`}
       style={{ y: parallaxY }}
       aria-hidden

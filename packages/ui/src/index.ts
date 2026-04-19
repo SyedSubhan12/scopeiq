@@ -4,12 +4,15 @@ export { Input } from "./input.js";
 export { Textarea } from "./textarea.js";
 export { Select } from "./select.js";
 export { Badge } from "./badge.js";
-export { Card, CardHeader, CardTitle, CardContent } from "./card.js";
+export { Card, CardHeader, CardTitle, CardBody, CardContent, CardFooter } from "./card.js";
 export { MetricCard } from "./metric-card.js";
 export { Dialog } from "./dialog.js";
 export { DropdownMenu, DropdownItem } from "./dropdown-menu.js";
-export { Avatar } from "./avatar.js";
+export { Avatar, AvatarGroup } from "./avatar.js";
 export { Skeleton } from "./skeleton.js";
 export { ToastProvider, useToast } from "./toast.js";
+export type { ToastType } from "./toast.js";
+export { Tabs } from "./tabs.js";
+export type { TabItem } from "./tabs.js";
 // Typography exports temporarily removed — see apps/web/src/lib/typography.ts
 // export { Heading, H1, H2, H3, H4, Body, Label, Caption, Stat, Code } from "./typography.js";

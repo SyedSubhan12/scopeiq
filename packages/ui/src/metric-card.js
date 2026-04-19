@@ -39,9 +39,12 @@ const jsx_runtime_1 = require("react/jsx-runtime");
 const React = __importStar(require("react"));
 const lucide_react_1 = require("lucide-react");
 const utils_js_1 = require("./utils.js");
-function MetricCard({ label, value, trend, className }) {
+function MetricCard({ label, value, prefix, suffix, trend, description, className, isLoading = false, }) {
     const [displayValue, setDisplayValue] = React.useState(0);
     React.useEffect(() => {
+        if (isLoading)
+            return;
+        setDisplayValue(0);
         const duration = 600;
         const steps = 30;
         const increment = value / steps;
@@ -57,6 +60,19 @@ function MetricCard({ label, value, trend, className }) {
             }
         }, duration / steps);
         return () => clearInterval(timer);
-    }, [value]);
-    return ((0, jsx_runtime_1.jsxs)("div", { className: (0, utils_js_1.cn)("rounded-lg border border-[rgb(var(--border-default))] bg-white p-4", className), children: [(0, jsx_runtime_1.jsx)("p", { className: "text-xs font-medium text-[rgb(var(--text-muted))] uppercase tracking-wider", children: label }), (0, jsx_runtime_1.jsxs)("div", { className: "mt-1 flex items-baseline gap-2", children: [(0, jsx_runtime_1.jsx)("span", { className: "text-2xl font-bold text-[rgb(var(--text-primary))]", children: displayValue.toLocaleString() }), trend && ((0, jsx_runtime_1.jsxs)("span", { className: (0, utils_js_1.cn)("flex items-center text-xs font-medium", trend.direction === "up" ? "text-status-green" : "text-status-red"), children: [trend.direction === "up" ? ((0, jsx_runtime_1.jsx)(lucide_react_1.TrendingUp, { className: "mr-0.5 h-3 w-3" })) : ((0, jsx_runtime_1.jsx)(lucide_react_1.TrendingDown, { className: "mr-0.5 h-3 w-3" })), trend.value, "%"] }))] })] }));
+    }, [value, isLoading]);
+    if (isLoading) {
+        return ((0, jsx_runtime_1.jsxs)("div", { className: (0, utils_js_1.cn)("rounded-xl border border-[rgb(var(--border-subtle))] bg-white p-4", className), "aria-busy": "true", "aria-label": "Loading metric", children: [(0, jsx_runtime_1.jsx)("div", { className: "skeleton-shimmer h-3 w-24 mb-3" }), (0, jsx_runtime_1.jsx)("div", { className: "skeleton-shimmer h-8 w-20 mb-2" }), (0, jsx_runtime_1.jsx)("div", { className: "skeleton-shimmer h-3 w-14" })] }));
+    }
+    const TrendIcon = trend?.direction === "up"
+        ? lucide_react_1.TrendingUp
+        : trend?.direction === "down"
+            ? lucide_react_1.TrendingDown
+            : lucide_react_1.Minus;
+    const trendColor = trend?.direction === "up"
+        ? "text-[rgb(var(--status-green))]"
+        : trend?.direction === "down"
+            ? "text-[rgb(var(--status-red))]"
+            : "text-[rgb(var(--text-muted))]";
+    return ((0, jsx_runtime_1.jsxs)("div", { className: (0, utils_js_1.cn)("rounded-xl border border-[rgb(var(--border-subtle))] bg-white p-4", "transition-all duration-200 ease-out hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5", className), children: [(0, jsx_runtime_1.jsx)("p", { className: "text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-muted))]", children: label }), (0, jsx_runtime_1.jsxs)("div", { className: "mt-1.5 flex items-baseline gap-1.5", children: [prefix ? ((0, jsx_runtime_1.jsx)("span", { className: "text-sm font-medium text-[rgb(var(--text-muted))]", children: prefix })) : null, (0, jsx_runtime_1.jsx)("span", { className: "text-2xl font-bold text-[rgb(var(--text-primary))] tabular-nums", children: displayValue.toLocaleString() }), suffix ? ((0, jsx_runtime_1.jsx)("span", { className: "text-sm font-medium text-[rgb(var(--text-muted))]", children: suffix })) : null, trend ? ((0, jsx_runtime_1.jsxs)("span", { className: (0, utils_js_1.cn)("ml-1 flex items-center gap-0.5 text-xs font-medium", trendColor), children: [(0, jsx_runtime_1.jsx)(TrendIcon, { className: "h-3.5 w-3.5 shrink-0", "aria-hidden": true }), trend.label ?? `${trend.value}%`] })) : null] }), description ? ((0, jsx_runtime_1.jsx)("p", { className: "mt-1 text-xs text-[rgb(var(--text-muted))] leading-relaxed", children: description })) : null] }));
 }

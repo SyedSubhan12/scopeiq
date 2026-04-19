@@ -89,8 +89,8 @@ export function useUpdateBriefValues(projectId: string, briefId: string) {
         body: JSON.stringify({ values }),
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["briefs", projectId] });
-      void queryClient.invalidateQueries({ queryKey: ["brief", projectId, briefId] });
+      void queryClient.invalidateQueries({ queryKey: ["briefs"] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId] });
     },
   });
 }
@@ -103,7 +103,7 @@ export function useOverrideBriefFlag(projectId: string, briefId: string) {
         method: "POST",
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["brief", projectId, briefId] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId] });
     },
   });
 }
@@ -116,8 +116,8 @@ export function useSubmitBrief(projectId: string, briefId: string) {
         method: "POST",
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["briefs", projectId] });
-      void queryClient.invalidateQueries({ queryKey: ["brief", projectId, briefId] });
+      void queryClient.invalidateQueries({ queryKey: ["briefs"] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", briefId] });
     },
   });
 }

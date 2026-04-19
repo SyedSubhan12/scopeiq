@@ -1,128 +1,215 @@
 import asyncio
+import json
 import time
 import structlog
 from bullmq import Worker
 
 from app.config import settings
+from app.gemini_client import get_gemini_client  # noqa: F401 — imported to confirm singleton pattern
 from app.schemas.scope_schemas import ScopeAnalysisInput, ScopeClauseInput
 from app.services.scope_analyzer import ScopeAnalyzerService
 from app.services.callback_service import post_callback
 
 logger = structlog.get_logger()
 
-# Performance SLA: scope flag detection within 5s p95
-SCOPE_FLAG_SLA_THRESHOLD_MS = 5000
+# Sprint 4 FEAT-SG-002: Scope Flag Detection confidence tuning.
+# Strategic doc targets: <5s p95 latency, drop low-confidence noise below 0.30,
+# map severity to confidence buckets so UX matches AI certainty.
+CONFIDENCE_MIN = 0.30  # Below this is noise — never flag
+CONFIDENCE_HIGH = 0.80
+CONFIDENCE_MEDIUM = 0.50
+SLA_LATENCY_MS = 5000
 
-CONFIDENCE_THRESHOLD = 0.60  # Flag only when confidence > 0.60
+# Default scope-guard confidence threshold when workspace has no override.
+# Workspace admin can raise/lower this via the AI policy settings.
+DEFAULT_SCOPE_GUARD_THRESHOLD = 0.60
+
+
+def _resolve_scope_guard_threshold(job_data: dict) -> float:
+    """Return the effective scope-guard confidence threshold.
+
+    Priority:
+    1. job.data["workspaceContext"]["scopeGuardThreshold"] — workspace admin setting (decimal string)
+    2. DEFAULT_SCOPE_GUARD_THRESHOLD                       — env fallback
+    """
+    workspace_ctx: dict = job_data.get("workspaceContext") or {}
+    raw = workspace_ctx.get("scopeGuardThreshold")
+    if raw is not None:
+        try:
+            value = float(raw)
+            if 0.0 <= value <= 1.0:
+                return value
+        except (TypeError, ValueError):
+            pass
+    return DEFAULT_SCOPE_GUARD_THRESHOLD
+
+
+def severity_for_confidence(confidence: float, fallback: str) -> str:
+    if confidence >= CONFIDENCE_HIGH:
+        return "high"
+    if confidence >= CONFIDENCE_MEDIUM:
+        return "medium"
+    if confidence >= CONFIDENCE_MIN:
+        return "low"
+    return fallback
+
+
+async def get_db_pool():
+    return await asyncpg.create_pool(settings.DATABASE_URL, min_size=1, max_size=5)
 
 
 async def process_scope_check(job, token):
     """Process a scope check job: input text vs. project SOW."""
     start_time = time.monotonic()
 
+    job_data: dict = dict(job.data)
+    scope_guard_threshold: float = _resolve_scope_guard_threshold(job_data)
+
     message_id = job.data.get("message_id")
     project_id = job.data.get("project_id")
-    input_text = job.data.get("text") or job.data.get("message_text")
-    author_id = job.data.get("author_id")
+    input_text = job.data.get("text")
+    author_id = job.data.get("author_id")  # Optional tracking
 
-    logger.info("processing_scope_check", project_id=project_id, message_id=message_id)
+    logger.info("processing_scope_check", project_id=project_id)
 
     analyzer = ScopeAnalyzerService()
+    pool = await get_db_pool()
+    start_ms = int(time.monotonic() * 1000)
 
     try:
-        # NOTE: The worker no longer fetches SOW clauses from the database directly.
-        # The API must include SOW clause data in the job payload or the worker
-        # must call an API endpoint to fetch them. For now, we pass the job data
-        # and let the scope analyzer work with what it has.
-        #
-        # The clauses are now expected to be fetched by the callback handler
-        # or included in the job data by the API dispatcher.
-
-        # Build a minimal analysis input — the scope analyzer service
-        # will need to be adapted or the API should pre-fetch clauses.
-        # For the callback pattern, the clauses are included in the response.
-
-        # For backward compatibility during transition, we still call the analyzer
-        # with whatever data is available. The analyzer should be updated separately
-        # to accept pre-fetched clauses.
-        clauses = job.data.get("clauses", [])
-        clauses_input = [
-            ScopeClauseInput(
-                id=c.get("id", ""),
-                clause_type=c.get("clause_type", "other"),
-                summary=c.get("summary"),
-                original_text=c.get("original_text", ""),
+        async with pool.acquire() as conn:
+            # 1. Fetch SOW clauses for the project
+            project = await conn.fetchrow(
+                "SELECT sow_id, workspace_id FROM projects WHERE id = $1", project_id
             )
-            for c in clauses
-        ]
+            if not project or not project["sow_id"]:
+                logger.warning("no_sow_for_project", project_id=project_id)
+                return {"status": "no_sow"}
 
-        analysis_input = ScopeAnalysisInput(
-            project_id=project_id,
-            input_text=input_text,
-            clauses=clauses_input,
-        )
+            workspace_id = project["workspace_id"]
 
-        result = await analyzer.analyze(analysis_input)
+            clauses_rows = await conn.fetch(
+                "SELECT id, clause_type, summary, original_text FROM sow_clauses WHERE sow_id = $1",
+                project["sow_id"],
+            )
 
-        duration_ms = (time.monotonic() - start_time) * 1000
+            clauses = [
+                ScopeClauseInput(
+                    id=str(row["id"]),
+                    clause_type=row["clause_type"],
+                    summary=row["summary"],
+                    original_text=row["original_text"],
+                )
+                for row in clauses_rows
+            ]
 
-        # Build matching clauses list
-        matching_clauses = result.matching_clauses if hasattr(result, 'matching_clauses') and result.matching_clauses else []
-        matching_clauses_list = [
-            {
-                "clauseId": mc.get("clause_id", mc.get("id", "")),
-                "clauseText": mc.get("clause_text", mc.get("original_text", "")),
-                "relevance": mc.get("relevance", mc.get("score", 0)),
+            # 2. Analyze with timeout
+            analysis_input = ScopeAnalysisInput(
+                project_id=project_id,
+                input_text=input_text,
+                clauses=clauses,
+            )
+
+            try:
+                result = await asyncio.wait_for(
+                    analyzer.analyze(analysis_input),
+                    timeout=30,
+                )
+            except asyncio.TimeoutError:
+                duration_ms = int(time.monotonic() * 1000) - start_ms
+                logger.error(
+                    "scope_check_timeout",
+                    project_id=project_id,
+                    model=settings.GEMINI_MODEL,
+                    duration_ms=duration_ms,
+                    success=False,
+                )
+                return {"status": "error", "reason": "AI analysis timed out"}
+
+            duration_ms = int(time.monotonic() * 1000) - start_ms
+            logger.info(
+                "scope_checked",
+                project_id=project_id,
+                is_deviation=result.is_deviation,
+                confidence=result.confidence,
+                model=settings.GEMINI_MODEL,
+                duration_ms=duration_ms,
+                success=True,
+            )
+
+            # 3. Sprint 4 confidence tuning: drop noise below CONFIDENCE_MIN,
+            #    bucket severity by confidence so UX matches AI certainty.
+            # Also respect workspace-level scopeGuardThreshold — flags are only
+            # created when confidence meets or exceeds the workspace admin's setting.
+            effective_min = max(CONFIDENCE_MIN, scope_guard_threshold)
+            if result.is_deviation and result.confidence >= effective_min:
+                flag_id = str(uuid4())
+                tuned_severity = severity_for_confidence(
+                    result.confidence,
+                    fallback=result.suggested_severity,
+                )
+                sla_ok = duration_ms <= SLA_LATENCY_MS
+                # Use Pydantic attribute access (not .get()) — result is a ScopeAnalysisResult model
+                await conn.execute(
+                    """
+                    INSERT INTO scope_flags (
+                        id, workspace_id, project_id, title, description,
+                        severity, status, source, metadata
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+                    """,
+                    flag_id,
+                    workspace_id,
+                    project_id,
+                    "AI Detection: Possible Scope Deviation",
+                    result.reasoning,
+                    tuned_severity,
+                    "pending",
+                    "ai_audit",
+                    json.dumps({
+                        "confidence": result.confidence,
+                        "ai_severity": result.suggested_severity,
+                        "matched_clause_id": result.matched_clause_id,
+                        "original_request": input_text,
+                        "detection_latency_ms": duration_ms,
+                        "sla_ok": sla_ok,
+                    }),
+                )
+                logger.info(
+                    "scope_flag_created",
+                    flag_id=flag_id,
+                    confidence=result.confidence,
+                    severity=tuned_severity,
+                    detection_latency_ms=duration_ms,
+                    sla_ok=sla_ok,
+                )
+            elif result.is_deviation:
+                logger.info(
+                    "scope_flag_dropped_low_confidence",
+                    project_id=project_id,
+                    confidence=result.confidence,
+                    effective_min=effective_min,
+                    scope_guard_threshold=scope_guard_threshold,
+                )
+
+            return {
+                "is_deviation": result.is_deviation,
+                "confidence": result.confidence,
+                "reasoning": result.reasoning,
             }
-            for mc in matching_clauses
-        ]
 
-        # POST results to the API callback instead of writing directly to DB
-        is_deviation = result.is_deviation and result.confidence > CONFIDENCE_THRESHOLD
-
-        callback_payload = {
-            "jobId": job.id,
-            "messageId": message_id,
-            "projectId": project_id,
-            "isDeviation": is_deviation,
-            "confidence": result.confidence,
-            "reasoning": result.reasoning,
-            "suggestedSeverity": result.suggested_severity,
-            "suggestedResponse": result.suggested_response if hasattr(result, 'suggested_response') else None,
-            "matchedClauseId": result.matched_clause_id if hasattr(result, 'matched_clause_id') else None,
-            "matchingClauses": matching_clauses_list,
-            "durationMs": round(duration_ms, 2),
-            "slaMet": duration_ms < SCOPE_FLAG_SLA_THRESHOLD_MS,
-        }
-
-        response = await post_callback("/api/ai-callback/scope-checked", callback_payload)
-
-        logger.info(
-            "scope_check_completed",
-            project_id=project_id,
-            duration_ms=round(duration_ms, 2),
-            sla_met=duration_ms < SCOPE_FLAG_SLA_THRESHOLD_MS,
-            is_deviation=is_deviation,
-        )
-
-        return {
-            "is_deviation": is_deviation,
-            "confidence": result.confidence,
-            "reasoning": result.reasoning,
-            "duration_ms": round(duration_ms, 2),
-            "sla_met": duration_ms < SCOPE_FLAG_SLA_THRESHOLD_MS,
-            "callback_response": response,
-        }
-
-    except Exception as e:
-        duration_ms = (time.monotonic() - start_time) * 1000
+    except Exception as exc:
+        duration_ms = int(time.monotonic() * 1000) - start_ms
         logger.error(
             "scope_check_failed",
             project_id=project_id,
-            duration_ms=round(duration_ms, 2),
-            error=str(e),
+            error=str(exc),
+            model=settings.GEMINI_MODEL,
+            duration_ms=duration_ms,
+            success=False,
         )
         raise
+    finally:
+        await pool.close()
 
 
 def start_worker():
@@ -139,5 +226,4 @@ def start_worker():
 
 
 if __name__ == "__main__":
-    worker = start_worker()
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(start_worker())

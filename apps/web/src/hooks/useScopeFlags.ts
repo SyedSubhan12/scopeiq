@@ -8,41 +8,49 @@ import {
   scopeFlagsQueryKey,
 } from "./query-keys";
 
+export type ScopeFlagSeverity = "high" | "medium" | "low";
+export type ScopeFlagStatus =
+  | "pending"
+  | "confirmed"
+  | "dismissed"
+  | "snoozed"
+  | "change_order_sent"
+  | "resolved";
+
 export interface ScopeFlag {
   id: string;
-  workspaceId: string;
+  workspaceId?: string;
   projectId: string;
-  sowClauseId: string | null;
-  messageText: string;
-  confidence: number;
-  severity: "low" | "medium" | "high";
-  status: "pending" | "confirmed" | "dismissed" | "snoozed" | "change_order_sent" | "resolved";
-  title: string;
-  description: string | null;
-  suggestedResponse: string | null;
-  aiReasoning: string | null;
+  sowClauseId?: string | null;
+  messageText?: string;
+  confidence?: number;
+  severity: ScopeFlagSeverity;
+  status: ScopeFlagStatus;
+  title?: string | null;
+  description?: string | null;
+  suggestedResponse?: string | null;
+  aiReasoning?: string | null;
+  reason?: string | null;
   matchingClausesJson?: unknown[] | null;
   evidence?: Record<string, unknown> | null;
-  flaggedBy: string | null;
-  resolvedBy: string | null;
-  resolvedAt: string | null;
-  snoozedUntil: string | null;
+  metadata?: Record<string, unknown> | null;
+  flaggedBy?: string | null;
+  resolvedBy?: string | null;
+  resolvedAt?: string | null;
+  snoozedUntil?: string | null;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export function getScopeFlagsQueryOptions(projectId?: string) {
-  return {
-    queryKey: [...scopeFlagsQueryKey, projectId] as const,
-    queryFn: () =>
-      fetchWithAuth(`/v1/scope-flags${projectId ? `?projectId=${projectId}` : ""}`) as Promise<{
-        data: ScopeFlag[];
-      }>,
-  };
+    return {
+        queryKey: ["scope-flags", projectId],
+        queryFn: () => fetchWithAuth(`/v1/scope-flags${projectId ? `?projectId=${projectId}` : ""}`) as Promise<{ data: ScopeFlag[] }>,
+    };
 }
 
 export function useScopeFlags(projectId?: string) {
-  return useQuery<{ data: ScopeFlag[] }>(getScopeFlagsQueryOptions(projectId));
+    return useQuery<{ data: ScopeFlag[] }>(getScopeFlagsQueryOptions(projectId));
 }
 
 export function useScopeFlagCount() {

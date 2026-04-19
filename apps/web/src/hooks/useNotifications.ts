@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 import { subHours } from "date-fns";
+import { useAuth } from "@/providers/auth-provider";
 
 export interface AuditLogEntry {
   id: string;
@@ -29,8 +30,12 @@ export function getNotificationsQueryOptions(limit = 20) {
   };
 }
 
-export function useNotifications(limit = 20) {
-  return useQuery<AuditLogResponse>(getNotificationsQueryOptions(limit));
+export function useNotifications(limit = 20, enabled = true) {
+  const { session } = useAuth();
+  return useQuery<AuditLogResponse>({
+    ...getNotificationsQueryOptions(limit),
+    enabled: enabled && !!session,
+  });
 }
 
 export function getAuditLogQueryOptions(options?: {
@@ -55,8 +60,14 @@ export function useAuditLog(options?: {
   entityType?: string;
   entityId?: string;
   limit?: number;
+  enabled?: boolean;
 }) {
-  return useQuery<AuditLogResponse>(getAuditLogQueryOptions(options));
+  const { session } = useAuth();
+  const queryOptions = getAuditLogQueryOptions(options);
+  return useQuery<AuditLogResponse>({
+    ...queryOptions,
+    enabled: (options?.enabled ?? true) && !!session,
+  });
 }
 
 /**
@@ -64,7 +75,8 @@ export function useAuditLog(options?: {
  * Treated as "unread" count — used by the bell badge in TopBar.
  */
 export function useUnreadNotificationCount(): number {
-  const { data } = useNotifications(50);
+  const { session } = useAuth();
+  const { data } = useNotifications(50, !!session);
   if (!data?.data) return 0;
   const cutoff = subHours(new Date(), 24);
   return data.data.filter((n) => new Date(n.createdAt) > cutoff).length;

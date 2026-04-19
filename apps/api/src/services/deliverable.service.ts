@@ -1,10 +1,16 @@
 import { deliverableRepository } from "../repositories/deliverable.repository.js";
 import { deliverableRevisionRepository } from "../repositories/deliverable-revision.repository.js";
 import { approvalEventRepository } from "../repositories/approval-event.repository.js";
-import { db, writeAuditLog } from "@novabots/db";
+import { writeAuditLog, projects, clients, eq } from "@novabots/db";
+import { db } from "@novabots/db";
 import { NotFoundError, ValidationError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
-import { getUploadUrl, getDownloadUrl } from "../lib/storage.js";
+import { getUploadUrl, getDownloadUrl, validateMimeType } from "../lib/storage.js";
+import { sendEmail } from "../lib/email.js";
+import { DeliverableReadyEmail } from "../emails/index.js";
+import React from "react";
+import { reminderService } from "./reminder.service.js";
+import { sowService } from "./sow.service.js";
 
 export const deliverableService = {
   async list(
@@ -36,6 +42,11 @@ export const deliverableService = {
       dueDate?: string | undefined;
     },
   ) {
+    const sowRevisionLimit =
+      data.maxRevisions === undefined
+        ? await sowService.getActiveRevisionLimitForProject(workspaceId, data.projectId)
+        : null;
+
     return db.transaction(async (trx) => {
       const deliverable = await deliverableRepository.create({
         workspaceId,
@@ -45,7 +56,7 @@ export const deliverableService = {
         type: (data.type as "file" | "figma" | "loom" | "youtube" | "link") ?? "file",
         externalUrl: data.externalUrl ?? null,
         metadata: data.metadata ?? null,
-        maxRevisions: data.maxRevisions ?? 3,
+        maxRevisions: data.maxRevisions ?? sowRevisionLimit ?? 3,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         revisionRound: 0,
       }, trx as never);
@@ -134,6 +145,8 @@ export const deliverableService = {
       throw new NotFoundError("Deliverable", deliverableId);
     }
 
+    validateMimeType(data.contentType);
+
     const objectKey = `deliverables/${workspaceId}/${deliverableId}/${data.fileName}`;
     const uploadUrl = await getUploadUrl(objectKey, data.contentType);
 
@@ -149,6 +162,11 @@ export const deliverableService = {
     const deliverable = await deliverableRepository.getById(workspaceId, deliverableId);
     if (!deliverable) {
       throw new NotFoundError("Deliverable", deliverableId);
+    }
+
+    const expectedPrefix = `deliverables/${workspaceId}/`;
+    if (!data.objectKey.startsWith(expectedPrefix)) {
+      throw new ValidationError("Invalid object key: does not belong to this workspace");
     }
 
     const fileUrl = await getDownloadUrl(data.objectKey);
@@ -167,20 +185,45 @@ export const deliverableService = {
         fileKey: data.objectKey,
         fileUrl,
         originalName: data.originalName ?? null,
-        status: "delivered",
+        status: "in_review",
         uploadedBy: actorId,
         reviewStartedAt: new Date(),
         currentRevisionId: revision.id,
       }, trx as never);
 
-      await writeAuditLog(trx as never, {
+    // Send DeliverableReadyEmail to client (best-effort — no crash if lookup fails)
+    db
+      .select({ contactEmail: clients.contactEmail, clientName: clients.name, projectName: projects.name })
+      .from(projects)
+      .innerJoin(clients, eq(projects.clientId, clients.id))
+      .where(eq(projects.id, deliverable.projectId))
+      .limit(1)
+      .then(([row]) => {
+        if (!row?.contactEmail) return;
+        return sendEmail({
+          to: row.contactEmail,
+          subject: `Deliverable Ready for Review: ${deliverable.name}`,
+          react: React.createElement(DeliverableReadyEmail, {
+            recipientName: row.clientName ?? "Client",
+            deliverableName: deliverable.name,
+            projectName: row.projectName ?? deliverable.projectId,
+            clientName: row.clientName ?? "Client",
+            reviewUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/portal/deliverables/${deliverableId}`,
+            revisionCount: nextVersion,
+            maxRevisions: deliverable.maxRevisions ?? 3,
+          }),
+        });
+      })
+      .catch((err) =>
+        console.error("[DeliverableService] Failed to send DeliverableReadyEmail:", err),
+      );
+
+      // Schedule the 3-step reminder sequence now that the deliverable is in review.
+      await reminderService.scheduleReminderSequence(
+        deliverable.projectId,
+        deliverableId,
         workspaceId,
-        actorId,
-        entityType: "deliverable",
-        entityId: deliverableId,
-        action: "update",
-        metadata: { action: "confirm_upload", version: nextVersion, fileKey: data.objectKey },
-      });
+      );
 
       return updated;
     });

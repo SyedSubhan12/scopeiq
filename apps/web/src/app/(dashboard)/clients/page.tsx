@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Mail, User, Building2, Copy, Check, ExternalLink, ChevronDown, ChevronUp, FolderKanban } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { PageEnter } from "@/components/shared/PageEnter";
 import { Button, Card, Skeleton, Dialog, Input, Textarea, useToast } from "@novabots/ui";
 import { useAssetsReady } from "@/hooks/useAssetsReady";
 import { getClientsQueryOptions, useClients, useCreateClient } from "@/hooks/useClients";
@@ -61,45 +63,97 @@ function ClientPortalLinks({ clientId }: { clientId: string }) {
   );
 }
 
-function ClientCard({ client }: { client: { id: string; name: string; contactName?: string | null; contactEmail?: string | null; notes?: string | null } }) {
+function ClientCard({
+  client,
+  index,
+}: {
+  client: { id: string; name: string; contactName?: string | null; contactEmail?: string | null; notes?: string | null };
+  index: number;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // GSAP back.out entrance staggered by index
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    let cancelled = false;
+    void import("gsap/dist/gsap").then((mod) => {
+      if (cancelled) return;
+      const gsap = (mod as { default: { from: (t: unknown, v: unknown) => void } }).default;
+      gsap.from(el, {
+        opacity: 0,
+        y: 18,
+        scale: 0.96,
+        duration: 0.38,
+        delay: index * 0.07,
+        ease: "back.out(1.4)",
+        clearProps: "all",
+      });
+    });
+    return () => { cancelled = true; };
+  }, [index]);
 
   return (
-    <Card hoverable className="group">
-      <div className="mb-3 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-          <Building2 className="h-5 w-5 text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-[rgb(var(--text-primary))]">{client.name}</h3>
-          {client.contactName && (
-            <p className="flex items-center gap-1 text-sm text-[rgb(var(--text-secondary))]">
-              <User className="h-3 w-3" />
-              {client.contactName}
-            </p>
+    <div ref={cardRef}>
+      <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.18 }}>
+        <Card hoverable className="group h-full">
+          <div className="mb-3 flex items-start gap-3">
+            {/* Avatar */}
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-[rgb(var(--text-primary))]">{client.name}</h3>
+              {client.contactName && (
+                <p className="flex items-center gap-1 text-sm text-[rgb(var(--text-secondary))]">
+                  <User className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{client.contactName}</span>
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="rounded-xl p-1.5 text-[rgb(var(--text-muted))] transition-colors hover:bg-[rgb(var(--surface-subtle))] hover:text-[rgb(var(--text-primary))]"
+              title={expanded ? "Hide projects" : "Show portal links"}
+              aria-expanded={expanded}
+            >
+              <motion.div
+                animate={{ rotate: expanded ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </motion.div>
+            </button>
+          </div>
+
+          {client.contactEmail && (
+            <div className="flex items-center gap-1.5 text-xs text-[rgb(var(--text-muted))]">
+              <Mail className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{client.contactEmail}</span>
+            </div>
           )}
-        </div>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="rounded-md p-1 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface-subtle))]"
-          title={expanded ? "Hide projects" : "Show portal links"}
-        >
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
-      </div>
+          {client.notes && (
+            <p className="mt-2 line-clamp-2 text-xs text-[rgb(var(--text-muted))]">{client.notes}</p>
+          )}
 
-      {client.contactEmail && (
-        <div className="flex items-center gap-1.5 text-xs text-[rgb(var(--text-muted))]">
-          <Mail className="h-3.5 w-3.5" />
-          {client.contactEmail}
-        </div>
-      )}
-      {client.notes && (
-        <p className="mt-2 line-clamp-2 text-xs text-[rgb(var(--text-muted))]">{client.notes}</p>
-      )}
-
-      {expanded && <ClientPortalLinks clientId={client.id} />}
-    </Card>
+          {/* Animated accordion for portal links */}
+          <AnimatePresence>
+            {expanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                className="overflow-hidden"
+              >
+                <ClientPortalLinks clientId={client.id} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Card>
+      </motion.div>
+    </div>
   );
 }
 
@@ -142,15 +196,16 @@ export default function ClientsPage() {
   }
 
   return (
+    <PageEnter>
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">Clients</h1>
           <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
             Manage your client contacts
           </p>
         </div>
-        <Button size="md" onClick={() => setShowCreate(true)}>
+        <Button size="md" className="max-sm:w-full max-sm:justify-center" onClick={() => setShowCreate(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New Client
         </Button>
@@ -163,9 +218,9 @@ export default function ClientsPage() {
           ))}
         </div>
       ) : clients.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {clients.map((client: { id: string; name: string; contactName?: string | null; contactEmail?: string | null; notes?: string | null }) => (
-            <ClientCard key={client.id} client={client} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {clients.map((client: { id: string; name: string; contactName?: string | null; contactEmail?: string | null; notes?: string | null }, i: number) => (
+            <ClientCard key={client.id} client={client} index={i} />
           ))}
         </div>
       ) : (
@@ -246,5 +301,6 @@ export default function ClientsPage() {
         </div>
       </Dialog>
     </div>
+    </PageEnter>
   );
 }

@@ -1,3 +1,9 @@
+# Prompt: feedback_summary_v1
+# Version: 1.0
+# Date: 2026-04-10
+# Model: gemini-2.0-flash
+# Changelog: Initial version (migrated from Claude claude-sonnet-4-6)
+
 FEEDBACK_SUMMARY_SYSTEM_PROMPT = """You are a creative project manager. Analyze the raw client feedback
 and convert it into a structured, prioritized revision task list.
 
@@ -9,40 +15,3 @@ For each task:
 
 Return a JSON response using the provided tool schema. If feedback items contradict each other,
 flag both with "contradiction": true and explain the conflict."""
-
-FEEDBACK_SUMMARY_TOOL = {
-    "name": "summarize_feedback",
-    "description": "Convert raw client feedback into a prioritized task list",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "tasks": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "action": {"type": "string"},
-                        "impact": {
-                            "type": "string",
-                            "enum": ["high", "medium", "low"],
-                        },
-                        "source_pin": {"type": "integer"},
-                        "contradiction": {"type": "boolean"},
-                        "conflict_explanation": {"type": "string"},
-                    },
-                    "required": [
-                        "action",
-                        "impact",
-                        "source_pin",
-                        "contradiction",
-                    ],
-                },
-            },
-            "overall_notes": {
-                "type": "string",
-                "description": "General notes about the feedback as a whole",
-            },
-        },
-        "required": ["tasks", "overall_notes"],
-    },
-}

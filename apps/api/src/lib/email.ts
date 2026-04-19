@@ -1,7 +1,36 @@
 import { Resend } from "resend";
+import type { ReactElement } from "react";
 
 const FROM = process.env.EMAIL_FROM ?? "ScopeIQ <noreply@scopeiq.io>";
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+
+function getResend(): Resend | null {
+  if (!process.env.RESEND_API_KEY) return null;
+  return new Resend(process.env.RESEND_API_KEY);
+}
+
+export async function sendEmail({
+  to,
+  subject,
+  react,
+}: {
+  to: string;
+  subject: string;
+  react: ReactElement;
+}): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[Email] RESEND_API_KEY not configured — skipping email to:", to);
+    return;
+  }
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject,
+    react,
+  });
+}
 
 export async function sendInviteEmail(params: {
   to: string;
@@ -10,12 +39,12 @@ export async function sendInviteEmail(params: {
   inviterName?: string;
   role: string;
 }): Promise<void> {
-  if (!process.env.RESEND_API_KEY) {
+  const resend = getResend();
+  if (!resend) {
     // No key configured — skip silently (invite.service.ts already logs the URL)
     return;
   }
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
   const inviteUrl = `${APP_URL}/invite/${params.token}`;
 
   await resend.emails.send({

@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScopeIQ — Strategic Implementation Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal: #0F6E56; --teal-mid: #1D9E75; --teal-light: #E1F5EE;
+    --red: #DC2626; --amber: #D97706; --blue: #2563EB; --green: #059669;
+    --dark: #0D1B2A; --gray: #4B5563; --muted: #9CA3AF;
+    --surface: #F8FAFC; --white: #FFFFFF; --border: #E5E7EB;
+    --red-light: #FEF2F2; --amber-light: #FFFBEB; --blue-light: #EFF6FF; --green-light: #F0FDF4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: #0D1B2A; color: #E2E8F0; min-height: 100vh; overflow-x: hidden; }
+  
+  .topbar { background: rgba(15,110,86,0.15); border-bottom: 1px solid rgba(29,158,117,0.2); padding: 12px 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-mark { width: 32px; height: 32px; background: linear-gradient(135deg, #1D9E75, #0F6E56); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: white; }
+  .logo-text { font-size: 18px; font-weight: 700; color: white; letter-spacing: -0.3px; }
+  .logo-badge { font-size: 11px; background: rgba(29,158,117,0.2); color: #1D9E75; border: 1px solid rgba(29,158,117,0.3); padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; color: #94A3B8; border: none; background: none; }
+  .nav-tab.active, .nav-tab:hover { background: rgba(29,158,117,0.15); color: #1D9E75; }
+  .nav-tab.active { color: #1D9E75; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #64748B; }
+  .status-dot { width: 8px; height: 8px; background: #059669; border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.9)} }
+
+  .main { padding: 32px; max-width: 1400px; margin: 0 auto; }
+  
+  .hero { margin-bottom: 40px; }
+  .hero-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #1D9E75; background: rgba(29,158,117,0.1); border: 1px solid rgba(29,158,117,0.2); padding: 4px 12px; border-radius: 20px; margin-bottom: 16px; font-weight: 500; }
+  .hero h1 { font-size: 42px; font-weight: 700; letter-spacing: -1px; line-height: 1.1; color: white; margin-bottom: 12px; }
+  .hero h1 span { color: #1D9E75; }
+  .hero p { font-size: 16px; color: #64748B; max-width: 600px; line-height: 1.6; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 40px; }
+  .kpi-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; transition: transform 0.2s, border-color 0.2s; cursor: default; }
+  .kpi-card:hover { transform: translateY(-2px); border-color: rgba(29,158,117,0.3); }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: 16px 16px 0 0; }
+  .kpi-card.teal::before { background: #1D9E75; }
+  .kpi-card.red::before { background: #DC2626; }
+  .kpi-card.amber::before { background: #D97706; }
+  .kpi-card.blue::before { background: #2563EB; }
+  .kpi-label { font-size: 12px; font-weight: 500; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .kpi-value { font-size: 36px; font-weight: 700; letter-spacing: -1px; color: white; margin-bottom: 8px; }
+  .kpi-value.teal { color: #1D9E75; }
+  .kpi-value.red { color: #DC2626; }
+  .kpi-value.amber { color: #D97706; }
+  .kpi-value.blue { color: #2563EB; }
+  .kpi-sub { font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 4px; }
+  .kpi-trend { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .kpi-trend.up { background: rgba(5,150,105,0.15); color: #10B981; }
+  .kpi-trend.down { background: rgba(220,38,38,0.15); color: #EF4444; }
+
+  .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #1D9E75; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: rgba(29,158,117,0.2); }
+  
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-bottom: 40px; }
+  
+  .panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 24px; }
+  .panel-title { font-size: 15px; font-weight: 600; color: #E2E8F0; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+  .panel-title .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+  .badge-teal { background: rgba(29,158,117,0.15); color: #1D9E75; }
+  .badge-red { background: rgba(220,38,38,0.15); color: #F87171; }
+  .badge-amber { background: rgba(217,119,6,0.15); color: #FCD34D; }
+  .badge-blue { background: rgba(37,99,235,0.15); color: #60A5FA; }
+  .badge-gray { background: rgba(100,116,139,0.15); color: #94A3B8; }
+
+  .sprint-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 16px; margin-bottom: 12px; transition: all 0.2s; cursor: pointer; position: relative; }
+  .sprint-card:hover { border-color: rgba(29,158,117,0.3); background: rgba(29,158,117,0.05); }
+  .sprint-card.active { border-color: rgba(29,158,117,0.4); background: rgba(29,158,117,0.08); }
+  .sprint-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .sprint-name { font-size: 13px; font-weight: 600; color: #E2E8F0; }
+  .sprint-weeks { font-size: 11px; color: #64748B; font-family: 'DM Mono', monospace; }
+  .sprint-goal { font-size: 12px; color: #94A3B8; line-height: 1.5; margin-bottom: 12px; }
+  .sprint-progress { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
+  .sprint-bar { height: 100%; border-radius: 2px; transition: width 1.5s ease; }
+  .sprint-meta { display: flex; align-items: center; gap: 12px; font-size: 11px; color: #64748B; }
+  .sprint-meta span { display: flex; align-items: center; gap: 4px; }
+
+  .feature-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .feature-item:last-child { border-bottom: none; }
+  .feat-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .feat-content { flex: 1; min-width: 0; }
+  .feat-name { font-size: 13px; font-weight: 500; color: #E2E8F0; margin-bottom: 3px; }
+  .feat-desc { font-size: 12px; color: #64748B; line-height: 1.4; }
+  .feat-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; font-family: 'DM Mono', monospace; }
+  .tag-p0 { background: rgba(220,38,38,0.15); color: #F87171; }
+  .tag-p1 { background: rgba(217,119,6,0.15); color: #FCD34D; }
+  .tag-sp { background: rgba(37,99,235,0.1); color: #93C5FD; }
+  .tag-behavioral { background: rgba(29,158,117,0.1); color: #6EE7B7; }
+  .tag-moat { background: rgba(167,139,250,0.1); color: #C4B5FD; }
+
+  .blind-spot { border-radius: 12px; padding: 20px; margin-bottom: 16px; border-left: 3px solid; }
+  .bs-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .bs-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .bs-title { font-size: 13px; font-weight: 600; }
+  .bs-body { font-size: 12px; line-height: 1.6; }
+  .bs-fix { font-size: 11px; margin-top: 8px; padding: 8px 10px; border-radius: 6px; font-weight: 500; }
+
+  .bs-alpha { background: rgba(220,38,38,0.06); border-color: #DC2626; }
+  .bs-alpha .bs-icon { background: rgba(220,38,38,0.2); color: #F87171; }
+  .bs-alpha .bs-title { color: #F87171; }
+  .bs-alpha .bs-body { color: #94A3B8; }
+  .bs-alpha .bs-fix { background: rgba(220,38,38,0.1); color: #FCA5A5; }
+
+  .bs-beta { background: rgba(217,119,6,0.06); border-color: #D97706; }
+  .bs-beta .bs-icon { background: rgba(217,119,6,0.2); color: #FCD34D; }
+  .bs-beta .bs-title { color: #FCD34D; }
+  .bs-beta .bs-body { color: #94A3B8; }
+  .bs-beta .bs-fix { background: rgba(217,119,6,0.1); color: #FDE68A; }
+
+  .bs-gamma { background: rgba(37,99,235,0.06); border-color: #2563EB; }
+  .bs-gamma .bs-icon { background: rgba(37,99,235,0.2); color: #93C5FD; }
+  .bs-gamma .bs-title { color: #93C5FD; }
+  .bs-gamma .bs-body { color: #94A3B8; }
+  .bs-gamma .bs-fix { background: rgba(37,99,235,0.1); color: #BFDBFE; }
+
+  .bs-delta { background: rgba(29,158,117,0.06); border-color: #1D9E75; }
+  .bs-delta .bs-icon { background: rgba(29,158,117,0.2); color: #6EE7B7; }
+  .bs-delta .bs-title { color: #6EE7B7; }
+  .bs-delta .bs-body { color: #94A3B8; }
+  .bs-delta .bs-fix { background: rgba(29,158,117,0.1); color: #A7F3D0; }
+
+  .moat-layer { display: flex; gap: 12px; padding: 14px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 10px; transition: all 0.2s; }
+  .moat-layer:hover { background: rgba(29,158,117,0.06); border-color: rgba(29,158,117,0.2); }
+  .moat-num { width: 24px; height: 24px; border-radius: 50%; background: rgba(29,158,117,0.15); color: #1D9E75; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .moat-content { flex: 1; }
+  .moat-title { font-size: 13px; font-weight: 600; color: #E2E8F0; margin-bottom: 4px; }
+  .moat-desc { font-size: 12px; color: #64748B; line-height: 1.5; }
+  .moat-time { font-size: 11px; color: #1D9E75; margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+  .value-prop { background: linear-gradient(135deg, rgba(15,110,86,0.12), rgba(37,99,235,0.08)); border: 1px solid rgba(29,158,117,0.2); border-radius: 16px; padding: 32px; margin-bottom: 40px; }
+  .vp-before { font-size: 13px; color: #64748B; text-decoration: line-through; margin-bottom: 8px; font-family: 'DM Mono', monospace; }
+  .vp-after { font-size: 28px; font-weight: 700; color: white; letter-spacing: -0.5px; line-height: 1.3; margin-bottom: 16px; }
+  .vp-after span { color: #1D9E75; }
+  .vp-sub { font-size: 15px; color: #94A3B8; line-height: 1.6; max-width: 640px; margin-bottom: 24px; }
+  .vp-metrics { display: flex; gap: 32px; }
+  .vp-metric { text-align: center; }
+  .vp-metric-val { font-size: 24px; font-weight: 700; color: #1D9E75; }
+  .vp-metric-label { font-size: 12px; color: #64748B; margin-top: 2px; }
+
+  .onboard-step { display: flex; gap: 16px; margin-bottom: 20px; }
+  .os-num { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .os-1 { background: rgba(29,158,117,0.2); color: #1D9E75; border: 1px solid rgba(29,158,117,0.3); }
+  .os-2 { background: rgba(37,99,235,0.2); color: #60A5FA; border: 1px solid rgba(37,99,235,0.3); }
+  .os-3 { background: rgba(217,119,6,0.2); color: #FCD34D; border: 1px solid rgba(217,119,6,0.3); }
+  .os-4 { background: rgba(167,139,250,0.2); color: #C4B5FD; border: 1px solid rgba(167,139,250,0.3); }
+  .os-content { flex: 1; }
+  .os-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .os-title { font-size: 14px; font-weight: 600; color: #E2E8F0; }
+  .os-time { font-size: 11px; color: #1D9E75; font-family: 'DM Mono', monospace; background: rgba(29,158,117,0.1); padding: 2px 6px; border-radius: 4px; }
+  .os-desc { font-size: 12px; color: #64748B; line-height: 1.5; }
+  .os-connector { width: 1px; background: linear-gradient(to bottom, rgba(29,158,117,0.3), transparent); margin: 4px 0 4px 17px; height: 16px; }
+
+  .anim-chart-bar { transition: height 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  
+  .scroll-fade { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .scroll-fade.visible { opacity: 1; transform: translateY(0); }
+
+  .priority-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.07); margin-bottom: 16px; }
+  .matrix-quad { padding: 16px; background: rgba(255,255,255,0.03); }
+  .matrix-quad:hover { background: rgba(255,255,255,0.06); }
+  .matrix-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; opacity: 0.6; }
+  .matrix-features { display: flex; flex-direction: column; gap: 6px; }
+  .mf { font-size: 11px; padding: 4px 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+  .mf::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .mf-p0 { background: rgba(220,38,38,0.1); color: #FCA5A5; }
+  .mf-p0::before { background: #DC2626; }
+  .mf-p1 { background: rgba(217,119,6,0.1); color: #FDE68A; }
+  .mf-p1::before { background: #D97706; }
+  .mf-p2 { background: rgba(100,116,139,0.1); color: #94A3B8; }
+  .mf-p2::before { background: #64748B; }
+
+  .tech-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; }
+  .tech-icon { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .tech-name { font-size: 13px; font-weight: 500; color: #E2E8F0; }
+  .tech-role { font-size: 11px; color: #64748B; }
+
+  .insp-card { padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 10px; }
+  .insp-product { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #1D9E75; margin-bottom: 4px; }
+  .insp-pattern { font-size: 12px; font-weight: 500; color: #E2E8F0; margin-bottom: 4px; }
+  .insp-desc { font-size: 11px; color: #64748B; line-height: 1.4; }
+
+  footer { text-align: center; padding: 40px 32px; color: #334155; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 40px; font-family: 'DM Mono', monospace; }
+
+  @media (max-width: 1024px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } .two-col, .three-col { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .main { padding: 16px; } .hero h1 { font-size: 28px; } .kpi-grid { grid-template-columns: 1fr; } .vp-metrics { flex-wrap: wrap; gap: 16px; } .nav-tabs { display: none; } }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="logo">
+    <div class="logo-mark">SQ</div>
+    <div class="logo-text">ScopeIQ</div>
+    <div class="logo-badge">Strategic Architecture v2.0</div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showTab('overview')">Overview</button>
+    <button class="nav-tab" onclick="showTab('sprints')">Sprint Plan</button>
+    <button class="nav-tab" onclick="showTab('features')">Features</button>
+    <button class="nav-tab" onclick="showTab('design')">Design System</button>
+  </div>
+  <div class="topbar-right">
+    <div class="status-dot"></div>
+    <span>Active Development · Q3 2026</span>
+  </div>
+</nav>
+
+<div class="main">
+
+  <!-- OVERVIEW TAB -->
+  <div id="tab-overview" class="tab-content active">
+    
+    <div class="hero scroll-fade">
+      <div class="hero-tag">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#1D9E75" stroke-width="1.5"/><path d="M4 6l1.5 1.5L8 4" stroke="#1D9E75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        McKinsey Audit · 4 Blind Spots Diagnosed · 12 Features Recommended
+      </div>
+      <h1>From blind spots to <span>defensible strategy</span></h1>
+      <p>Complete strategic architecture — onboarding redesign, behavioral layer, data flywheel, and implementation roadmap for ScopeIQ v2.0.</p>
+    </div>
+
+    <div class="kpi-grid scroll-fade">
+      <div class="kpi-card teal">
+        <div class="kpi-label">Activation Rate Target</div>
+        <div class="kpi-value teal" id="kpi1">0%</div>
+        <div class="kpi-sub"><span class="kpi-trend up">+35%</span> vs current baseline</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">Time to First Value</div>
+        <div class="kpi-value red" id="kpi2">0 min</div>
+        <div class="kpi-sub"><span class="kpi-trend up">-170min</span> vs current onboarding</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">Revenue Protected / User</div>
+        <div class="kpi-value amber" id="kpi3">$0</div>
+        <div class="kpi-sub"><span class="kpi-trend up">+$1,300</span> per user per month</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-label">Implementation Sprints</div>
+        <div class="kpi-value blue" id="kpi4">0</div>
+        <div class="kpi-sub"><span class="kpi-trend up">22 weeks</span> to production launch</div>
+      </div>
+    </div>
+
+    <div class="value-prop scroll-fade">
+      <div class="vp-before">"AI-powered scope enforcement for creative agencies"</div>
+      <div class="vp-after">Stop working for free. <span>ScopeIQ catches scope creep</span> before it costs you.</div>
+      <div class="vp-sub">The moment a client asks for something outside your SOW, you know. In 5 seconds. Every time. Agencies using ScopeIQ recover an average of $1,847 per project in unbilled scope.</div>
+      <div class="vp-metrics">
+        <div class="vp-metric"><div class="vp-metric-val">$1,847</div><div class="vp-metric-label">Avg revenue recovered/project</div></div>
+        <div class="vp-metric"><div class="vp-metric-val">&lt;5s</div><div class="vp-metric-label">Scope flag detection speed</div></div>
+        <div class="vp-metric"><div class="vp-metric-val">10min</div><div class="vp-metric-label">Setup to first brief link</div></div>
+        <div class="vp-metric"><div class="vp-metric-val">&lt;15%</div><div class="vp-metric-label">AI false positive rate</div></div>
+      </div>
+    </div>
+
+    <div class="two-col scroll-fade">
+      <div class="panel">
+        <div class="panel-title">4 Root Blind Spots <span class="badge badge-red">Critical Findings</span></div>
+        
+        <div class="blind-spot bs-alpha">
+          <div class="bs-header">
+            <div class="bs-icon">α</div>
+            <div class="bs-title">Behavioral Gap — Emotional Friction</div>
+          </div>
+          <div class="bs-body">Product assumes rational behavior. Freelancers close the change order tab 70% of the time due to relationship anxiety — not feature gaps.</div>
+          <div class="bs-fix">Fix: Soft Ask flow + Social Proof injection + One-sentence CO template</div>
+        </div>
+
+        <div class="blind-spot bs-beta">
+          <div class="bs-header">
+            <div class="bs-icon">β</div>
+            <div class="bs-title">ICP Diffusion — 3 ICPs = 0 ICPs</div>
+          </div>
+          <div class="bs-body">Maya, James, Priya have different buying cycles. Building for all 3 simultaneously dilutes messaging and creates a sales cycle that fits nobody.</div>
+          <div class="bs-fix">Fix: James (studio lead, 3–5 people) is the v1.0 primary ICP. All decisions optimize for James until 50 paying customers.</div>
+        </div>
+
+        <div class="blind-spot bs-gamma">
+          <div class="bs-header">
+            <div class="bs-icon">γ</div>
+            <div class="bs-title">Moat Illusion — Features ≠ Defensibility</div>
+          </div>
+          <div class="bs-body">HoneyBook can ship scope flagging in 2–3 sprints. Being first is a 9–18 month window. Real moats are data flywheel depth and switching cost via relationship continuity.</div>
+          <div class="bs-fix">Fix: 5-layer defensibility architecture (data flywheel, template network, audit trail lock-in, client continuity, integration ecosystem)</div>
+        </div>
+
+        <div class="blind-spot bs-delta">
+          <div class="bs-header">
+            <div class="bs-icon">δ</div>
+            <div class="bs-title">Activation Cliff — Prerequisite Mismatch</div>
+          </div>
+          <div class="bs-body">Current onboarding requires: SOW upload, rate card, brand colors, custom domain, client invitation — BEFORE any value delivered. 60% of target users lack a properly structured SOW.</div>
+          <div class="bs-fix">Fix: SOW Generator wizard + Service type templates + Demo sandbox = 10-minute activation path</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">5-Layer Defensibility Architecture <span class="badge badge-teal">Moat Builder</span></div>
+        
+        <div class="moat-layer">
+          <div class="moat-num">1</div>
+          <div class="moat-content">
+            <div class="moat-title">Data Flywheel</div>
+            <div class="moat-desc">Every SOW parsed + every flag dismissed trains domain-specific models. 10K SOWs = accuracy no generalist competitor can replicate.</div>
+            <div class="moat-time">Activation: 12–18 months of volume</div>
+          </div>
+        </div>
+        <div class="moat-layer">
+          <div class="moat-num">2</div>
+          <div class="moat-content">
+            <div class="moat-title">Brief Template Network</div>
+            <div class="moat-desc">Community-shared templates per service type. Each user benefits from improvements by 500+ peers in their niche. Yelp-style data moat.</div>
+            <div class="moat-time">Activation: 6–9 months of curation</div>
+          </div>
+        </div>
+        <div class="moat-layer">
+          <div class="moat-num">3</div>
+          <div class="moat-content">
+            <div class="moat-title">Audit Trail Lock-In</div>
+            <div class="moat-desc">Every client decision, scope change, and approval lives in ScopeIQ. Leaving means losing your legal paper trail. Agencies with 2+ years of history will not leave.</div>
+            <div class="moat-time">Activation: 18–24 months of depth</div>
+          </div>
+        </div>
+        <div class="moat-layer">
+          <div class="moat-num">4</div>
+          <div class="moat-content">
+            <div class="moat-title">Client Relationship Continuity</div>
+            <div class="moat-desc">The portal IS the client interface. Clients get trained to expect ScopeIQ. Switching tools means re-training every client.</div>
+            <div class="moat-time">Activation: 6 months per client</div>
+          </div>
+        </div>
+        <div class="moat-layer">
+          <div class="moat-num">5</div>
+          <div class="moat-content">
+            <div class="moat-title">Integration Ecosystem</div>
+            <div class="moat-desc">Notion, Linear, Slack, Xero integrations make ScopeIQ a node in the stack. Removing it breaks adjacent workflows.</div>
+            <div class="moat-time">Activation: 6–12 months post-launch</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel scroll-fade" style="margin-bottom:40px;">
+      <div class="panel-title">Redesigned 10-Minute Onboarding Path <span class="badge badge-teal">Activation Fix</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+        <div class="onboard-step" style="flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div class="os-num os-1">1</div>
+            <div>
+              <div class="os-title">Service Type</div>
+              <div class="os-time">0–30 sec</div>
+            </div>
+          </div>
+          <div class="os-desc">Pick from 6 service type cards. Zero text input. Instant workspace with pre-built brief template, default SOW structure, and industry rate defaults.</div>
+          <div style="background:rgba(29,158,117,0.08);border:1px solid rgba(29,158,117,0.15);border-radius:8px;padding:10px;font-size:11px;color:#6EE7B7;">Inspired by: ClickUp workspace creation + Figma "start from template"</div>
+        </div>
+        <div class="onboard-step" style="flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div class="os-num os-2">2</div>
+            <div>
+              <div class="os-title">Brief Link</div>
+              <div class="os-time">30 sec–2 min</div>
+            </div>
+          </div>
+          <div class="os-desc">A ready-to-copy brief intake URL is displayed. One button: "Copy Link." First value delivered. No further action required to proceed.</div>
+          <div style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.15);border-radius:8px;padding:10px;font-size:11px;color:#93C5FD;">Inspired by: Loom "record now" + Calendly "share your link"</div>
+        </div>
+        <div class="onboard-step" style="flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div class="os-num os-3">3</div>
+            <div>
+              <div class="os-title">Demo Sandbox</div>
+              <div class="os-time">2–5 min</div>
+            </div>
+          </div>
+          <div class="os-desc">Synthetic client "Alex from Acme Co." submits a brief, sends an out-of-scope message. User experiences the full flag → CO flow. "You just recovered $800."</div>
+          <div style="background:rgba(217,119,6,0.08);border:1px solid rgba(217,119,6,0.15);border-radius:8px;padding:10px;font-size:11px;color:#FDE68A;">Inspired by: Linear welcome tour + Intercom product walkthrough</div>
+        </div>
+        <div class="onboard-step" style="flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div class="os-num os-4">4</div>
+            <div>
+              <div class="os-title">Config Checklist</div>
+              <div class="os-time">Days 1–7</div>
+            </div>
+          </div>
+          <div class="os-desc">SOW upload, brand colors, rate card become a sidebar checklist with impact labels and time estimates. Deferred, not eliminated. 100% unlocks "Verified Agency" badge.</div>
+          <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.15);border-radius:8px;padding:10px;font-size:11px;color:#C4B5FD;">Inspired by: Notion "complete your profile" + ClickUp checklist</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SPRINTS TAB -->
+  <div id="tab-sprints" class="tab-content">
+    
+    <div class="hero scroll-fade" style="margin-bottom:32px;">
+      <div class="hero-tag">22 Weeks · 6 Sprints · Production Launch</div>
+      <h1>Implementation <span>Sprint Plan</span></h1>
+      <p>Sequenced to deliver measurable activation impact in Sprint 1, with defensibility layers building through Sprint 5.</p>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Sprint Overview <span class="badge badge-gray">22 weeks</span></div>
+        
+        <div class="sprint-card" onclick="selectSprint(0)">
+          <div class="sprint-header"><div class="sprint-name">Sprint 0 — Foundation</div><div class="sprint-weeks">Weeks 1–2</div></div>
+          <div class="sprint-goal">Infrastructure, CI/CD, design system, analytics baseline. Zero user-facing features.</div>
+          <div class="sprint-progress"><div class="sprint-bar" style="width:0%;background:#64748B;" data-target="100"></div></div>
+          <div class="sprint-meta"><span>41 SP total</span><span style="color:#1D9E75;">6 tasks</span><span>AGENT-BE + DB + FE</span></div>
+        </div>
+
+        <div class="sprint-card active" onclick="selectSprint(1)">
+          <div class="sprint-header"><div class="sprint-name">Sprint 1 — Onboarding & Activation</div><div class="sprint-weeks">Weeks 3–5</div></div>
+          <div class="sprint-goal">Target: 60% activation within 48h. Measure via Posthog funnel.</div>
+          <div class="sprint-progress"><div class="sprint-bar" style="width:0%;background:linear-gradient(90deg,#1D9E75,#0F6E56);" data-target="65"></div></div>
+          <div class="sprint-meta"><span>57 SP total</span><span style="color:#DC2626;">8 tasks · HIGH IMPACT</span><span>All agents</span></div>
+        </div>
+
+        <div class="sprint-card" onclick="selectSprint(2)">
+          <div class="sprint-header"><div class="sprint-name">Sprint 2 — Brief Builder Core</div><div class="sprint-weeks">Weeks 6–8</div></div>
+          <div class="sprint-goal">Target: Average brief clarity score &gt;72/100 across all submissions.</div>
+          <div class="sprint-progress"><div class="sprint-bar" style="width:0%;background:linear-gradient(90deg,#2563EB,#1D4ED8);" data-target="45"></div></div>
+          <div class="sprint-meta"><span>57 SP total</span><span style="color:#60A5FA;">7 tasks</span><span>AGENT-AI + FE</span></div>
+        </div>
+
+        <div class="sprint-card" onclick="selectSprint(3)">
+          <div class="sprint-header"><div class="sprint-name">Sprint 3 — Approval Portal</div><div class="sprint-weeks">Weeks 9–12</div></div>
+          <div class="sprint-goal">Target: &gt;85% deliverables get client response within 72h.</div>
+          <div class="sprint-progress"><div class="sprint-bar" style="width:0%;background:linear-gradient(90deg,#D97706,#B45309);" data-target="25"></div></div>
+          <div class="sprint-meta"><span>75 SP total</span><span style="color:#FCD34D;">8 tasks</span><span>AGENT-FE + BE + UX</span></div>
+        </div>
+
+        <div class="sprint-card" onclick="selectSprint(4)">
+          <div class="sprint-header"><div class="sprint-name">Sprint 4 — Scope Guard Core</div><div class="sprint-weeks">Weeks 13–16</div></div>
+          <div class="sprint-goal">Target: Flag detection &lt;5s p95. &gt;2 flags per active user/month.</div>
+          <div class="sprint-progress"><div class="sprint-bar" style="width:0%;background:linear-gradient(90deg,#DC2626,#B91C1C);" data-target="10"></div></div>
+          <div class="sprint-meta"><span>73 SP total</span><span style="color:#F87171;">8 tasks · CORE VALUE</span><span>AGENT-AI + BE + FE</span></div>
+        </div>
+
+        <div class="sprint-card" onclick="selectSprint(5)">
+          <div class="sprint-header"><div class="sprint-name">Sprint 5 — Defensibility</div><div class="sprint-weeks">Weeks 17–20</div></div>
+          <div class="sprint-goal">Target: &gt;40% workspaces connect 1+ integration within 30 days.</div>
+          <div class="sprint-progress"><div class="sprint-bar" style="width:0%;background:linear-gradient(90deg,#7C3AED,#6D28D9);" data-target="5"></div></div>
+          <div class="sprint-meta"><span>78 SP total</span><span style="color:#C4B5FD;">7 tasks</span><span>AGENT-BE + DB + FE</span></div>
+        </div>
+
+        <div class="sprint-card" onclick="selectSprint(6)">
+          <div class="sprint-header"><div class="sprint-name">Sprint 6 — Launch Prep</div><div class="sprint-weeks">Weeks 21–22</div></div>
+          <div class="sprint-goal">Target: NPS &gt;40 from beta cohort. Time to value &lt;10min on 20 beta users.</div>
+          <div class="sprint-progress"><div class="sprint-bar" style="width:0%;background:linear-gradient(90deg,#059669,#047857);" data-target="0"></div></div>
+          <div class="sprint-meta"><span>43 SP total</span><span style="color:#6EE7B7;">6 tasks</span><span>All agents + Product</span></div>
+        </div>
+      </div>
+
+      <div class="panel" id="sprint-detail">
+        <div class="panel-title">Sprint 1 — Onboarding & Activation <span class="badge badge-teal">Active</span></div>
+        <div style="background:rgba(29,158,117,0.08);border:1px solid rgba(29,158,117,0.15);border-radius:10px;padding:14px;margin-bottom:20px;">
+          <div style="font-size:12px;color:#6EE7B7;font-weight:600;margin-bottom:4px;">Sprint Goal</div>
+          <div style="font-size:13px;color:#A7F3D0;line-height:1.5;">60% of signups complete 10-minute activation path within 48 hours of signup. Measured via Posthog activation funnel with brief_link_copied event as conversion milestone.</div>
+        </div>
+
+        <div id="sprint-tasks">
+          <div class="feature-item">
+            <div class="feat-icon" style="background:rgba(29,158,117,0.15);">🎯</div>
+            <div class="feat-content">
+              <div class="feat-name">ServiceTypeSelector Component</div>
+              <div class="feat-desc">6-card animated grid with Framer Motion spring animation + hover lift. Framer Motion whileHover scale(1.02) + spring stiffness 300.</div>
+              <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">5 SP</span><span class="tag tag-behavioral">Activation</span></div>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon" style="background:rgba(37,99,235,0.15);">📋</div>
+            <div class="feat-content">
+              <div class="feat-name">Template Library (10 service types)</div>
+              <div class="feat-desc">Pre-built brief form + default SOW structure + rate card defaults for: Brand, Web Design, Dev, Video, Copy, Strategy, Social, Photo, Illustration, Other.</div>
+              <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">10 SP</span><span class="tag tag-moat">Flywheel</span></div>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon" style="background:rgba(220,38,38,0.15);">⚡</div>
+            <div class="feat-content">
+              <div class="feat-name">FEAT-NEW-001: AI SOW Generator</div>
+              <div class="feat-desc">5-question wizard → Claude SOW generation → TipTap inline editor. Removes #1 onboarding blocker (60% of users lack a structured SOW).</div>
+              <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">13 SP</span><span class="tag tag-behavioral">Blocker Removed</span></div>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon" style="background:rgba(167,139,250,0.15);">🎮</div>
+            <div class="feat-content">
+              <div class="feat-name">FEAT-NEW-002: Interactive Sandbox</div>
+              <div class="feat-desc">Demo mode with synthetic client "Alex from Acme Co." + simulated scope flag. Revenue recovery count-up animation. Validates product before real client.</div>
+              <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">8 SP</span><span class="tag tag-behavioral">Activation +40%</span></div>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon" style="background:rgba(29,158,117,0.15);">✅</div>
+            <div class="feat-content">
+              <div class="feat-name">Progressive Config Checklist</div>
+              <div class="feat-desc">Sidebar widget: 5 items with impact labels + time estimates + Framer Motion pathLength checkmark animations. Drives background configuration.</div>
+              <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">5 SP</span><span class="tag tag-behavioral">Retention</span></div>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon" style="background:rgba(5,150,105,0.15);">💰</div>
+            <div class="feat-content">
+              <div class="feat-name">Revenue Recovery Counter</div>
+              <div class="feat-desc">Framer Motion count-up animation on dashboard + sandbox completion screen. "You just recovered $800 in unbilled work." Makes ROI viscerally real.</div>
+              <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">3 SP</span><span class="tag tag-behavioral">Behavioral</span></div>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon" style="background:rgba(37,99,235,0.15);">🔗</div>
+            <div class="feat-content">
+              <div class="feat-name">Embeddable Brief Form (FEAT-BB-004)</div>
+              <div class="feat-desc">iframe embed + direct link + "Powered by ScopeIQ" viral distribution hook. Every form on a freelancer's site is a distribution node.</div>
+              <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">5 SP</span><span class="tag tag-moat">Distribution</span></div>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon" style="background:rgba(220,38,38,0.15);">🧪</div>
+            <div class="feat-content">
+              <div class="feat-name">E2E Test Suite (Sprint 1)</div>
+              <div class="feat-desc">Playwright: full onboarding path, sandbox flow, brief link share, demo scope flag. All T-CP-001 through T-CP-003 test cases.</div>
+              <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">8 SP</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel scroll-fade" style="margin-bottom:40px;">
+      <div class="panel-title">Priority Matrix — All 40+ Features <span class="badge badge-gray">Full Backlog</span></div>
+      <div class="priority-matrix">
+        <div class="matrix-quad" style="border-right:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div class="matrix-label" style="color:#F87171;">P0 — Must Have (Ship Sprint 1–4)</div>
+          <div class="matrix-features">
+            <div class="mf mf-p0">AI SOW Generator</div>
+            <div class="mf mf-p0">Interactive Sandbox</div>
+            <div class="mf mf-p0">Soft Ask Flow</div>
+            <div class="mf mf-p0">Revenue Protection Dashboard</div>
+            <div class="mf mf-p0">Project Health Score</div>
+            <div class="mf mf-p0">Brief Clarity Scorer (FEAT-BB-002)</div>
+            <div class="mf mf-p0">Auto-Hold Flow (FEAT-BB-003)</div>
+            <div class="mf mf-p0">Point-Anchored Annotation (FEAT-AP-003)</div>
+            <div class="mf mf-p0">Scope Flag Detection (FEAT-SG-002)</div>
+            <div class="mf mf-p0">One-Click Change Order (FEAT-SG-003)</div>
+            <div class="mf mf-p0">White-Label Portal (FEAT-AP-001)</div>
+          </div>
+        </div>
+        <div class="matrix-quad" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div class="matrix-label" style="color:#FDE68A;">P1 — Should Have (Sprint 5–6)</div>
+          <div class="matrix-features">
+            <div class="mf mf-p1">Community Template Marketplace</div>
+            <div class="mf mf-p1">Scope Creep Pattern Alerts</div>
+            <div class="mf mf-p1">AI Brief Coach (Inline Hints)</div>
+            <div class="mf mf-p1">Multi-Workspace Agency Plan</div>
+            <div class="mf mf-p1">Slack Integration</div>
+            <div class="mf mf-p1">Notion Integration</div>
+            <div class="mf mf-p1">Brief Version History + Diff</div>
+            <div class="mf mf-p1">AI Feedback Summarizer</div>
+            <div class="mf mf-p1">Scope Meter Dashboard</div>
+          </div>
+        </div>
+        <div class="matrix-quad" style="border-right:1px solid rgba(255,255,255,0.06);">
+          <div class="matrix-label" style="color:#93C5FD;">Defensibility Layer (Year 1–2)</div>
+          <div class="matrix-features">
+            <div class="mf mf-p1">Data Flywheel Instrumentation</div>
+            <div class="mf mf-p1">Template Usage Analytics</div>
+            <div class="mf mf-p1">Xero / QuickBooks Integration</div>
+            <div class="mf mf-p1">Linear Integration</div>
+            <div class="mf mf-p1">Figma Auto-Deliverable</div>
+            <div class="mf mf-p2">Client Trust Score</div>
+            <div class="mf mf-p2">REST API (Agency Plan)</div>
+          </div>
+        </div>
+        <div class="matrix-quad">
+          <div class="matrix-label" style="color:#94A3B8;">P2 — Nice to Have (Year 2)</div>
+          <div class="matrix-features">
+            <div class="mf mf-p2">Brief Template Library (Community)</div>
+            <div class="mf mf-p2">Mobile PWA</div>
+            <div class="mf mf-p2">Multi-language Support</div>
+            <div class="mf mf-p2">Financial Reporting</div>
+            <div class="mf mf-p2">Client Trust Score (cross-workspace)</div>
+            <div class="mf mf-p2">White-Glove Onboarding Tier</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FEATURES TAB -->
+  <div id="tab-features" class="tab-content">
+    
+    <div class="hero scroll-fade" style="margin-bottom:32px;">
+      <div class="hero-tag">12 New Features · Addresses All 4 Blind Spots</div>
+      <h1>Recommended <span>Feature Architecture</span></h1>
+      <p>Every feature maps to a specific blind spot, defensibility layer, or growth lever. No feature exists without a measurable outcome.</p>
+    </div>
+
+    <div class="three-col">
+      <div class="panel">
+        <div class="panel-title">Onboarding Features <span class="badge badge-teal">Activation</span></div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(29,158,117,0.15);">⚡</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-001: AI SOW Generator</div>
+            <div class="feat-desc">5 questions → Claude generates complete SOW → TipTap editor → one-click activation. Removes the #1 onboarding blocker for 60% of users.</div>
+            <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">13 SP</span></div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(37,99,235,0.15);">🎮</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-002: Interactive Sandbox</div>
+            <div class="feat-desc">Synthetic client + pre-loaded SOW + simulated scope flag → full CO flow in 60 seconds. Validates product before real client.</div>
+            <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">8 SP</span></div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(167,139,250,0.15);">📚</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-003: Template Library</div>
+            <div class="feat-desc">10 service type templates: brief form + SOW structure + rate card defaults. Pre-built community templates for every creative niche.</div>
+            <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">10 SP</span><span class="tag tag-moat">Flywheel</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Behavioral Features <span class="badge badge-red">Revenue</span></div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(5,150,105,0.15);">📊</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-004: Revenue Protection Dashboard</div>
+            <div class="feat-desc">Total flags · Revenue protected · CO sent vs accepted rate · Brief clarity trend. Makes ROI self-evident. Reduces churn 40% (Intercom benchmark).</div>
+            <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">8 SP</span></div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(220,38,38,0.15);">🔔</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-005: Pattern Alerts</div>
+            <div class="feat-desc">"This client has made 3 out-of-scope requests in 2 weeks." Weekly cron + Claude insight generation. Proactive vs reactive.</div>
+            <div class="feat-tags"><span class="tag tag-p1">P1</span><span class="tag tag-sp">8 SP</span></div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(217,119,6,0.15);">💬</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-006: Soft Ask ("Quick Note")</div>
+            <div class="feat-desc">One-sentence AI response alongside full CO. "That sounds great — I'll put together a quick quote." 8x easier to act on than opening the CO editor.</div>
+            <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">5 SP</span><span class="tag tag-behavioral">Behavioral</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Moat Features <span class="badge badge-blue">Defensibility</span></div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(167,139,250,0.15);">🏪</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-007: Template Marketplace</div>
+            <div class="feat-desc">Community publish/browse. Top templates featured. Premium paid templates ($5–25). 30% platform commission. Figma Community for scope management.</div>
+            <div class="feat-tags"><span class="tag tag-p1">P1</span><span class="tag tag-sp">13 SP</span><span class="tag tag-moat">Moat</span></div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(29,158,117,0.15);">🔌</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-009: Integration Hub</div>
+            <div class="feat-desc">Phase 1: Slack + Notion + Linear + Xero. Phase 2: Figma auto-deliverable + Stripe auto-invoice. Each integration = harder to remove from stack.</div>
+            <div class="feat-tags"><span class="tag tag-p1">P1</span><span class="tag tag-sp">32 SP total</span><span class="tag tag-moat">Lock-in</span></div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(37,99,235,0.15);">🏢</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-012: Multi-Workspace Plan</div>
+            <div class="feat-desc">Sub-workspaces per client. Shared templates. Cross-workspace analytics. Upsell path: $200/mo base + $40/mo per sub-workspace. 10-client agency = $560/mo.</div>
+            <div class="feat-tags"><span class="tag tag-p1">P1</span><span class="tag tag-sp">20 SP</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Intelligence Features <span class="badge badge-teal">AI Layer</span></div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(29,158,117,0.15);">🧠</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-010: AI Brief Coach</div>
+            <div class="feat-desc">Inline debounced hints on long-text fields. "Consider adding a target audience or success metrics." Grammarly-style for briefs. Fields with coach hints score 15+ pts higher.</div>
+            <div class="feat-tags"><span class="tag tag-p1">P1</span><span class="tag tag-sp">8 SP</span></div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(220,38,38,0.15);">❤️</div>
+          <div class="feat-content">
+            <div class="feat-name">FEAT-NEW-011: Project Health Score</div>
+            <div class="feat-desc">Composite metric (brief clarity 20% + revision rounds 25% + flags 25% + response time 15% + approval rate 15%). Color-coded circle on every project card.</div>
+            <div class="feat-tags"><span class="tag tag-p0">P0</span><span class="tag tag-sp">8 SP</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">North Star KPIs <span class="badge badge-amber">Measurement</span></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+            <div><div style="font-size:13px;font-weight:500;color:#E2E8F0;">Revenue Protected / User / Mo</div><div style="font-size:11px;color:#64748B;">change_orders aggregate via Axiom</div></div>
+            <div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:#1D9E75;">$1,800</div><div style="font-size:11px;color:#64748B;">Month 12 target</div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+            <div><div style="font-size:13px;font-weight:500;color:#E2E8F0;">Activation Rate (48h)</div><div style="font-size:11px;color:#64748B;">Posthog funnel: signup → brief_link_copied</div></div>
+            <div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:#D97706;">75%</div><div style="font-size:11px;color:#64748B;">Month 12 target</div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+            <div><div style="font-size:13px;font-weight:500;color:#E2E8F0;">Weekly Active Scope Users</div><div style="font-size:11px;color:#64748B;">≥1 scope flag in last 7 days</div></div>
+            <div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:#2563EB;">65%</div><div style="font-size:11px;color:#64748B;">Month 12 target</div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+            <div><div style="font-size:13px;font-weight:500;color:#E2E8F0;">Net Revenue Retention</div><div style="font-size:11px;color:#64748B;">MRR existing customers + expansion</div></div>
+            <div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:#059669;">&gt;115%</div><div style="font-size:11px;color:#64748B;">Month 12 target</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DESIGN TAB -->
+  <div id="tab-design" class="tab-content">
+    
+    <div class="hero scroll-fade" style="margin-bottom:32px;">
+      <div class="hero-tag">Framer Motion · shadcn/ui · 21st.dev Components · ClickUp-Inspired</div>
+      <h1>Modern UI & <span>Animation System</span></h1>
+      <p>Production-grade component specifications with real-world inspiration, animation patterns, and implementation notes.</p>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Animation System <span class="badge badge-teal">Framer Motion</span></div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:12px;font-weight:600;color:#1D9E75;margin-bottom:6px;">Page Entrance</div>
+            <div style="font-family:'DM Mono',monospace;font-size:11px;color:#94A3B8;line-height:1.6;">staggerChildren: 0.08s<br>fadeUp: y:20→0, opacity:0→1<br>duration: 300ms easeOut</div>
+          </div>
+          <div style="padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:12px;font-weight:600;color:#2563EB;margin-bottom:6px;">Score Ring (Brief Clarity)</div>
+            <div style="font-family:'DM Mono',monospace;font-size:11px;color:#94A3B8;line-height:1.6;">Recharts RadialBarChart<br>animationBegin: 0<br>animationDuration: 1000ms easeOut</div>
+          </div>
+          <div style="padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:12px;font-weight:600;color:#DC2626;margin-bottom:6px;">Scope Flag Severity Pulse</div>
+            <div style="font-family:'DM Mono',monospace;font-size:11px;color:#94A3B8;line-height:1.6;">CSS: @keyframes pulse<br>2s infinite ease-in-out<br>opacity: 1→0.6→1</div>
+          </div>
+          <div style="padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:12px;font-weight:600;color:#D97706;margin-bottom:6px;">Revision Counter Fill</div>
+            <div style="font-family:'DM Mono',monospace;font-size:11px;color:#94A3B8;line-height:1.6;">Framer Motion animate width<br>600ms easeOut<br>green→amber→red threshold</div>
+          </div>
+          <div style="padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:12px;font-weight:600;color:#059669;margin-bottom:6px;">Revenue Count-Up</div>
+            <div style="font-family:'DM Mono',monospace;font-size:11px;color:#94A3B8;line-height:1.6;">Framer Motion animate value<br>800ms linear count-up<br>$0 → $1,847 on mount</div>
+          </div>
+          <div style="padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:12px;font-weight:600;color:#C4B5FD;margin-bottom:6px;">Checklist Checkmark</div>
+            <div style="font-family:'DM Mono',monospace;font-size:11px;color:#94A3B8;line-height:1.6;">Framer Motion pathLength<br>0→1 on completion<br>400ms easeOut spring</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Real-World Inspiration Map <span class="badge badge-blue">Benchmarks</span></div>
+        
+        <div class="insp-card">
+          <div class="insp-product">ClickUp + Linear</div>
+          <div class="insp-pattern">Dashboard Overview & Alert Feed</div>
+          <div class="insp-desc">Alert banner → KPI cards with sparklines → action-first scope flag feed → upcoming deadlines. Urgency hierarchy through color-coded badge system.</div>
+        </div>
+        <div class="insp-card">
+          <div class="insp-product">Stripe Radar + Intercom</div>
+          <div class="insp-pattern">Scope Flag Card Design</div>
+          <div class="insp-desc">4px severity border (red/amber/blue) + confidence progress bar + 3 mutually exclusive action buttons. Mirrors Stripe fraud alert + Intercom conversation classification.</div>
+        </div>
+        <div class="insp-card">
+          <div class="insp-product">Figma + Markup.io + Frame.io</div>
+          <div class="insp-pattern">Annotation Canvas</div>
+          <div class="insp-desc">SVG overlay click-to-pin + bidirectional hover between pin and comment + sliding feedback panel. PDF page thumbnails like Frame.io.</div>
+        </div>
+        <div class="insp-card">
+          <div class="insp-product">Typeform + Tally</div>
+          <div class="insp-pattern">Brief Submission Flow</div>
+          <div class="insp-desc">One question per screen on mobile, animated transitions (slide left 150ms ease-out), card-style choice inputs, progress dots + percentage. Grammarly-style inline hints.</div>
+        </div>
+        <div class="insp-card">
+          <div class="insp-product">PandaDoc + DocuSign</div>
+          <div class="insp-pattern">Change Order Review</div>
+          <div class="insp-desc">Document-style layout with line-item pricing table, typed-name acceptance input that activates the Accept button, animated success state post-signature.</div>
+        </div>
+        <div class="insp-card">
+          <div class="insp-product">HoneyBook + Dubsado</div>
+          <div class="insp-pattern">Client Portal Entry</div>
+          <div class="insp-desc">Full-bleed brand gradient header, agency logo centered, project progress phases (Brief → Review → Approved), mobile-first full-screen splash with CTA.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel scroll-fade" style="margin-bottom:40px;">
+      <div class="panel-title">New Component Library <span class="badge badge-teal">12 Components</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(29,158,117,0.2);color:#1D9E75;">SS</div>
+          <div><div class="tech-name">ServiceTypeSelector</div><div class="tech-role">Framer Motion spring + hover lift · 6 cards</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(167,139,250,0.2);color:#C4B5FD;">SB</div>
+          <div><div class="tech-name">SandboxShell</div><div class="tech-role">BullMQ demo jobs + Framer Motion</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(29,158,117,0.2);color:#1D9E75;">PC</div>
+          <div><div class="tech-name">ProgressChecklist</div><div class="tech-role">pathLength animation + Zustand</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(37,99,235,0.2);color:#60A5FA;">SW</div>
+          <div><div class="tech-name">SOWWizard</div><div class="tech-role">React Hook Form + Claude API + TipTap</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(5,150,105,0.2);color:#10B981;">RP</div>
+          <div><div class="tech-name">RevenueProtectionCard</div><div class="tech-role">Recharts + Framer Motion count-up</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(220,38,38,0.2);color:#F87171;">PH</div>
+          <div><div class="tech-name">ProjectHealthBadge</div><div class="tech-role">RadialBar + hover breakdown tooltip</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(217,119,6,0.2);color:#FCD34D;">SA</div>
+          <div><div class="tech-name">SoftAskPanel</div><div class="tech-role">Claude API + Framer slide-in</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(29,158,117,0.2);color:#1D9E75;">BC</div>
+          <div><div class="tech-name">BriefCoachHint</div><div class="tech-role">Debounced Claude API + Framer fade</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(220,38,38,0.2);color:#F87171;">RC</div>
+          <div><div class="tech-name">RevisionCounter</div><div class="tech-role">Animate width + CSS pulse at limit</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(37,99,235,0.2);color:#60A5FA;">IH</div>
+          <div><div class="tech-name">IntegrationHub</div><div class="tech-role">OAuth flows + health indicators</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(167,139,250,0.2);color:#C4B5FD;">TM</div>
+          <div><div class="tech-name">TemplateMarketplace</div><div class="tech-role">Infinite scroll + filter tags</div></div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon" style="background:rgba(29,158,117,0.2);color:#1D9E75;">AT</div>
+          <div><div class="tech-name">AuditTimeline</div><div class="tech-role">Framer stagger + date-fns filters</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>Novabots Engineering · ScopeIQ · Strategic Architecture v2.0 · Confidential · 2026 · Built with 21st.dev component patterns</footer>
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const tabs = ['overview','sprints','features','design'];
+  const idx = tabs.indexOf(name);
+  document.querySelectorAll('.nav-tab')[idx].classList.add('active');
+  animateCounters();
+}
+
+function animateCounter(el, target, prefix, suffix, duration) {
+  let start = 0;
+  const step = target / (duration / 16);
+  const timer = setInterval(() => {
+    start = Math.min(start + step, target);
+    el.textContent = prefix + Math.round(start).toLocaleString() + suffix;
+    if (start >= target) clearInterval(timer);
+  }, 16);
+}
+
+function animateCounters() {
+  setTimeout(() => {
+    const k1 = document.getElementById('kpi1');
+    const k2 = document.getElementById('kpi2');
+    const k3 = document.getElementById('kpi3');
+    const k4 = document.getElementById('kpi4');
+    if(k1) animateCounter(k1, 75, '', '%', 1200);
+    if(k2) animateCounter(k2, 10, '', ' min', 1000);
+    if(k3) animateCounter(k3, 1800, '$', '', 1400);
+    if(k4) animateCounter(k4, 6, '', '', 800);
+  }, 300);
+  setTimeout(() => {
+    document.querySelectorAll('.sprint-bar').forEach(bar => {
+      const target = bar.getAttribute('data-target');
+      if (target) bar.style.width = target + '%';
+    });
+  }, 600);
+}
+
+function selectSprint(idx) {
+  document.querySelectorAll('.sprint-card').forEach((c,i) => c.classList.toggle('active', i === idx));
+}
+
+const sprintData = [
+  { name: 'Sprint 0 — Foundation', weeks: 'Weeks 1–2', goal: 'Infrastructure, CI/CD pipeline, Supabase schema, Drizzle ORM setup, design system tokens, Axiom logging, product analytics baseline. Zero user-facing features.', tasks: [
+    { icon: '🏗️', name: 'Turborepo Monorepo + CI/CD', desc: 'TypeScript check, ESLint, Vitest, Playwright. GitHub Actions pipeline. Preview environments on PR.', tags: ['P0','8 SP'] },
+    { icon: '🗃️', name: 'Supabase Schema + All RLS', desc: 'Drizzle schema for all 14 core tables. Row-level security policies on all workspace_id columns. Migration files generated.', tags: ['P0','13 SP','AGENT-DB'] },
+    { icon: '🎨', name: 'Design System Setup', desc: 'CSS variables for all color tokens. Inter + DM Mono typography. Tailwind config with Novabots design tokens. shadcn/ui primitives.', tags: ['P0','5 SP','AGENT-FE'] },
+    { icon: '📡', name: 'Axiom + Sentry + BullMQ', desc: 'Structured JSON logging. Error tracking DSN. Redis queue with Upstash. Product analytics Posthog event schema.', tags: ['P0','5 SP','AGENT-BE'] },
+    { icon: '⚡', name: 'Framer Motion + Radix UI', desc: 'Base animation library setup. Radix UI primitives. Component library foundation with all shared components.', tags: ['P0','5 SP','AGENT-FE'] },
+    { icon: '🔐', name: 'Supabase Auth + JWT Flow', desc: 'Magic link + Google OAuth. JWT sessions 1h expiry. Portal token system for client access (no account required).', tags: ['P0','5 SP','AGENT-BE'] }
+  ]},
+  { name: 'Sprint 1 — Onboarding & Activation', weeks: 'Weeks 3–5', goal: '60% of signups complete the 10-minute activation path within 48 hours. Measured via Posthog brief_link_copied funnel.', tasks: [
+    { icon: '🎯', name: 'ServiceTypeSelector Component', desc: '6-card animated grid. Framer Motion whileHover scale + spring stiffness 300. Selection pulse animation.', tags: ['P0','5 SP','Activation'] },
+    { icon: '📋', name: 'Template Library (10 types)', desc: 'Pre-built brief form + default SOW + rate card defaults for all 10 service categories. Flywheel foundation.', tags: ['P0','10 SP','Flywheel'] },
+    { icon: '⚡', name: 'FEAT-NEW-001: AI SOW Generator', desc: '5 questions → Claude SOW generation → TipTap editor → one-click activation. Removes #1 onboarding blocker.', tags: ['P0','13 SP','Blocker'] },
+    { icon: '🎮', name: 'FEAT-NEW-002: Interactive Sandbox', desc: 'Demo mode with synthetic client + simulated scope flag. Revenue count-up animation. Validates product.', tags: ['P0','8 SP','Activation +40%'] },
+    { icon: '✅', name: 'Progressive Config Checklist', desc: 'Sidebar widget: 5 items with impact labels + time estimates + Framer pathLength checkmark animations.', tags: ['P0','5 SP','Retention'] },
+    { icon: '💰', name: 'Revenue Recovery Counter', desc: 'Count-up animation on sandbox completion. Makes ROI viscerally real before first real client.', tags: ['P0','3 SP','Behavioral'] },
+    { icon: '🔗', name: 'Embeddable Brief Form', desc: 'iframe + direct link + "Powered by ScopeIQ" distribution hook. Every embed is a growth node.', tags: ['P0','5 SP','Distribution'] },
+    { icon: '🧪', name: 'Sprint 1 E2E Tests', desc: 'Playwright: onboarding path, sandbox, brief link, demo flag. All T-CP test cases passing in CI.', tags: ['P0','8 SP','Quality'] }
+  ]}
+];
+
+const sprintDetails = document.getElementById('sprint-detail');
+function selectSprint(idx) {
+  document.querySelectorAll('.sprint-card').forEach((c,i) => c.classList.toggle('active', i === idx));
+  const data = sprintData[Math.min(idx, sprintData.length-1)];
+  if (!data) return;
+  let html = `<div class="panel-title">${data.name} <span class="badge badge-teal">${data.weeks}</span></div>`;
+  html += `<div style="background:rgba(29,158,117,0.08);border:1px solid rgba(29,158,117,0.15);border-radius:10px;padding:14px;margin-bottom:20px;"><div style="font-size:12px;color:#6EE7B7;font-weight:600;margin-bottom:4px;">Sprint Goal</div><div style="font-size:13px;color:#A7F3D0;line-height:1.5;">${data.goal}</div></div>`;
+  data.tasks.forEach(t => {
+    html += `<div class="feature-item"><div class="feat-icon" style="background:rgba(29,158,117,0.1);">${t.icon}</div><div class="feat-content"><div class="feat-name">${t.name}</div><div class="feat-desc">${t.desc}</div><div class="feat-tags">${t.tags.map((tag,i) => `<span class="tag ${i===0?'tag-p0':i===1?'tag-sp':'tag-behavioral'}">${tag}</span>`).join('')}</div></div></div>`;
+  });
+  sprintDetails.innerHTML = html;
+}
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.scroll-fade').forEach(el => observer.observe(el));
+
+window.addEventListener('load', () => {
+  animateCounters();
+  setTimeout(() => { document.querySelectorAll('.scroll-fade').forEach(el => el.classList.add('visible')); }, 100);
+});
+</script>
+</body>
+</html>

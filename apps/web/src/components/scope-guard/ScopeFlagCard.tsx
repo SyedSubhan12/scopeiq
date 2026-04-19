@@ -1,20 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  AlertTriangle, AlertCircle, Info, CheckCircle2, XCircle, Clock,
-  ChevronDown, ChevronUp, FileText, Zap, ExternalLink
+  AlertTriangle, AlertCircle, Info, CheckCircle2, Clock,
+  ChevronDown, ChevronUp, FileText, MessageCircle, ExternalLink
 } from "lucide-react";
 import { Card, Badge, Button, Dialog, Textarea, useToast } from "@novabots/ui";
 import { useUpdateScopeFlag } from "@/hooks/useScopeFlags";
-import { useCreateChangeOrder } from "@/hooks/change-orders";
+import type { ScopeFlag } from "@/hooks/useScopeFlags";
+import { useCreateChangeOrder } from "@/hooks/useChangeOrders";
 import { cn } from "@novabots/ui";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+import { ConfidenceBar } from "./ConfidenceBar";
+import { SoftAskDialog } from "./SoftAskDialog";
 
 interface ScopeFlagCardProps {
-  flag: any;
+  flag: ScopeFlag;
   projectId: string;
   onDetail?: () => void;
 }
@@ -74,20 +77,35 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
   const createCO = useCreateChangeOrder();
 
   const [expanded, setExpanded] = useState(false);
-  const [action, setAction] = useState<FlagAction>(null);
+  const [, setAction] = useState<FlagAction>(null);
   const [dismissReason, setDismissReason] = useState("");
   const [showDismissDialog, setShowDismissDialog] = useState(false);
+  const [showSoftAsk, setShowSoftAsk] = useState(false);
   const [isActing, setIsActing] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const cfg = getSeverityConfig(flag.severity)!;
   const statusCfg = getStatusConfig(flag.status)!;
   const Icon = cfg.Icon;
   const isPending = flag.status === "pending";
-  const confidence = flag.metadata?.confidence
-    ? Math.round(flag.metadata.confidence * 100)
-    : flag.evidence?.confidence
-      ? Math.round(flag.evidence.confidence * 100)
-      : null;
+  const metaConfidence = typeof flag.metadata?.confidence === "number" ? flag.metadata.confidence : null;
+  const evidenceConfidence = typeof flag.evidence?.confidence === "number" ? flag.evidence.confidence : null;
+  const confidenceValue = metaConfidence ?? evidenceConfidence ?? null;
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    import("gsap/dist/gsap").then(({ default: gsap }) => {
+      gsap.from(el, {
+        opacity: 0,
+        y: 12,
+        scale: 0.98,
+        duration: 0.35,
+        ease: "back.out(1.4)",
+      });
+    });
+  }, []);
 
   const handleConfirm = async () => {
     setAction("confirm");
@@ -150,7 +168,7 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
         projectId,
         scopeFlagId: flag.id,
         title: flag.title || "Scope Change Request",
-        description: flag.description ?? undefined,
+        ...(flag.description ? { description: flag.description } : {}),
       });
       await updateFlag.mutateAsync({ status: "change_order_sent" });
       toast("success", "Change order created and sent");
@@ -164,6 +182,7 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
   return (
     <>
       <motion.div
+        ref={cardRef}
         layout
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -189,13 +208,13 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
                 <Badge status={statusCfg.badgeStatus as any} className="text-[10px]">
                   {statusCfg.label}
                 </Badge>
-                {confidence != null && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-                    <Zap className="h-2.5 w-2.5" />
-                    {confidence}%
-                  </span>
-                )}
               </div>
+
+              {confidenceValue != null && (
+                <div className="mb-2">
+                  <ConfidenceBar confidence={confidenceValue} size="sm" />
+                </div>
+              )}
 
               {/* Message */}
               <p className="text-sm font-medium text-[rgb(var(--text-primary))]">
@@ -267,16 +286,26 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     size="sm"
-                    onClick={() => void handleGenerateChangeOrder()}
+                    onClick={() => setShowSoftAsk(true)}
                     disabled={isActing}
-                    className="bg-red-600 text-xs hover:bg-red-700"
+                    className="bg-[#1D9E75] text-xs hover:bg-[#178862]"
                   >
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                    Confirm & Generate Change Order
+                    <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                    Quick Note
                   </Button>
                   <Button
                     size="sm"
                     variant="secondary"
+                    onClick={() => void handleGenerateChangeOrder()}
+                    disabled={isActing}
+                    className="text-xs"
+                  >
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                    Change Order
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     onClick={() => void handleInScope()}
                     disabled={isActing}
                     className="text-xs"
@@ -354,6 +383,18 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
           </div>
         </div>
       </Dialog>
+
+      {/* Soft Ask / Quick Note dialog */}
+      <SoftAskDialog
+        open={showSoftAsk}
+        onClose={() => setShowSoftAsk(false)}
+        flagId={flag.id}
+        severity={flag.severity}
+        flagTitle={flag.title ?? flag.description ?? undefined}
+        onEscalate={async () => {
+          await handleGenerateChangeOrder();
+        }}
+      />
     </>
   );
 }

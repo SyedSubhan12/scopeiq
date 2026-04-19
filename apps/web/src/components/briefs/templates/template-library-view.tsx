@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import Link from "next/link";
+import { Plus, Search, Sparkles } from "lucide-react";
 import { Button, Card, Dialog, Input, Skeleton, Textarea, useToast } from "@novabots/ui";
 import { BriefModuleHeader } from "@/components/briefs/shared/brief-module-header";
 import { EmptyStateCard } from "@/components/briefs/shared/empty-state-card";
@@ -67,10 +68,18 @@ export function TemplateLibraryView({
         title="Brief template library"
         description="Create, edit, and publish intake templates that turn vague project requests into cleaner project starts."
         actions={
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            New template
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/briefs/templates/marketplace">
+              <Button variant="secondary">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Marketplace
+              </Button>
+            </Link>
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              New template
+            </Button>
+          </div>
         }
       />
 

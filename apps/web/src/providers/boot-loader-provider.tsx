@@ -2,6 +2,7 @@
 
 import { GlobalLoader } from "@/components/shared/GlobalLoader";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -13,6 +14,7 @@ import {
 } from "react";
 
 const MIN_BOOT_MS = 800; // Controlled reveal (ClickUp style): minimum display time
+const PUBLIC_AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 type LoaderTask = Promise<unknown> | (() => Promise<unknown> | unknown);
 
@@ -49,7 +51,10 @@ function waitForFonts() {
 
 export function BootLoaderProvider({ children }: { children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();
-  const [isBootReady, setIsBootReady] = useState(false);
+  const pathname = usePathname();
+  const isAuthPage = PUBLIC_AUTH_ROUTES.includes(pathname);
+
+  const [isBootReady, setIsBootReady] = useState(isAuthPage);
   const [registrationWindowClosed, setRegistrationWindowClosed] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -185,7 +190,7 @@ export function BootLoaderProvider({ children }: { children: React.ReactNode }) 
 
       {/* Sandy loader: shows until boot ready, smooth fade out */}
       <AnimatePresence>
-        {!isBootReady ? (
+        {!isBootReady && !isAuthPage ? (
           <motion.div
             key="boot-loader"
             className="fixed inset-0 z-[100001] flex items-center justify-center bg-[rgb(var(--surface-subtle))]"

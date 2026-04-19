@@ -132,11 +132,19 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
     if (method === "DELETE") {
         return apiClient.delete(path, options);
     }
-    if (method === "PATCH") {
-        const body = options.body ? JSON.parse(options.body as string) : undefined;
-        return apiClient.patch(path, body, headers ? { headers } : {});
+    if (method === "PATCH" || method === "POST") {
+        const parsedBody = typeof options.body === "string" 
+            ? JSON.parse(options.body) 
+            : options.body;
+            
+        const { body: _, ...restOptions } = options;
+        const mergedOptions = headers ? { ...restOptions, headers } : restOptions;
+        
+        return method === "PATCH"
+            ? apiClient.patch(path, parsedBody, mergedOptions)
+            : apiClient.post(path, parsedBody, mergedOptions);
     }
-    // POST and everything else
-    const body = options.body ? JSON.parse(options.body as string) : undefined;
-    return apiClient.post(path, body, headers ? { headers } : {});
+    
+    // Fallback for everything else
+    return apiClient.post(path, undefined, headers ? { ...options, headers } : options);
 }

@@ -1,12 +1,15 @@
 import { pgTable, uuid, varchar, text, timestamp, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { workspaces } from './workspaces.schema';
 
+export type SowStatus = 'draft' | 'parsed' | 'active' | 'archived';
+
 export const statementsOfWork = pgTable(
   "statements_of_work",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id),
     title: varchar("title", { length: 255 }).notNull(),
+    status: text("status").$type<SowStatus>().notNull().default("draft"),
     fileUrl: text("file_url"),
     fileKey: varchar("file_key", { length: 512 }),
     fileSizeBytes: integer("file_size_bytes"),

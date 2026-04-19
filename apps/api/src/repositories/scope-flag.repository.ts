@@ -1,4 +1,4 @@
-import { db, scopeFlags, eq, and, desc, sql } from "@novabots/db";
+import { db, scopeFlags, eq, and, desc, isNull, lt, sql } from "@novabots/db";
 import type { FlagStatus } from "@novabots/db";
 
 export const scopeFlagRepository = {
@@ -66,5 +66,55 @@ export const scopeFlagRepository = {
                 ),
             );
         return result[0]?.count ?? 0;
+    },
+
+    /**
+     * List open (pending) flags sorted by slaDeadline ascending — soonest breach first.
+     * Flags with no deadline are appended at the end.
+     */
+    async listOpenSortedByBreach(workspaceId: string) {
+        return db
+            .select()
+            .from(scopeFlags)
+            .where(
+                and(
+                    eq(scopeFlags.workspaceId, workspaceId),
+                    eq(scopeFlags.status, "pending"),
+                ),
+            )
+            .orderBy(
+                sql`${scopeFlags.slaDeadline} ASC NULLS LAST`,
+                desc(scopeFlags.createdAt),
+            );
+    },
+
+    /**
+     * Return all flags that are open, have a past slaDeadline, and have not yet been marked breached.
+     * Used by the SLA sweep job.
+     */
+    async listBreachable(now: Date) {
+        return db
+            .select()
+            .from(scopeFlags)
+            .where(
+                and(
+                    eq(scopeFlags.status, "pending"),
+                    eq(scopeFlags.slaBreached, false),
+                    lt(scopeFlags.slaDeadline, now),
+                    isNull(scopeFlags.resolvedAt),
+                ),
+            );
+    },
+
+    /**
+     * Mark a single flag as SLA-breached. Must be called inside a transaction.
+     */
+    async markSlaBreached(id: string, workspaceId: string, trx: typeof db) {
+        const [updated] = await trx
+            .update(scopeFlags)
+            .set({ slaBreached: true, updatedAt: new Date() })
+            .where(and(eq(scopeFlags.id, id), eq(scopeFlags.workspaceId, workspaceId)))
+            .returning();
+        return updated ?? null;
     },
 };

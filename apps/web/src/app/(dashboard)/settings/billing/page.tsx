@@ -4,6 +4,7 @@ import { Check, Zap, AlertTriangle } from "lucide-react";
 import { Button, Card, useToast } from "@novabots/ui";
 import { useWorkspaceStore } from "@/stores/workspace.store";
 import { cn } from "@novabots/ui";
+import { MultiWorkspacePlanCard } from "@/components/billing/MultiWorkspacePlanCard";
 
 type Plan = "solo" | "studio" | "agency";
 
@@ -172,6 +173,9 @@ export default function BillingPage() {
           );
         })}
       </div>
+
+      {/* Multi-workspace add-on (FEAT-NEW-011) */}
+      <MultiWorkspacePlanCard />
 
       {/* Billing info note */}
       <Card className="flex items-start gap-3 border-amber-200 bg-amber-50 p-4">

@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { db, users, workspaces, eq } from "@novabots/db";
 import { ValidationError } from "@novabots/types";
 import { env } from "../lib/env.js";
+import { rateLimiter } from "../middleware/rate-limiter.js";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -20,27 +21,13 @@ const loginSchema = z.object({
 
 export const authRouter = new Hono();
 
-authRouter.post("/register", zValidator("json", registerSchema), async (c) => {
+authRouter.post("/register", rateLimiter(3, 60 * 60 * 1000), zValidator("json", registerSchema), async (c) => {
   const { email, password, fullName, workspaceName } = c.req.valid("json");
 
   const supabase = createClient(
     env.SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY,
   );
-
-  // Check for orphaned user (exists in Supabase Auth but NOT in our DB)
-  const { data: { users: existingAuthUsers } } = await supabase.auth.admin.listUsers();
-  const orphanedUser = existingAuthUsers.find(u => u.email === email);
-
-  if (orphanedUser) {
-    const [dbUser] = await db.select().from(users).where(eq(users.authUid, orphanedUser.id)).limit(1);
-    if (!dbUser) {
-      console.log(`[Auth] Detected orphaned Supabase user ${email}. Cleaning up for re-registration.`);
-      await supabase.auth.admin.deleteUser(orphanedUser.id);
-    } else {
-      throw new ValidationError("A user with this email address has already been registered");
-    }
-  }
 
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
@@ -49,6 +36,12 @@ authRouter.post("/register", zValidator("json", registerSchema), async (c) => {
   });
 
   if (authError) {
+    if (
+      authError.message?.toLowerCase().includes("already registered") ||
+      authError.message?.toLowerCase().includes("already exists")
+    ) {
+      throw new ValidationError("An account with this email already exists");
+    }
     throw new ValidationError(authError.message);
   }
 
@@ -92,7 +85,7 @@ authRouter.post("/register", zValidator("json", registerSchema), async (c) => {
   }
 });
 
-authRouter.post("/login", zValidator("json", loginSchema), async (c) => {
+authRouter.post("/login", rateLimiter(5, 60 * 1000), zValidator("json", loginSchema), async (c) => {
   const { email, password } = c.req.valid("json");
 
   const supabase = createClient(

@@ -19,9 +19,10 @@ import {
   isNull,
   sql,
 } from "@novabots/db";
-import type { ClauseType } from "@novabots/db";
+import type { ClauseType, SowStatus } from "@novabots/db";
 import { dispatchScopeFlagAlertJob } from "../jobs/scope-flag-alert.job.js";
 import { dispatchClarificationEmail } from "../services/clarification-email.service.js";
+import { computeSlaDeadline } from "../services/scope-flag.service.js";
 
 // ---------------------------------------------------------------------------
 // Middleware — shared-secret validation
@@ -93,6 +94,20 @@ const changeOrderGeneratedSchema = z.object({
     subtotalCents: z.number(),
   })).optional().default([]),
   totalAmountCents: z.number().default(0),
+  // New fields: persisted so acceptWithFullTransaction can consume them
+  scopeItemsJson: z.array(z.object({
+    clauseType: z.string(),
+    originalText: z.string(),
+    summary: z.string().optional().nullable(),
+    sortOrder: z.number().int().optional(),
+  })).optional().default([]),
+  pricingJson: z.object({
+    subtotalCents: z.number().optional(),
+    taxCents: z.number().optional(),
+    totalCents: z.number().optional(),
+    currency: z.string().optional(),
+    lineItemCount: z.number().int().optional(),
+  }).optional().nullable(),
 });
 
 const briefScoredSchema = z.object({
@@ -171,10 +186,10 @@ aiCallbackRouter.post("/sow-parsed", zValidator("json", sowParsedSchema), async 
       );
     }
 
-    // Mark SOW as parsed
+    // Mark SOW as parsed and transition status: draft → parsed
     await trx
       .update(statementsOfWork)
-      .set({ parsedAt: new Date(), updatedAt: new Date() })
+      .set({ status: "parsed" as SowStatus, parsedAt: new Date(), updatedAt: new Date() })
       .where(eq(statementsOfWork.id, payload.sowId));
 
     // Audit log
@@ -185,7 +200,7 @@ aiCallbackRouter.post("/sow-parsed", zValidator("json", sowParsedSchema), async 
       entityType: "statement_of_work",
       entityId: payload.sowId,
       action: "update",
-      metadata: { action: "ai_parse_complete", clauseCount: payload.clauses.length, jobId: payload.jobId },
+      metadata: { action: "ai_parse_complete", clauseCount: payload.clauses.length, jobId: payload.jobId, status: "parsed" },
     });
 
     return { clauseCount: payload.clauses.length };
@@ -222,6 +237,8 @@ aiCallbackRouter.post("/scope-checked", zValidator("json", scopeCheckedSchema), 
     return c.json({ error: "Project not found", projectId: payload.projectId }, 404);
   }
 
+  const slaDeadline = await computeSlaDeadline(project.workspaceId);
+
   const result = await db.transaction(async (trx) => {
     let flagId: string | null = null;
 
@@ -251,6 +268,8 @@ aiCallbackRouter.post("/scope-checked", zValidator("json", scopeCheckedSchema), 
             matched_clause_id: payload.matchedClauseId,
             message_id: payload.messageId,
           },
+          slaDeadline,
+          slaBreached: false,
         })
         .returning();
 
@@ -338,7 +357,22 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
   }
 
   const result = await db.transaction(async (trx) => {
-    // Insert change order
+    // Build pricing object: prefer worker-supplied pricingJson, fall back to totalAmountCents
+    const pricingValue = payload.pricingJson
+      ? {
+          subtotal_cents: payload.pricingJson.subtotalCents ?? payload.totalAmountCents,
+          tax_cents: payload.pricingJson.taxCents ?? 0,
+          total_cents: payload.pricingJson.totalCents ?? payload.totalAmountCents,
+          currency: payload.pricingJson.currency ?? "USD",
+          line_item_count: payload.pricingJson.lineItemCount ?? payload.lineItems.length,
+        }
+      : payload.totalAmountCents > 0
+        ? { total_cents: payload.totalAmountCents, currency: "USD" }
+        : null;
+
+    // Insert change order — scopeItemsJson is persisted here so that
+    // changeOrderService.acceptWithFullTransaction() can read it and insert
+    // new SOW clauses when the client accepts the change order.
     await trx.insert(changeOrders).values({
       id: payload.changeOrderId,
       workspaceId: flag.workspaceId,
@@ -347,7 +381,7 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
       title: payload.title,
       workDescription: payload.description ?? null,
       estimatedHours: payload.estimatedHours ?? null,
-      pricing: payload.totalAmountCents > 0 ? { amount: payload.totalAmountCents } : null,
+      pricing: pricingValue,
       currency: "USD",
       status: "draft",
       lineItemsJson: payload.lineItems.map(item => ({
@@ -358,6 +392,9 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
         rate_in_cents: item.rateInCents,
         subtotal_cents: item.subtotalCents,
       })),
+      // scopeItemsJson stores the AI-generated SOW clause objects so that
+      // acceptWithFullTransaction can append them to the project SOW on acceptance.
+      scopeItemsJson: payload.scopeItemsJson.length > 0 ? payload.scopeItemsJson : [],
     });
 
     // Update scope flag status
@@ -366,7 +403,7 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
       .set({ status: "change_order_sent", updatedAt: new Date() })
       .where(eq(scopeFlags.id, payload.scopeFlagId));
 
-    // Audit log
+    // Audit log — must be in the same transaction as the INSERT
     await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
       workspaceId: flag.workspaceId,
       actorId: null,
@@ -378,6 +415,7 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
         action: "ai_change_order_generated",
         title: payload.title,
         totalAmountCents: payload.totalAmountCents,
+        scopeItemCount: payload.scopeItemsJson.length,
         scopeFlagId: payload.scopeFlagId,
         jobId: payload.jobId,
       },

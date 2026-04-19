@@ -1,15 +1,44 @@
-export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
+import { ReducedMotionProvider } from "@/animations/context/ReducedMotionProvider";
+
+/**
+ * Onboarding layout — full-screen, no sidebar, no external chrome.
+ * The OnboardingShell itself renders the header/progress/footer.
+ * Background uses the ScopeIQ "natural paper" tone from CSS variables.
+ */
+export default function OnboardingLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
     return (
-        <div className="flex min-h-screen items-center justify-center bg-[rgb(var(--surface-subtle))]">
-            <div className="w-full max-w-2xl px-4 py-12">
-                <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-bold text-primary">ScopeIQ</h1>
-                    <p className="mt-2 text-sm text-[rgb(var(--text-muted))]">
-                        Let&apos;s get your workspace set up
-                    </p>
+        <ReducedMotionProvider>
+            <div
+                className="onboarding-root"
+                style={{
+                    minHeight: "100svh",
+                    background:
+                        "radial-gradient(ellipse 120% 80% at 50% -10%, rgba(15,110,86,0.08) 0%, transparent 60%), rgb(var(--surface-subtle, 247 249 251))",
+                    position: "relative",
+                    overflow: "hidden",
+                }}
+            >
+                {/* Subtle grid texture overlay */}
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        backgroundImage:
+                            "radial-gradient(circle, rgba(15,110,86,0.04) 1px, transparent 1px)",
+                        backgroundSize: "32px 32px",
+                        pointerEvents: "none",
+                        zIndex: 0,
+                    }}
+                />
+                <div style={{ position: "relative", zIndex: 1 }}>
+                    {children}
                 </div>
-                {children}
             </div>
-        </div>
+        </ReducedMotionProvider>
     );
 }

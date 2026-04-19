@@ -62,3 +62,14 @@ export const listFeedbackQuerySchema = z.object({
 export const resolveFeedbackSchema = z.object({
   resolved: z.boolean(),
 });
+
+export const submitNpsSchema = z.object({
+  score: z.number().int().min(0).max(10),
+  comment: z.string().max(2000).optional(),
+  surface: z.string().max(100).optional(),
+});
+
+export const npsResponseSchema = z.object({
+  ok: z.literal(true),
+  category: z.enum(["promoter", "passive", "detractor"]),
+});

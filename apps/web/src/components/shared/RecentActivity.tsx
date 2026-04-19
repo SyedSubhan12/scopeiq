@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef, useEffect } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import {
   Clock,
@@ -95,7 +97,26 @@ interface RecentActivityProps {
 }
 
 export function RecentActivity({ activities }: RecentActivityProps) {
+  const listRef = useRef<HTMLDivElement>(null);
   const displayActivities = activities.slice(0, 8);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const items = el.querySelectorAll("[data-activity-item]");
+    if (!items.length) return;
+    void import("animejs").then((mod) => {
+      const anime = (mod as { default: (p: unknown) => void }).default;
+      anime({
+        targets: items,
+        opacity: [0, 1],
+        translateX: [-12, 0],
+        duration: 280,
+        delay: (anime as any).stagger(35),
+        easing: "easeOutQuad",
+      });
+    });
+  }, [activities]);
 
   if (displayActivities.length === 0) {
     return (
@@ -119,7 +140,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
           Recent Activity
         </h3>
       </div>
-      <div className="divide-y divide-[rgb(var(--border-subtle))]">
+      <div ref={listRef} className="divide-y divide-[rgb(var(--border-subtle))]">
         {displayActivities.map((entry, index) => {
           const ActionIcon = getActionIcon(entry.action);
           const EntityIcon = getEntityIcon(entry.entityType);
@@ -129,12 +150,18 @@ export function RecentActivity({ activities }: RecentActivityProps) {
             <Link
               key={entry.id}
               href={link}
+              data-activity-item
               className="flex items-start gap-3 px-5 py-3 hover:bg-[rgb(var(--surface-subtle))] transition-colors"
             >
               <div className="relative mt-0.5 flex-shrink-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--surface-subtle))] border border-[rgb(var(--border-subtle))]">
+                <motion.div
+                  initial={false}
+                  whileHover={{ scale: 1.15 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--surface-subtle))] border border-[rgb(var(--border-subtle))]"
+                >
                   <ActionIcon className="h-3.5 w-3.5 text-[rgb(var(--text-muted))]" />
-                </div>
+                </motion.div>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-[rgb(var(--text-primary))] line-clamp-2">

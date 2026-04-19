@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { cors } from "hono/cors";
 import { logger } from "./middleware/logger.js";
 import { errorHandler } from "./middleware/error.js";
+import { corsConfig } from "./lib/cors.js";
 import { healthRouter } from "./routes/health.route.js";
 import { authRouter } from "./routes/auth.route.js";
 import { workspaceRouter } from "./routes/workspace.route.js";
@@ -35,16 +35,23 @@ import webhookStripe from "./routes/webhook-stripe.route.js";
 import { resendWebhookRouter } from "./routes/resend-webhook.route.js";
 import { env } from "./lib/env.js";
 import { scheduleHourlyReminders } from "./jobs/send-reminder.job.js";
+import { startReminderWorker } from "./services/reminder.service.js";
 import { startScopeFlagAlertWorker } from "./services/scope-flag-alert.service.js";
 import { startBriefScoringWorker } from "./services/brief-scoring-worker.service.js";
 import { startClarificationEmailWorker } from "./services/clarification-email.service.js";
+import { startDomainVerificationWorker } from "./jobs/verify-domain.job.js";
+import { startSlaBreachWorker, scheduleSlaBreachSweep } from "./jobs/scope-flag-sla.job.js";
+import { briefEmbedRouter } from "./routes/brief-embed.route.js";
+import { oembedRouter } from "./routes/oembed.route.js";
+import { publicBriefEmbedRouter } from "./routes/public-brief-embed.route.js";
 import { ensureBucketExists } from "./lib/storage.js";
+import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
 
 const app = new Hono();
 
 // Middleware
 app.use("*", logger());
-app.use("*", cors({ origin: "*" })); // Configure for production later
+app.use("*", corsConfig);
 app.onError(errorHandler);
 
 // Routes
@@ -72,8 +79,13 @@ v1.route("/ai", aiRouter);
 v1.route("/billing", billingRouter);
 v1.route("/dashboard", dashboardRouter);
 v1.route("/sow", sowRouter);
+v1.route("/brief-embeds", briefEmbedRouter);
+v1.route("/oembed", oembedRouter);
 
 app.route("/v1", v1);
+
+// Public embed endpoints (open CORS, rate-limited)
+app.route("/public/brief-embed", publicBriefEmbedRouter);
 
 // Public Stripe webhook (outside /v1, no auth)
 app.route("/webhooks/stripe", webhookStripe);
@@ -84,10 +96,10 @@ app.route("/webhooks/resend", resendWebhookRouter);
 // Public routes (outside /v1)
 app.route("/briefs/submit", briefSubmitRouter);
 
-// AI callback routes (secret-authenticated, no user auth)
-app.route("/api/ai-callback", aiCallbackRouter);
-
-// Portal routes (token-authenticated)
+// Portal routes (token-authenticated, rate-limited)
+app.use("/portal/*", portalRateLimiter);
+app.route("/portal", portalRouter);
+app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/session", portalSessionRouter);
 app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/change-orders", portalChangeOrderRouter);
@@ -96,8 +108,7 @@ app.route("/portal", portalRouter);
 // Email approval links (HMAC-token authenticated, public)
 app.route("/api/portal/email-approve", emailApprovalRouter);
 
-// Public invite acceptance (outside /v1)
-app.route("/invites", inviteRouter);
+// Note: invite acceptance (POST /accept) is handled within /v1/invites — no separate mount needed.
 
 const port = Number(env.PORT) || 4000;
 console.log(`Server is running on port ${port}`);
@@ -112,18 +123,30 @@ ensureBucketExists().catch((err) => {
     console.error("[Startup] Failed to ensure storage bucket exists:", err);
 });
 
+// Start BullMQ worker that processes per-deliverable reminder steps and auto-approvals
+startReminderWorker();
+
 // Register hourly reminder cron after server starts
 scheduleHourlyReminders().catch((err) => {
     console.error("[Startup] Failed to schedule reminders:", err);
 });
 
-// Start scope flag alert worker (processes delayed 2-hour email fallback jobs)
+// Start scope flag alert worker (delayed 2-hour email fallback)
 startScopeFlagAlertWorker();
 
-// Start brief scoring worker (processes AI scoring jobs from brief-scoring queue)
+// Start brief scoring worker (BullMQ AI gateway, Rule 3)
 startBriefScoringWorker();
 
-// Start clarification email worker (sends clarification request emails to clients)
+// Start clarification email worker
 startClarificationEmailWorker();
+
+// Start domain verification polling worker (DNS TXT check w/ backoff)
+startDomainVerificationWorker();
+
+// Start SLA breach sweep worker + register 15-min repeating cron
+startSlaBreachWorker();
+scheduleSlaBreachSweep().catch((err) => {
+    console.error("[Startup] Failed to schedule SLA breach sweep:", err);
+});
 
 export default app;

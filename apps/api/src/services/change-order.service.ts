@@ -1,17 +1,13 @@
 import { changeOrderRepository } from "../repositories/change-order.repository.js";
 import { NotFoundError } from "@novabots/types";
-import {
-  db,
-  writeAuditLog,
-  changeOrders,
-  scopeFlags,
-  sowClauses,
-  deliverables,
-  projects,
-  eq,
-  and,
-} from "@novabots/db";
+import { db, writeAuditLog, projects, sowClauses, deliverables, scopeFlags, eq, and } from "@novabots/db";
 import type { ChangeOrder, ClauseType } from "@novabots/db";
+import { sendEmail } from "../lib/email.js";
+import { ChangeOrderSentEmail } from "../emails/index.js";
+import { ChangeOrderAcceptedEmail } from "../emails/index.js";
+import React from "react";
+import { generateSignedCoPdf } from "../lib/change-order-pdf.js";
+import { putBytes, getDownloadUrl } from "../lib/storage.js";
 
 export const changeOrderService = {
     async list(workspaceId: string, projectId?: string) {
@@ -84,52 +80,76 @@ export const changeOrderService = {
         workspaceId: string;
         projectId: string;
         signatureName: string;
+        signerIp: string;
         revisionLimitAdjustment?: {
             deliverableId: string;
             newMaxRevisions: number;
         };
     }) {
-        const { changeOrderId, workspaceId, projectId, signatureName, revisionLimitAdjustment } = input;
+        const { changeOrderId, workspaceId, projectId, signatureName, signerIp, revisionLimitAdjustment } = input;
 
         // Fetch the change order first to get current state
         const co = await changeOrderRepository.getById(workspaceId, changeOrderId);
         if (!co) throw new NotFoundError("ChangeOrder", changeOrderId);
         if (co.projectId !== projectId) throw new NotFoundError("ChangeOrder", changeOrderId);
-        if (co.status !== "sent") {
+
+        // Idempotency: if already accepted and PDF already generated, return early
+        if (co.status === "accepted" && co.signedPdfKey != null) {
+            return co;
+        }
+
+        if (co.status !== "sent" && co.status !== "accepted") {
             throw new Error("Change order is not in a state that can be accepted");
         }
 
+        // Fetch project for PDF metadata (outside tx — read-only)
+        const [projectRow] = await db
+            .select({ id: projects.id, sowId: projects.sowId, name: projects.name })
+            .from(projects)
+            .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)));
+
+        if (!projectRow) throw new NotFoundError("Project", projectId);
+
+        // Generate signed PDF before opening the transaction (pure CPU work)
+        const signedAt = new Date();
+        const { bytes: pdfBytes, hash: pdfHash } = await generateSignedCoPdf(
+            {
+                id: co.id,
+                title: co.title,
+                workDescription: co.workDescription,
+                revisedTimeline: co.revisedTimeline,
+                estimatedHours: co.estimatedHours,
+                pricing: co.pricing as Record<string, unknown> | null,
+            },
+            { name: signatureName, ip: signerIp, signedAt },
+            { id: projectRow.id, title: projectRow.name },
+        );
+
+        const pdfKey = `workspaces/${workspaceId}/change-orders/${changeOrderId}/signed-${signedAt.getTime()}.pdf`;
+
+        // Upload PDF to object storage before the DB transaction
+        await putBytes(pdfKey, pdfBytes, "application/pdf");
+
         return db.transaction(async (trx) => {
-            // Step 1: Update change order with acceptance data
+            // Step 1: Update change order with acceptance data + artifact pointers
             const updated = await changeOrderRepository.update(
                 workspaceId,
                 changeOrderId,
                 {
                     status: "accepted",
-                    signedAt: new Date(),
+                    signedAt,
                     signedByName: signatureName,
-                    respondedAt: new Date(),
+                    signedByIp: signerIp,
+                    signedPdfKey: pdfKey,
+                    signedPdfHash: pdfHash,
+                    respondedAt: signedAt,
                 },
                 trx as never,
             );
             if (!updated) throw new NotFoundError("ChangeOrder", changeOrderId);
 
-            // Step 2: Fetch the project to get SOW ID
-            const [project] = await trx
-                .select({ id: projects.id, sowId: projects.sowId })
-                .from(projects)
-                .where(
-                    and(
-                        eq(projects.id, projectId),
-                        eq(projects.workspaceId, workspaceId),
-                    ),
-                );
-
-            if (!project) {
-                throw new NotFoundError("Project", projectId);
-            }
-
-            // Step 3: Insert SOW clauses from scopeItemsJson if present
+            // Step 2: Insert SOW clauses from scopeItemsJson if present
+            // projectRow was already fetched above (with name for PDF)
             const coWithScopeItems = co as ChangeOrder;
             const scopeItems = coWithScopeItems.scopeItemsJson as Array<{
                 clauseType: ClauseType;
@@ -138,8 +158,8 @@ export const changeOrderService = {
                 sortOrder?: number;
             }> | null | undefined;
 
-            if (scopeItems && scopeItems.length > 0 && project.sowId) {
-                const sowId = project.sowId; // Narrow to string for TypeScript
+            if (scopeItems && scopeItems.length > 0 && projectRow.sowId) {
+                const sowId = projectRow.sowId; // Narrow to string for TypeScript
                 await trx.insert(sowClauses).values(
                     scopeItems.map((item, index) => ({
                         sowId,
@@ -196,6 +216,9 @@ export const changeOrderService = {
                     oldStatus: co.status,
                     newStatus: "accepted",
                     signedByName: signatureName,
+                    signedByIp: signerIp,
+                    signedPdfKey: pdfKey,
+                    signedPdfHash: pdfHash,
                     scopeItemsCount: scopeItems?.length ?? 0,
                     revisionLimitAdjusted: !!revisionLimitAdjustment,
                     scopeFlagResolved: !!co.scopeFlagId,
@@ -214,9 +237,11 @@ export const changeOrderService = {
             title?: string | undefined;
             description?: string | undefined;
             amount?: number | undefined;
-            lineItemsJson?: Array<{ id?: string | undefined; description: string; hours: number; rate: number }> | undefined;
-            revisedTimeline?: string | undefined;
             status?: string | undefined;
+            clientEmail?: string | undefined;
+            clientName?: string | undefined;
+            lineItemsJson?: Array<{ hours: number; [key: string]: unknown }> | undefined;
+            revisedTimeline?: string | undefined;
         },
     ) {
         const co = await changeOrderRepository.getById(workspaceId, id);
@@ -243,9 +268,9 @@ export const changeOrderService = {
 
         const action = data.status === "sent" ? "send" : "update";
 
-        return db.transaction(async (trx) => {
-            const updated = await changeOrderRepository.update(workspaceId, id, updateData, trx as never);
-            if (!updated) throw new NotFoundError("ChangeOrder", id);
+        const updated = await db.transaction(async (trx) => {
+            const result = await changeOrderRepository.update(workspaceId, id, updateData, trx as never);
+            if (!result) throw new NotFoundError("ChangeOrder", id);
 
             await writeAuditLog(trx as never, {
                 workspaceId,
@@ -256,8 +281,57 @@ export const changeOrderService = {
                 metadata: { oldStatus, newStatus: data.status ?? oldStatus },
             });
 
-            return updated;
+            return result;
         });
+
+        if (data.status === "sent" && data.clientEmail) {
+            const pricingAmount = (updated.pricing as Record<string, unknown> | null)?.amount;
+            sendEmail({
+                to: data.clientEmail,
+                subject: `Change Order: ${updated.title}`,
+                react: React.createElement(ChangeOrderSentEmail, {
+                    recipientName: data.clientName ?? "Client",
+                    clientName: data.clientName ?? "Client",
+                    changeOrderTitle: updated.title,
+                    description: updated.workDescription ?? "",
+                    pricing: pricingAmount != null ? `$${pricingAmount}` : "TBD",
+                    status: "Sent",
+                    viewChangeOrderUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/change-orders/${id}`,
+                }),
+            }).catch((err) =>
+                console.error("[ChangeOrderService] Failed to send ChangeOrderSentEmail:", err),
+            );
+        }
+
+        if (data.status === "accepted" && data.clientEmail) {
+            const pricingAmount = (updated.pricing as Record<string, unknown> | null)?.amount;
+            sendEmail({
+                to: data.clientEmail,
+                subject: `Change Order Accepted: ${updated.title}`,
+                react: React.createElement(ChangeOrderAcceptedEmail, {
+                    recipientName: data.clientName ?? "Client",
+                    clientName: data.clientName ?? "Client",
+                    changeOrderTitle: updated.title,
+                    description: updated.workDescription ?? "",
+                    pricing: pricingAmount != null ? `$${pricingAmount}` : "TBD",
+                    viewSowUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/projects/${updated.projectId}/sow`,
+                }),
+            }).catch((err) =>
+                console.error("[ChangeOrderService] Failed to send ChangeOrderAcceptedEmail:", err),
+            );
+        }
+
+        return updated;
+    },
+
+    async getSignedPdfUrl(workspaceId: string, id: string): Promise<{ url: string; hash: string }> {
+        const co = await changeOrderRepository.getById(workspaceId, id);
+        if (!co) throw new NotFoundError("ChangeOrder", id);
+        if (co.signedPdfKey == null || co.signedPdfHash == null) {
+            throw new NotFoundError("SignedPdf", id);
+        }
+        const url = await getDownloadUrl(co.signedPdfKey, 3600);
+        return { url, hash: co.signedPdfHash };
     },
 
     async countPending(workspaceId: string) {

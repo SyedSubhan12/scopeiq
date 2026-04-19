@@ -7,12 +7,13 @@ import {
 } from "lucide-react";
 import { Card, Badge, Button, Dialog, Textarea, useToast } from "@novabots/ui";
 import { useUpdateScopeFlag } from "@/hooks/useScopeFlags";
-import { useCreateChangeOrder } from "@/hooks/change-orders";
+import type { ScopeFlag } from "@/hooks/useScopeFlags";
+import { useCreateChangeOrder } from "@/hooks/useChangeOrders";
 import { cn } from "@novabots/ui";
 import { formatDistanceToNow, format } from "date-fns";
 
 interface ScopeFlagDetailProps {
-  flag: any;
+  flag: ScopeFlag;
   open: boolean;
   onClose: () => void;
   projectId: string;
@@ -63,10 +64,12 @@ export function ScopeFlagDetail({ flag, open, onClose, projectId }: ScopeFlagDet
 
   const cfg = getSeverityDetailConfig(flag.severity)!;
   const Icon = cfg.Icon;
-  const confidence = flag.metadata?.confidence
-    ? Math.round(flag.metadata.confidence * 100)
-    : flag.evidence?.confidence
-      ? Math.round(flag.evidence.confidence * 100)
+  const metaConfidence = typeof flag.metadata?.confidence === "number" ? flag.metadata.confidence : null;
+  const evidenceConfidence = typeof flag.evidence?.confidence === "number" ? flag.evidence.confidence : null;
+  const confidence = metaConfidence != null
+    ? Math.round(metaConfidence * 100)
+    : evidenceConfidence != null
+      ? Math.round(evidenceConfidence * 100)
       : null;
 
   const handleConfirm = async () => {
@@ -115,7 +118,7 @@ export function ScopeFlagDetail({ flag, open, onClose, projectId }: ScopeFlagDet
         projectId,
         scopeFlagId: flag.id,
         title: flag.title || "Scope Change Request",
-        description: flag.description ?? undefined,
+        ...(flag.description ? { description: flag.description } : {}),
       });
       await updateFlag.mutateAsync({ status: "change_order_sent" });
       toast("success", "Change order created from flag");
@@ -168,9 +171,9 @@ export function ScopeFlagDetail({ flag, open, onClose, projectId }: ScopeFlagDet
               <p className="mt-1 text-xs text-[rgb(var(--text-secondary))]">
                 Clause ID: {flag.sowClauseId.slice(0, 8)}...
               </p>
-              {flag.evidence?.clauseText && (
+              {typeof flag.evidence?.clauseText === "string" && (
                 <p className="mt-1 text-xs italic text-[rgb(var(--text-muted))]">
-                  "{flag.evidence.clauseText}"
+                  &quot;{flag.evidence.clauseText}&quot;
                 </p>
               )}
             </div>

@@ -64,25 +64,22 @@ async def process_summarize_feedback(job, token):
             task_count=len(result.tasks),
         )
 
-        # POST results to the API callback instead of writing directly to DB
-        callback_payload = {
-            "jobId": job.id,
-            "deliverableId": deliverable_id,
-            "tasks": [
-                {
-                    "action": t.action,
-                    "impact": t.impact,
-                    "sourcePin": t.source_pin,
-                    "contradiction": t.contradiction,
-                    "conflictExplanation": t.conflict_explanation,
-                }
-                for t in result.tasks
-            ],
-            "overallNotes": result.overall_notes,
-            "taskCount": len(result.tasks),
-        }
-
-        response = await post_callback("/api/ai-callback/feedback-summarized", callback_payload)
+        # Store summary result in database — update deliverable with AI summary
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE deliverables
+                SET ai_feedback_summary = $1,
+                    updated_at = NOW()
+                WHERE id = $2
+                """,
+                json.dumps({
+                    "tasks": [t.model_dump() for t in result.tasks],
+                    "overall_notes": result.overall_notes,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                }),
+                deliverable_id,
+            )
 
         return {
             "deliverable_id": deliverable_id,
@@ -111,5 +108,4 @@ def start_worker():
 
 
 if __name__ == "__main__":
-    worker = start_worker()
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(start_worker())

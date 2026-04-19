@@ -9,6 +9,7 @@ interface FeedbackPanelProps {
   deliverableId: string;
   pins: FeedbackItem[];
   activePinId?: string | null;
+  onActivePinChange?: (id: string | null) => void;
   onClose: () => void;
   createMutation: {
     mutateAsync: (data: { body: string; annotationJson?: FeedbackItem["annotationJson"] }) => Promise<unknown>;
@@ -149,6 +150,7 @@ export function FeedbackPanel({
   deliverableId,
   pins,
   activePinId,
+  onActivePinChange,
   onClose,
   createMutation,
   resolveMutation,
@@ -236,8 +238,12 @@ export function FeedbackPanel({
               return (
                 <div
                   key={pin.id}
+                  onMouseEnter={() => onActivePinChange?.(pin.id)}
+                  onMouseLeave={() => onActivePinChange?.(null)}
                   className={`transition-colors ${
-                    activePinId === pin.id ? "bg-primary/5" : "hover:bg-[rgb(var(--surface-subtle))]"
+                    activePinId === pin.id
+                      ? "border-l-2 border-[#1D9E75] bg-[#1D9E75]/5"
+                      : "border-l-2 border-transparent hover:bg-[rgb(var(--surface-subtle))]"
                   }`}
                 >
                   <FeedbackPin

@@ -1,5 +1,5 @@
-import { HomePageClient } from "@/components/landing/HomePageClient";
+import { BillWhatYouBuiltLanding } from "@/components/landing/v3/BillWhatYouBuiltLanding";
 
 export default function HomePage() {
-  return <HomePageClient />;
+  return <BillWhatYouBuiltLanding />;
 }

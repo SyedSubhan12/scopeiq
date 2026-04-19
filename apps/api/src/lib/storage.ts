@@ -6,6 +6,25 @@ import {
   HeadBucketCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { ValidationError } from "@novabots/types";
+
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+  "video/mp4", "video/quicktime", "video/webm",
+  "application/zip",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain",
+]);
+
+export function validateMimeType(contentType: string): void {
+  if (!ALLOWED_MIME_TYPES.has(contentType)) {
+    throw new ValidationError(`File type '${contentType}' is not permitted`);
+  }
+}
 
 const s3 = new S3Client({
   region: "us-east-1",
@@ -57,7 +76,7 @@ export async function ensureBucketExists(): Promise<void> {
 export async function getUploadUrl(
   key: string,
   contentType: string,
-  expiresIn = 3600,
+  expiresIn = 900,
 ): Promise<string> {
   const command = new PutObjectCommand({
     Bucket: bucket,
@@ -72,6 +91,25 @@ export async function getUploadUrl(
     // and responds with 404.
     unhoistableHeaders: new Set(["x-amz-checksum-crc32", "x-amz-sdk-checksum-algorithm"]),
   });
+}
+
+/**
+ * Upload raw bytes directly from the server (e.g. server-generated PDFs).
+ * Use presigned URLs only for client-initiated uploads per Rule 5.
+ */
+export async function putBytes(
+  key: string,
+  body: Uint8Array,
+  contentType: string,
+): Promise<void> {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
 }
 
 export async function getDownloadUrl(key: string, expiresIn = 3600): Promise<string> {

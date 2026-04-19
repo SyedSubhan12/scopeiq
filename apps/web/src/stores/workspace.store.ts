@@ -76,8 +76,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 loading: false,
             });
 
-            // Set cookie for middleware to read
-            document.cookie = `x-onboarded=${isOnboarded ? "1" : "0"}; path=/; SameSite=Lax; Secure`;
+            if (typeof document !== "undefined") {
+                const secure =
+                    typeof window !== "undefined" && window.location.protocol === "https:";
+                const secureAttr = secure ? "; Secure" : "";
+                document.cookie = `x-onboarded=${isOnboarded ? "1" : "0"}; path=/; SameSite=Lax${secureAttr}`;
+            }
         } catch (error) {
             console.error("Failed to hydrate workspace:", error);
             set({ loading: false, hydrated: true });

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { deliverableService } from "../services/deliverable.service.js";
 import { feedbackService } from "../services/feedback.service.js";
@@ -12,6 +13,7 @@ import {
   confirmUploadSchema,
   deliverableResponseSchema,
   deliverableDeleteResponseSchema,
+  approvalEventResponseSchema,
 } from "./deliverable.schemas.js";
 import { submitFeedbackSchema, feedbackResponseSchema } from "./feedback.schemas.js";
 
@@ -126,23 +128,52 @@ deliverableRouter.get("/:id/feedback", async (c) => {
   return c.json({ data: items });
 });
 
-deliverableRouter.post(
-  "/:id/feedback",
-  zValidator("json", submitFeedbackSchema.omit({ deliverableId: true })),
+deliverableRouter.post("/:id/feedback", async (c) => {
+  const userId = c.get("userId");
+  const workspaceId = c.get("workspaceId");
+  const deliverableId = c.req.param("id");
+  const body = await c.req.json();
+  const item = await feedbackService.submit({
+    workspaceId,
+    deliverableId,
+    body: body.body,
+    annotationJson: body.annotationJson,
+    authorId: userId,
+    source: "manual_input",
+  });
+  return c.json({ data: item }, 201);
+});
+
+const approveBodySchema = z.object({
+  comment: z.string().optional(),
+});
+
+const rejectBodySchema = z.object({
+  comment: z.string().min(1),
+});
+
+deliverableRouter.patch(
+  "/:id/approve",
+  zValidator("json", approveBodySchema),
   async (c) => {
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
-    const deliverableId = c.req.param("id");
-    const body = c.req.valid("json");
-    const item = await feedbackService.submit({
-      workspaceId,
-      deliverableId,
-      body: body.body,
-      annotationJson: body.annotationJson,
-      authorId: userId,
-      source: "manual_input",
-      pageNumber: body.pageNumber,
-    });
-    return c.json(feedbackResponseSchema.parse({ data: item }), 201);
+    const id = c.req.param("id");
+    const { comment } = c.req.valid("json");
+    const result = await deliverableService.approve(workspaceId, id, userId, null, comment);
+    return c.json(approvalEventResponseSchema.parse({ data: result }));
+  },
+);
+
+deliverableRouter.patch(
+  "/:id/reject",
+  zValidator("json", rejectBodySchema),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const id = c.req.param("id");
+    const { comment } = c.req.valid("json");
+    const result = await deliverableService.requestRevision(workspaceId, id, userId, null, comment);
+    return c.json(approvalEventResponseSchema.parse({ data: result }));
   },
 );

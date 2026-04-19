@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, Save, Clock } from "lucide-react";
 import {
   Card,
@@ -10,6 +10,9 @@ import {
   Button,
   useToast,
 } from "@novabots/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { fetchWithAuth } from "@/lib/api";
 
 interface ReminderStep {
   label: string;
@@ -48,25 +51,14 @@ interface ReminderConfig {
   autoApproveOnSilence: boolean;
 }
 
-function loadFromStorage(): ReminderConfig | null {
-  try {
-    const raw = localStorage.getItem("scopeiq-reminder-settings");
-    if (raw) {
-      return JSON.parse(raw) as ReminderConfig;
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-function saveToStorage(config: ReminderConfig) {
-  try {
-    localStorage.setItem("scopeiq-reminder-settings", JSON.stringify(config));
-  } catch {
-    // ignore
-  }
-}
+const DEFAULT_CONFIG = {
+  steps: [{ hours: 48 }, { hours: 96 }, { hours: 168 }] as [
+    { hours: number },
+    { hours: number },
+    { hours: number },
+  ],
+  autoApproveOnSilence: true,
+} as const;
 
 function formatDuration(hours: number): string {
   if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""}`;
@@ -78,19 +70,48 @@ function formatDuration(hours: number): string {
 
 export default function RemindersSettingsPage() {
   const { toast } = useToast();
-  const saved = loadFromStorage();
+  const queryClient = useQueryClient();
+  const { data: workspaceData, isLoading } = useWorkspace();
 
-  const initialSteps =
-    saved?.steps.map((s) => s.hours) ?? [48, 96, 168];
-  const initialAutoApprove = saved?.autoApproveOnSilence ?? true;
+  const reminderSettings: ReminderConfig =
+    (workspaceData?.data?.reminderSettings as ReminderConfig | undefined) ?? DEFAULT_CONFIG;
 
   const [steps, setSteps] = useState<[number, number, number]>([
-    initialSteps[0] ?? 48,
-    initialSteps[1] ?? 96,
-    initialSteps[2] ?? 168,
+    reminderSettings.steps[0]?.hours ?? DEFAULT_CONFIG.steps[0].hours,
+    reminderSettings.steps[1]?.hours ?? DEFAULT_CONFIG.steps[1].hours,
+    reminderSettings.steps[2]?.hours ?? DEFAULT_CONFIG.steps[2].hours,
   ]);
-  const [autoApprove, setAutoApprove] = useState(initialAutoApprove);
-  const [saving, setSaving] = useState(false);
+  const [autoApprove, setAutoApprove] = useState(
+    reminderSettings.autoApproveOnSilence ?? DEFAULT_CONFIG.autoApproveOnSilence,
+  );
+
+  // Sync state when workspace data loads
+  useEffect(() => {
+    if (workspaceData?.data?.reminderSettings) {
+      const settings = workspaceData.data.reminderSettings as ReminderConfig;
+      setSteps([
+        settings.steps[0]?.hours ?? DEFAULT_CONFIG.steps[0].hours,
+        settings.steps[1]?.hours ?? DEFAULT_CONFIG.steps[1].hours,
+        settings.steps[2]?.hours ?? DEFAULT_CONFIG.steps[2].hours,
+      ]);
+      setAutoApprove(settings.autoApproveOnSilence ?? DEFAULT_CONFIG.autoApproveOnSilence);
+    }
+  }, [workspaceData]);
+
+  const updateReminderSettings = useMutation({
+    mutationFn: (settings: ReminderConfig) =>
+      fetchWithAuth("/v1/workspaces/me", {
+        method: "PATCH",
+        body: JSON.stringify({ reminderSettings: settings }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      toast("success", "Reminder settings saved");
+    },
+    onError: () => {
+      toast("error", "Failed to save settings");
+    },
+  });
 
   const updateStep = (index: number, value: number) => {
     const stepConfig = REMINDER_STEPS[index];
@@ -104,21 +125,25 @@ export default function RemindersSettingsPage() {
     setSteps(updated);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const config: ReminderConfig = {
-        steps: steps.map((h) => ({ hours: h })),
-        autoApproveOnSilence: autoApprove,
-      };
-      saveToStorage(config);
-      toast("success", "Reminder settings saved");
-    } catch {
-      toast("error", "Failed to save settings");
-    } finally {
-      setSaving(false);
-    }
+  const handleSave = () => {
+    const config: ReminderConfig = {
+      steps: steps.map((h) => ({ hours: h })),
+      autoApproveOnSilence: autoApprove,
+    };
+    updateReminderSettings.mutate(config);
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-3xl">
+        <div className="mb-6">
+          <div className="h-8 w-48 animate-pulse rounded-lg bg-[rgb(var(--surface-subtle))]" />
+          <div className="mt-2 h-4 w-72 animate-pulse rounded bg-[rgb(var(--surface-subtle))]" />
+        </div>
+        <div className="h-64 w-full animate-pulse rounded-xl bg-[rgb(var(--surface-subtle))]" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl">
@@ -246,11 +271,11 @@ export default function RemindersSettingsPage() {
             <div className="flex justify-end pt-2">
               <Button
                 size="sm"
-                onClick={() => void handleSave()}
-                disabled={saving}
+                onClick={handleSave}
+                disabled={updateReminderSettings.isPending}
               >
                 <Save className="mr-1.5 h-3.5 w-3.5" />
-                {saving ? "Saving..." : "Save Settings"}
+                {updateReminderSettings.isPending ? "Saving..." : "Save Settings"}
               </Button>
             </div>
           </div>

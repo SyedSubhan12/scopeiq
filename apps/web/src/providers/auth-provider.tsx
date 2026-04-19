@@ -93,32 +93,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export const useAuth = () => useContext(AuthContext);
 
 /**
- * Syncs the session to a cookie so the Next.js middleware can see it.
- * Middleware expects: name includes "supabase" and "auth-token"
+ * The shared Supabase browser client now keeps auth cookies in sync for us.
+ * This no-op remains only to preserve existing call sites.
  */
-function syncSessionToCookie(session: Session | null) {
-    if (!session) return;
-
-    // We use a name that matches the loose regex in middleware.ts:
-    // cookie.name.includes("supabase") && cookie.name.includes("auth-token")
-    const cookieName = "sb-supabase-auth-token";
-    const cookieValue = session.access_token;
-    const maxAge = session.expires_in;
-
-    // `Secure` cookies are not persisted on http://localhost — omit so middleware
-    // can see the session in local dev over HTTP.
-    const secure =
-        typeof window !== "undefined" && window.location.protocol === "https:";
-    const secureAttr = secure ? "; Secure" : "";
-
-    document.cookie = `${cookieName}=${cookieValue}; path=/; max-age=${maxAge}; SameSite=Lax${secureAttr}`;
+function syncSessionToCookie(_session: Session | null) {
+    // Intentionally empty.
 }
 
 function clearAuthCookie() {
+    // Supabase clears its own auth cookies during sign-out.
+    // Clear only the onboarding hint cookie we manage locally.
     const secure =
         typeof window !== "undefined" && window.location.protocol === "https:";
     const secureAttr = secure ? "; Secure" : "";
 
-    document.cookie = `sb-supabase-auth-token=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
     document.cookie = `x-onboarded=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
 }

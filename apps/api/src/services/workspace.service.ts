@@ -1,9 +1,26 @@
 import { workspaceRepository } from "../repositories/workspace.repository.js";
 import { userRepository } from "../repositories/user.repository.js";
-import { writeAuditLog } from "@novabots/db";
+import { writeAuditLog, workspaces } from "@novabots/db";
 import { db } from "@novabots/db";
 import { NotFoundError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
+
+export type AiPolicyUpdate = Partial<
+  Pick<
+    typeof workspaces.$inferInsert,
+    | "briefScoreThreshold"
+    | "scopeGuardThreshold"
+    | "autoHoldEnabled"
+    | "autoApproveAfterDays"
+  >
+>;
+
+const REQUIRED_ONBOARDING_STEPS = [
+  "workspace_named",
+  "service_type",
+  "brief_link",
+  "sandbox",
+] as const;
 
 export const workspaceService = {
   async listWorkspaceUsers(workspaceId: string) {
@@ -40,15 +57,9 @@ export const workspaceService = {
       if (idx >= 0) completedSteps.splice(idx, 1);
     }
 
-    const ALL_STEPS = [
-      "workspace_named",
-      "first_client",
-      "first_project",
-      "brief_template",
-      "portal_tour",
-    ];
-
-    const isFullyOnboarded = ALL_STEPS.every((s) => completedSteps.includes(s));
+    const isFullyOnboarded = REQUIRED_ONBOARDING_STEPS.every((s) =>
+      completedSteps.includes(s),
+    );
 
     const updated = await workspaceRepository.update(workspaceId, {
       onboardingProgress: {
@@ -82,5 +93,33 @@ export const workspaceService = {
     });
 
     return workspace;
+  },
+
+  async updateAiPolicy(
+    workspaceId: string,
+    actorId: string,
+    data: AiPolicyUpdate,
+  ) {
+    const result = await db.transaction(async (trx) => {
+      const updated = await workspaceRepository.updateAiPolicy(
+        workspaceId,
+        stripUndefined(data) as AiPolicyUpdate,
+        trx,
+      );
+      if (!updated) throw new NotFoundError("Workspace", workspaceId);
+
+      await writeAuditLog(trx, {
+        workspaceId,
+        actorId,
+        entityType: "workspace",
+        entityId: workspaceId,
+        action: "update",
+        metadata: { fields: Object.keys(data), context: "ai_policy" },
+      });
+
+      return updated;
+    });
+
+    return result;
   },
 };
