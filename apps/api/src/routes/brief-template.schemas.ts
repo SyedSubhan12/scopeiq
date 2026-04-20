@@ -60,3 +60,12 @@ export const updateBriefTemplateSchema = z.object({
 export const restoreBriefTemplateVersionSchema = z.object({
   versionId: z.string().uuid(),
 });
+
+export const marketplaceInstallsResponseSchema = z.object({
+  installedSlugs: z.array(z.string()),
+});
+
+export const marketplaceInstallResponseSchema = z.object({
+  slug: z.string(),
+  briefTemplateId: z.string().uuid().nullable(),
+});

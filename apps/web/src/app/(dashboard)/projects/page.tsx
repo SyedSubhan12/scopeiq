@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Plus, FolderKanban, Search } from "lucide-react";
 import { Button, Card, Skeleton, Dialog, Input, Select, Textarea, useToast } from "@novabots/ui";
 import { AnimatedProjectCard } from "@/components/projects/AnimatedProjectCard";
@@ -26,7 +27,16 @@ export default function ProjectsPage() {
   const createProject = useCreateProject();
   const { toast } = useToast();
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("new") === "true") {
+      setShowCreate(true);
+      router.replace("/projects");
+    }
+  }, [searchParams, router]);
   const [name, setName] = useState("");
   const [clientId, setClientId] = useState("");
   const [description, setDescription] = useState("");

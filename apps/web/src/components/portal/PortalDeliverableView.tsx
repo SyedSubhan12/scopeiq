@@ -215,7 +215,7 @@ export function PortalDeliverableView({
                                     {/* Viewer — full width, taller on desktop */}
                                     <div
                                         className={`transition-all duration-300 ${showFeedback ? "lg:mr-[360px]" : ""}`}
-                                        style={{ minHeight: "480px" }}
+                                        style={{ height: "480px" }}
                                     >
                                         <DeliverableViewer
                                             fileUrl={deliverable.fileUrl ?? ""}

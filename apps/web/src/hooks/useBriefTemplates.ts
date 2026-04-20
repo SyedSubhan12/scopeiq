@@ -152,3 +152,33 @@ export function useDeleteBriefTemplate() {
     },
   });
 }
+
+export function getMarketplaceInstallsQueryOptions() {
+  return {
+    queryKey: ["marketplace-installs"],
+    queryFn: async () => {
+      const response = (await fetchWithAuth("/v1/brief-templates/marketplace/installs")) as {
+        data: { installedSlugs: string[] };
+      };
+      return response;
+    },
+  };
+}
+
+export function useMarketplaceInstalls() {
+  return useQuery<{ data: { installedSlugs: string[] } }>(getMarketplaceInstallsQueryOptions());
+}
+
+export function useInstallMarketplaceTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (slug: string) =>
+      fetchWithAuth(`/v1/brief-templates/install/${slug}`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["marketplace-installs"] });
+      void queryClient.invalidateQueries({ queryKey: ["brief-templates"] });
+    },
+  });
+}

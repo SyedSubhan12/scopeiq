@@ -55,7 +55,6 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
   for (const client of clientCandidates) {
     if (!client.portalTokenHash) continue;
     if (!constantTimeCompare(tokenHash, client.portalTokenHash)) continue;
-    if (client.tokenExpiresAt && client.tokenExpiresAt < new Date()) continue;
 
     const [clientProject] = await db
       .select({ id: projects.id, workspaceId: projects.workspaceId })
