@@ -1,8 +1,19 @@
 import type { ErrorHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { AppError, type ApiErrorResponse } from "@novabots/types";
 
 export const errorHandler: ErrorHandler = async (err, c) => {
     console.error(err);
+
+    if (err instanceof HTTPException) {
+        const errorResponse: ApiErrorResponse = {
+            error: {
+                code: "RATE_LIMITED",
+                message: err.message,
+            },
+        };
+        return c.json(errorResponse, err.status);
+    }
 
     if (err instanceof AppError) {
         const errorResponse: ApiErrorResponse = {

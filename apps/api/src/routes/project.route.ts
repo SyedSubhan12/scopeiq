@@ -11,6 +11,9 @@ export const projectRouter = new Hono();
 
 projectRouter.use("*", authMiddleware);
 
+// Validate UUID in path parameters for all routes with :id
+const uuidParamSchema = z.object({ id: z.string().uuid() });
+
 projectRouter.get("/", zValidator("query", listProjectsQuerySchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const query = c.req.valid("query");
@@ -26,21 +29,21 @@ projectRouter.post("/", zValidator("json", createProjectSchema), async (c) => {
   return c.json({ data: project }, 201);
 });
 
-projectRouter.get("/:id", async (c) => {
+projectRouter.get("/:id", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const projectId = c.req.param("id");
   const project = await projectService.getProject(workspaceId, projectId);
   return c.json({ data: project });
 });
 
-projectRouter.get("/:id/sow", async (c) => {
+projectRouter.get("/:id/sow", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const projectId = c.req.param("id");
   const sow = await projectService.getProjectSOW(workspaceId, projectId);
   return c.json({ data: sow });
 });
 
-projectRouter.patch("/:id", zValidator("json", updateProjectSchema), async (c) => {
+projectRouter.patch("/:id", zValidator("param", uuidParamSchema), zValidator("json", updateProjectSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const userId = c.get("userId");
   const projectId = c.req.param("id");
@@ -49,7 +52,7 @@ projectRouter.patch("/:id", zValidator("json", updateProjectSchema), async (c) =
   return c.json({ data: project });
 });
 
-projectRouter.get("/:id/health", async (c) => {
+projectRouter.get("/:id/health", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const projectId = c.req.param("id");
   const { analyticsService } = await import("../services/analytics.service.js");
@@ -57,14 +60,14 @@ projectRouter.get("/:id/health", async (c) => {
   return c.json({ data: health });
 });
 
-projectRouter.get("/:id/briefs", async (c) => {
+projectRouter.get("/:id/briefs", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const projectId = c.req.param("id");
   const briefs = await projectService.getProjectBriefs(workspaceId, projectId);
   return c.json({ data: briefs });
 });
 
-projectRouter.get("/:id/deliverables", async (c) => {
+projectRouter.get("/:id/deliverables", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const projectId = c.req.param("id");
   const result = await projectService.getProjectDeliverables(workspaceId, projectId);
@@ -73,6 +76,7 @@ projectRouter.get("/:id/deliverables", async (c) => {
 
 projectRouter.post(
   "/:id/deliverables",
+  zValidator("param", uuidParamSchema),
   zValidator("json", createDeliverableSchema.omit({ projectId: true })),
   async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -84,7 +88,7 @@ projectRouter.post(
   },
 );
 
-projectRouter.delete("/:id", async (c) => {
+projectRouter.delete("/:id", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const userId = c.get("userId");
   const projectId = c.req.param("id");

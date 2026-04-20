@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { changeOrderService } from "../services/change-order.service.js";
 import { projectRepository } from "../repositories/project.repository.js";
@@ -16,6 +17,8 @@ export const changeOrderRouter = new Hono();
 
 changeOrderRouter.use("*", authMiddleware);
 
+const uuidParamSchema = z.object({ id: z.string().uuid() });
+
 changeOrderRouter.get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
     const projectId = c.req.query("projectId");
@@ -29,39 +32,8 @@ changeOrderRouter.get("/count", async (c) => {
     return c.json({ data: { count } });
 });
 
-changeOrderRouter.get("/:id", async (c) => {
-    const workspaceId = c.get("workspaceId");
-    const id = c.req.param("id");
-    const co = await changeOrderService.getById(workspaceId, id);
-    return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }));
-});
-
-changeOrderRouter.post(
-    "/",
-    zValidator("json", createChangeOrderSchema),
-    async (c) => {
-        const workspaceId = c.get("workspaceId");
-        const userId = c.get("userId");
-        const body = c.req.valid("json");
-        const co = await changeOrderService.create(workspaceId, userId, body);
-        return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }), 201);
-    },
-);
-
-changeOrderRouter.patch(
-    "/:id",
-    zValidator("json", updateChangeOrderSchema),
-    async (c) => {
-        const workspaceId = c.get("workspaceId");
-        const userId = c.get("userId");
-        const id = c.req.param("id");
-        const body = c.req.valid("json");
-        const co = await changeOrderService.update(workspaceId, id, userId, body);
-        return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }));
-    },
-);
-
-changeOrderRouter.get("/:id/diff-pdf", async (c) => {
+// Specific routes before generic /:id
+changeOrderRouter.get("/:id/diff-pdf", zValidator("param", uuidParamSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const compareId = c.req.query("compare");
@@ -123,9 +95,43 @@ changeOrderRouter.get("/:id/diff-pdf", async (c) => {
     });
 });
 
-changeOrderRouter.get("/:id/signed-pdf", async (c) => {
+changeOrderRouter.get("/:id/signed-pdf", zValidator("param", uuidParamSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const result = await changeOrderService.getSignedPdfUrl(workspaceId, id);
     return c.json({ data: result });
 });
+
+// Generic /:id route after specific sub-routes
+changeOrderRouter.get("/:id", zValidator("param", uuidParamSchema), async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const id = c.req.param("id");
+    const co = await changeOrderService.getById(workspaceId, id);
+    return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }));
+});
+
+changeOrderRouter.post(
+    "/",
+    zValidator("json", createChangeOrderSchema),
+    async (c) => {
+        const workspaceId = c.get("workspaceId");
+        const userId = c.get("userId");
+        const body = c.req.valid("json");
+        const co = await changeOrderService.create(workspaceId, userId, body);
+        return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }), 201);
+    },
+);
+
+changeOrderRouter.patch(
+    "/:id",
+    zValidator("param", uuidParamSchema),
+    zValidator("json", updateChangeOrderSchema),
+    async (c) => {
+        const workspaceId = c.get("workspaceId");
+        const userId = c.get("userId");
+        const id = c.req.param("id");
+        const body = c.req.valid("json");
+        const co = await changeOrderService.update(workspaceId, id, userId, body);
+        return c.json(changeOrderResponseSchema.parse({ data: serializeChangeOrder(co) }));
+    },
+);

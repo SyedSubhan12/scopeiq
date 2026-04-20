@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { briefTemplateService } from "../services/brief-template.service.js";
 import { marketplaceService } from "../services/marketplace.service.js";
@@ -12,6 +13,9 @@ import {
 export const briefTemplateRouter = new Hono();
 
 briefTemplateRouter.use("*", authMiddleware);
+
+// Validate UUID in path parameters
+const uuidParamSchema = z.object({ id: z.string().uuid() });
 
 briefTemplateRouter.get("/", async (c) => {
   const workspaceId = c.get("workspaceId");
@@ -45,7 +49,7 @@ briefTemplateRouter.post("/install/:slug", async (c) => {
   return c.json({ data: result }, 201);
 });
 
-briefTemplateRouter.get("/:id", async (c) => {
+briefTemplateRouter.get("/:id", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const templateId = c.req.param("id");
   const template = await briefTemplateService.getTemplate(workspaceId, templateId);
@@ -54,6 +58,7 @@ briefTemplateRouter.get("/:id", async (c) => {
 
 briefTemplateRouter.patch(
   "/:id",
+  zValidator("param", uuidParamSchema),
   zValidator("json", updateBriefTemplateSchema),
   async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -65,14 +70,14 @@ briefTemplateRouter.patch(
   },
 );
 
-briefTemplateRouter.get("/:id/versions", async (c) => {
+briefTemplateRouter.get("/:id/versions", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const templateId = c.req.param("id");
   const versions = await briefTemplateService.listTemplateVersions(workspaceId, templateId);
   return c.json({ data: versions });
 });
 
-briefTemplateRouter.post("/:id/publish", async (c) => {
+briefTemplateRouter.post("/:id/publish", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const userId = c.get("userId");
   const templateId = c.req.param("id");
@@ -82,6 +87,7 @@ briefTemplateRouter.post("/:id/publish", async (c) => {
 
 briefTemplateRouter.post(
   "/:id/restore",
+  zValidator("param", uuidParamSchema),
   zValidator("json", restoreBriefTemplateVersionSchema),
   async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -98,7 +104,7 @@ briefTemplateRouter.post(
   },
 );
 
-briefTemplateRouter.delete("/:id", async (c) => {
+briefTemplateRouter.delete("/:id", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const userId = c.get("userId");
   const templateId = c.req.param("id");
