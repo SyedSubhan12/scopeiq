@@ -6,7 +6,7 @@ ALTER TABLE scope_flags
   ADD COLUMN IF NOT EXISTS sla_deadline  TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS sla_breached  BOOLEAN NOT NULL DEFAULT FALSE;
 
--- Index to accelerate the SLA sweep query (open flags past their deadline)
+-- Index to accelerate the SLA sweep query (unresolved flags past their deadline)
 CREATE INDEX IF NOT EXISTS idx_scope_flags_sla_breach
   ON scope_flags (sla_deadline)
-  WHERE status IN ('open', 'pending');
+  WHERE status IN ('pending', 'confirmed', 'dismissed', 'snoozed', 'change_order_sent');

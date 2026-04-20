@@ -68,4 +68,19 @@ export const clientRepository = {
       .returning();
     return updated ?? null;
   },
+
+  async delete(workspaceId: string, clientId: string) {
+    const [deleted] = await db
+      .update(clients)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(clients.id, clientId),
+          eq(clients.workspaceId, workspaceId),
+          isNull(clients.deletedAt),
+        ),
+      )
+      .returning();
+    return deleted ?? null;
+  },
 };

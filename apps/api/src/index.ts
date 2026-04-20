@@ -110,6 +110,9 @@ app.route("/api/portal/email-approve", emailApprovalRouter);
 
 // Note: invite acceptance (POST /accept) is handled within /v1/invites — no separate mount needed.
 
+// 404 handler for unknown routes
+app.notFound((c) => c.json({ error: { code: "NOT_FOUND", message: "Route not found" } }, 404));
+
 const port = Number(env.PORT) || 4000;
 console.log(`Server is running on port ${port}`);
 

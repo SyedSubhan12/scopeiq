@@ -74,4 +74,21 @@ export const clientService = {
 
     return client;
   },
+
+  async deleteClient(workspaceId: string, clientId: string, actorId: string) {
+    const client = await clientRepository.delete(workspaceId, clientId);
+    if (!client) {
+      throw new NotFoundError("Client", clientId);
+    }
+
+    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
+      workspaceId,
+      actorId,
+      entityType: "client",
+      entityId: clientId,
+      action: "delete",
+    });
+
+    return client;
+  },
 };
