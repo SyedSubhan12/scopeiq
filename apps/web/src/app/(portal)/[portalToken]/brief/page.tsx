@@ -47,7 +47,7 @@ function BriefPageContent() {
     );
   }
 
-  const { project, workspace, pendingBrief } = session;
+  const { project, workspace, pendingBrief, submittedBriefs } = session;
   const effectiveBranding = pendingBrief?.branding ?? null;
   const portalBrandColor = effectiveBranding?.accentColor || workspace.brandColor;
   const portalLogoUrl = effectiveBranding?.logoUrl ?? workspace.logoUrl;
@@ -56,21 +56,88 @@ function BriefPageContent() {
 
   if (!pendingBrief) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <div className="rounded-2xl border border-dashed border-[rgb(var(--border-default))] bg-white p-16">
-          <h3 className="text-lg font-semibold text-[rgb(var(--text-primary))]">
-            No brief to fill out
-          </h3>
-          <p className="mt-2 text-sm text-[rgb(var(--text-muted))]">
-            Your agency will share a brief when your project is ready to begin.
-          </p>
-          <button
-            className="mt-6 rounded-xl border border-[rgb(var(--border-default))] px-4 py-2.5 text-sm font-medium hover:bg-[rgb(var(--surface-subtle))]"
-            onClick={() => router.push(`/portal/${session.token}`)}
-          >
-            Back to Portal
-          </button>
-        </div>
+      <div className="min-h-screen" style={{ backgroundColor: `${portalBrandColor}08` }}>
+        <PortalHeader
+          workspaceName={workspace.name}
+          logoUrl={portalLogoUrl}
+          brandColor={portalBrandColor}
+          projectName={project.name}
+          clientName={project.clientName}
+        />
+
+        <main className="mx-auto max-w-4xl px-4 py-8">
+          {submittedBriefs.length > 0 ? (
+            <>
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">
+                  Submitted Briefs
+                </h1>
+                <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
+                  View briefs you&apos;ve submitted for this project
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {submittedBriefs.map((brief) => (
+                  <div
+                    key={brief.id}
+                    className="rounded-lg border border-[rgb(var(--border-default))] bg-white p-4 hover:shadow-sm transition-shadow"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-[rgb(var(--text-primary))]">
+                          {brief.title}
+                        </h3>
+                        <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
+                          Submitted on{" "}
+                          {brief.submittedAt
+                            ? new Date(brief.submittedAt).toLocaleDateString()
+                            : "N/A"}
+                        </p>
+                      </div>
+                      {brief.scopeScore !== null && (
+                        <div className="ml-4 text-right">
+                          <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">
+                            Score
+                          </p>
+                          <p className="text-lg font-bold" style={{ color: portalBrandColor }}>
+                            {Math.round(brief.scopeScore)}%
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                className="mt-8 rounded-xl border border-[rgb(var(--border-default))] px-4 py-2.5 text-sm font-medium hover:bg-[rgb(var(--surface-subtle))]"
+                onClick={() => router.push(`/portal/${session.token}`)}
+              >
+                Back to Portal
+              </button>
+            </>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[rgb(var(--border-default))] bg-white p-16 text-center">
+              <h3 className="text-lg font-semibold text-[rgb(var(--text-primary))]">
+                No brief to fill out
+              </h3>
+              <p className="mt-2 text-sm text-[rgb(var(--text-muted))]">
+                Your agency will share a brief when your project is ready to begin.
+              </p>
+              <button
+                className="mt-6 rounded-xl border border-[rgb(var(--border-default))] px-4 py-2.5 text-sm font-medium hover:bg-[rgb(var(--surface-subtle))]"
+                onClick={() => router.push(`/portal/${session.token}`)}
+              >
+                Back to Portal
+              </button>
+            </div>
+          )}
+
+          <div className="mt-8">
+            <PoweredByBadge plan={workspace.plan} />
+          </div>
+        </main>
       </div>
     );
   }
