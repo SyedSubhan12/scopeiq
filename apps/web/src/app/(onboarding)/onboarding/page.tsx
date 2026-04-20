@@ -3,39 +3,60 @@
 import { useEffect, useRef, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace.store";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
-import { NameWorkspace } from "@/components/onboarding/steps/NameWorkspace";
-import { ServiceTypeSelector } from "@/components/onboarding/steps/ServiceTypeSelector";
-import { BriefLinkStep } from "@/components/onboarding/steps/BriefLinkStep";
-import { DemoSandbox } from "@/components/onboarding/steps/DemoSandbox";
+import { OnboardingProvider, useOnboardingContext } from "@/components/onboarding/OnboardingContext";
+import { PersonaStep } from "@/components/onboarding/steps/PersonaStep";
+import { WorkspaceSetup } from "@/components/onboarding/steps/WorkspaceSetup";
+import { PainPointRouter } from "@/components/onboarding/steps/PainPointRouter";
+import { ScopeGuardSetup } from "@/components/onboarding/steps/ScopeGuardSetup";
+import { ApprovalPortalSetup } from "@/components/onboarding/steps/ApprovalPortalSetup";
+import { BriefBuilderSetup } from "@/components/onboarding/steps/BriefBuilderSetup";
+import { InviteTeam } from "@/components/onboarding/steps/InviteTeam";
+import { SetupComplete } from "@/components/onboarding/steps/SetupComplete";
 import type { TransitionDirection } from "@/animations/context/AnimationContext";
 
 const STEP_KEYS = [
-    "workspace_named",
-    "service_type",
-    "brief_link",
-    "sandbox",
+    "persona_selected",
+    "workspace_configured",
+    "pain_point_selected",
+    "path_setup_complete",
+    "team_invited",
+    "setup_complete",
 ] as const;
 
 const STEP_LABELS = [
-    "Name Workspace",
-    "Service Type",
-    "Brief Link",
-    "Try It Live",
+    "Who You Are",
+    "Your Workspace",
+    "Your Challenge",
+    "First Value",
+    "Your Team",
+    "You're Ready",
 ];
 
-const STEP_COMPONENTS = [NameWorkspace, ServiceTypeSelector, BriefLinkStep, DemoSandbox];
+function PathSetupStep() {
+    const { painPoint } = useOnboardingContext();
+    if (painPoint === "approval_portal") return <ApprovalPortalSetup />;
+    if (painPoint === "brief_builder") return <BriefBuilderSetup />;
+    return <ScopeGuardSetup />;
+}
 
-export default function OnboardingPage() {
+const STEP_COMPONENTS = [
+    PersonaStep,
+    WorkspaceSetup,
+    PainPointRouter,
+    PathSetupStep,
+    InviteTeam,
+    SetupComplete,
+];
+
+function OnboardingPageInner() {
     const completedSteps = useWorkspaceStore(
         (s) => s.onboardingProgress?.completedSteps ?? []
     );
 
-    // Derive current step index from completed steps
     const currentStepIndex = STEP_KEYS.findIndex(
         (key) => !completedSteps.includes(key)
     );
 
-    // Track direction for GSAP slide transitions
     const [direction, setDirection] = useState<TransitionDirection>("forward");
     const prevIndexRef = useRef(currentStepIndex);
 
@@ -46,12 +67,11 @@ export default function OnboardingPage() {
         prevIndexRef.current = currentStepIndex;
     }, [currentStepIndex]);
 
-    // All steps done — the auth-provider / middleware will redirect to dashboard
     if (currentStepIndex === -1) {
         return (
             <div
                 className="flex min-h-screen items-center justify-center text-sm"
-                style={{ color: "rgb(var(--text-muted))" }}
+                style={{ color: "rgba(244,241,236,0.4)" }}
             >
                 <div className="flex items-center gap-2">
                     <span
@@ -74,5 +94,13 @@ export default function OnboardingPage() {
         >
             <StepComponent />
         </OnboardingShell>
+    );
+}
+
+export default function OnboardingPage() {
+    return (
+        <OnboardingProvider>
+            <OnboardingPageInner />
+        </OnboardingProvider>
     );
 }
