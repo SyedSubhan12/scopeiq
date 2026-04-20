@@ -10,6 +10,8 @@ export const sowRouter = new Hono();
 
 sowRouter.use("*", authMiddleware);
 
+const uuidParamSchema = z.object({ id: z.string().uuid() });
+
 const createSowSchema = z.object({
   projectId: z.string().uuid(),
   title: z.string().min(1).max(255),
@@ -56,18 +58,28 @@ sowRouter.post("/", zValidator("json", createSowSchema), async (c) => {
   return c.json({ data: result }, 201);
 });
 
-// Get SOW with clauses by ID
-sowRouter.get("/:id", async (c) => {
+// Specific routes before generic /:id
+// Activate (finalize) a SOW with reviewed clauses
+sowRouter.post("/:id/activate", zValidator("param", uuidParamSchema), zValidator("json", activateClausesSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
+  const userId = c.get("userId");
   const id = c.req.param("id");
+  const { clauses } = c.req.valid("json");
 
-  const result = await sowService.getById(workspaceId, id);
+  const result = await sowService.activateSow(workspaceId, userId, id, {
+    clauses: clauses.map((clause, index) => ({
+      clauseType: clause.clauseType as ClauseType,
+      originalText: clause.originalText,
+      summary: clause.summary ?? null,
+      sortOrder: clause.sortOrder ?? index,
+    })),
+  });
 
   return c.json({ data: result });
 });
 
 // Replace all clauses (after agency review / editing)
-sowRouter.patch("/:id/clauses", zValidator("json", updateClausesSchema), async (c) => {
+sowRouter.patch("/:id/clauses", zValidator("param", uuidParamSchema), zValidator("json", updateClausesSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const userId = c.get("userId");
   const id = c.req.param("id");
@@ -88,27 +100,19 @@ sowRouter.patch("/:id/clauses", zValidator("json", updateClausesSchema), async (
   return c.json({ data: updated });
 });
 
-// Activate (finalize) a SOW with reviewed clauses
-sowRouter.post("/:id/activate", authMiddleware, zValidator("json", activateClausesSchema), async (c) => {
+// Generic /:id route after specific sub-routes
+// Get SOW with clauses by ID
+sowRouter.get("/:id", zValidator("param", uuidParamSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
-  const userId = c.get("userId");
   const id = c.req.param("id");
-  const { clauses } = c.req.valid("json");
 
-  const result = await sowService.activateSow(workspaceId, userId, id, {
-    clauses: clauses.map((clause, index) => ({
-      clauseType: clause.clauseType as ClauseType,
-      originalText: clause.originalText,
-      summary: clause.summary ?? null,
-      sortOrder: clause.sortOrder ?? index,
-    })),
-  });
+  const result = await sowService.getById(workspaceId, id);
 
   return c.json({ data: result });
 });
 
 // Get presigned upload URL for SOW file
-sowRouter.post("/upload", authMiddleware, zValidator("json", sowUploadSchema), async (c) => {
+sowRouter.post("/upload", zValidator("json", sowUploadSchema), async (c) => {
   const workspaceId = c.get("workspaceId");
   const { projectId, fileName, contentType } = c.req.valid("json");
 
