@@ -30,7 +30,7 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
         description: "Create a project and upload a SOW",
         impact: "+$1,200/mo protection",
         timeEstimate: "~5 min",
-        href: "/projects/new",
+        href: "/projects?new=true",
     },
     {
         id: "brief_template",

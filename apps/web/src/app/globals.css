@@ -28,24 +28,25 @@
 
 @layer base {
     :root {
-        /* Font families — set by next/font in layout.tsx */
-        --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
-        --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
-        --font-serif: "Lora", "Georgia", "Times New Roman", serif;
+        /* Font families — fallbacks; next/font overrides these on <html>
+           UI body:    IBM Plex Sans  → --font-sans  (structured, editorial-financial)
+           Display:    Fraunces       → --font-serif  (editorial gravitas, marketing moments)
+           Code/data:  JetBrains Mono → --font-mono   (IDs, amounts, scope codes) */
+        --font-body-alt: "IBM Plex Sans", system-ui, sans-serif;
 
-        /* Root font size — fluid between 13px and 16px */
-        --text-root: clamp(0.8125rem, 0.75rem + 0.35vw, 1rem);
+        /* Root font size — fluid between 14px and 16px (IBM Plex reads better slightly larger) */
+        --text-root: clamp(0.875rem, 0.82rem + 0.28vw, 1rem);
 
         /* Font size scale — fluid between mobile and desktop */
-        --text-xs:   clamp(0.6875rem, 0.625rem + 0.35vw, 0.75rem);
-        --text-sm:   clamp(0.75rem, 0.6875rem + 0.35vw, 0.8125rem);
-        --text-base: clamp(0.8125rem, 0.75rem + 0.35vw, 0.875rem);
-        --text-lg:   clamp(0.875rem, 0.75rem + 0.7vw, 1rem);
-        --text-xl:   clamp(1rem, 0.875rem + 0.7vw, 1.125rem);
-        --text-2xl:  clamp(1.125rem, 0.9375rem + 1.05vw, 1.25rem);
-        --text-3xl:  clamp(1.25rem, 1rem + 1.4vw, 1.5rem);
-        --text-4xl:  clamp(1.5rem, 1.125rem + 2.1vw, 1.875rem);
-        --text-5xl:  clamp(1.875rem, 1.375rem + 2.8vw, 2.25rem);
+        --text-xs:   clamp(0.6875rem, 0.65rem + 0.2vw, 0.75rem);
+        --text-sm:   clamp(0.8125rem, 0.78rem + 0.18vw, 0.875rem);
+        --text-base: clamp(0.875rem, 0.84rem + 0.18vw, 0.9375rem);
+        --text-lg:   clamp(1rem, 0.95rem + 0.28vw, 1.0625rem);
+        --text-xl:   clamp(1.0625rem, 1rem + 0.35vw, 1.125rem);
+        --text-2xl:  clamp(1.25rem, 1.1rem + 0.8vw, 1.375rem);
+        --text-3xl:  clamp(1.375rem, 1.2rem + 1vw, 1.625rem);
+        --text-4xl:  clamp(1.625rem, 1.35rem + 1.5vw, 2rem);
+        --text-5xl:  clamp(2rem, 1.6rem + 2.2vw, 2.5rem);
 
         /* Line-height scale — 4px baseline grid (multiples of 0.25) */
         --leading-none:     1;

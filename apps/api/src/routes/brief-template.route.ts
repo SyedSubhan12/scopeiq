@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { authMiddleware } from "../middleware/auth.js";
 import { briefTemplateService } from "../services/brief-template.service.js";
+import { marketplaceService } from "../services/marketplace.service.js";
 import {
   createBriefTemplateSchema,
   restoreBriefTemplateVersionSchema,
@@ -29,6 +30,20 @@ briefTemplateRouter.post(
     return c.json({ data: template }, 201);
   },
 );
+
+briefTemplateRouter.get("/marketplace/installs", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const installedSlugs = await marketplaceService.listInstalls(workspaceId);
+  return c.json({ data: { installedSlugs } });
+});
+
+briefTemplateRouter.post("/install/:slug", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const userId = c.get("userId");
+  const slug = c.req.param("slug");
+  const result = await marketplaceService.install(workspaceId, userId, slug);
+  return c.json({ data: result }, 201);
+});
 
 briefTemplateRouter.get("/:id", async (c) => {
   const workspaceId = c.get("workspaceId");

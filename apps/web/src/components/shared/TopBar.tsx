@@ -104,7 +104,7 @@ export function TopBar() {
     <motion.header
       animate={{ y: hidden ? "-100%" : 0 }}
       transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-      className="sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b border-[rgb(var(--border-subtle))] bg-white/95 px-3 py-2 backdrop-blur-sm sm:gap-3 sm:px-4"
+      className="sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-base))]/96 px-3 py-2 backdrop-blur-md sm:gap-3 sm:px-4"
     >
       {/* Mobile sidebar toggle */}
       <button

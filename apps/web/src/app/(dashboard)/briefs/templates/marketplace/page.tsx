@@ -3,16 +3,15 @@
 /**
  * Sprint 5 — Template Marketplace browser (FEAT-NEW-008).
  *
- * Phase 1 ships with a curated set of seed templates. Selecting "Install"
- * fires a toast and persists the installed state in component memory — the
- * real backend hand-off (POST /v1/brief-templates/install/:slug) lands in
- * Phase 2 once we have community submissions to publish.
+ * Phase 2 wires the install mutation to POST /v1/brief-templates/install/:slug
+ * and loads the installation state from the server.
  */
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Search, Sparkles } from "lucide-react";
 import { Card, useToast, cn } from "@novabots/ui";
+import { useMarketplaceInstalls, useInstallMarketplaceTemplate } from "@/hooks/useBriefTemplates";
 import {
   MarketplaceCard,
   type MarketplaceTemplate,
@@ -85,8 +84,14 @@ export default function TemplateMarketplacePage() {
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState<Category>("All");
   const [query, setQuery] = useState("");
-  const [installed, setInstalled] = useState<Set<string>>(new Set());
-  const [installingId, setInstallingId] = useState<string | null>(null);
+
+  const { data: installsData, isLoading: installsLoading } = useMarketplaceInstalls();
+  const installMutation = useInstallMarketplaceTemplate();
+
+  const installedSlugs = useMemo(
+    () => new Set(installsData?.data?.installedSlugs ?? []),
+    [installsData],
+  );
 
   const visible = useMemo(() => {
     return TEMPLATES.filter((tpl) => {
@@ -105,17 +110,11 @@ export default function TemplateMarketplacePage() {
   }, [activeCategory, query]);
 
   const handleInstall = async (id: string) => {
-    setInstallingId(id);
     try {
-      // Simulate the API round-trip; replace with `fetchWithAuth` once the
-      // backend route is live.
-      await new Promise((res) => setTimeout(res, 450));
-      setInstalled((prev) => new Set(prev).add(id));
+      await installMutation.mutateAsync(id);
       toast("success", "Template added to your library");
     } catch {
       toast("error", "Couldn't install template — try again");
-    } finally {
-      setInstallingId(null);
     }
   };
 
@@ -175,7 +174,16 @@ export default function TemplateMarketplacePage() {
       </Card>
 
       {/* Grid */}
-      {visible.length === 0 ? (
+      {installsLoading ? (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {TEMPLATES.map((_, i) => (
+            <div
+              key={i}
+              className="h-64 animate-pulse rounded-lg bg-[rgb(var(--surface-subtle))]"
+            />
+          ))}
+        </div>
+      ) : visible.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border-subtle))] py-16">
           <p className="text-sm text-[rgb(var(--text-muted))]">
             No templates match that search.
@@ -188,8 +196,8 @@ export default function TemplateMarketplacePage() {
               key={tpl.id}
               template={tpl}
               index={i}
-              installed={installed.has(tpl.id)}
-              installing={installingId === tpl.id}
+              installed={installedSlugs.has(tpl.id)}
+              installing={installMutation.isPending && installMutation.variables === tpl.id}
               onInstall={handleInstall}
             />
           ))}

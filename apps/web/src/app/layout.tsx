@@ -5,7 +5,7 @@ import { Providers } from "@/providers";
 
 const inter = Inter({
     subsets: ["latin"],
-    variable: "--font-sans",
+    variable: "--font-alt",
     display: "swap",
     fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
 });
@@ -41,7 +41,7 @@ const fraunces = Fraunces({
 const ibmPlex = IBM_Plex_Sans({
     subsets: ["latin"],
     weight: ["300", "400", "500", "600"],
-    variable: "--font-body-alt",
+    variable: "--font-sans",
     display: "swap",
 });
 
@@ -79,7 +79,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${sora.variable} ${dmSans.variable} ${fraunces.variable} ${ibmPlex.variable} font-sans`} suppressHydrationWarning>
+        <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${sora.variable} ${dmSans.variable} ${fraunces.variable} ${ibmPlex.variable} font-sans antialiased`} suppressHydrationWarning>
             <body className="antialiased" suppressHydrationWarning>
                 <Providers>{children}</Providers>
             </body>

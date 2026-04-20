@@ -98,11 +98,11 @@ app.route("/briefs/submit", briefSubmitRouter);
 
 // Portal routes (token-authenticated, rate-limited)
 app.use("/portal/*", portalRateLimiter);
-app.route("/portal", portalRouter);
-app.route("/portal/deliverables", portalDeliverableRouter);
+// Register specific routes BEFORE the catch-all /:token route to prevent shadowing
 app.route("/portal/session", portalSessionRouter);
 app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/change-orders", portalChangeOrderRouter);
+// Catch-all token route must come last
 app.route("/portal", portalRouter);
 
 // Email approval links (HMAC-token authenticated, public)

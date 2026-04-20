@@ -1,131 +1,244 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, Suspense, useLayoutEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mail, Eye, EyeOff, Loader2, CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { GoogleAuthButton } from "@/components/google-auth-button";
+import { gsap } from "@/animations/utils/gsap.config";
 
-// Abstract art background component
-const AbstractArtBackground: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+/* ============================================================================
+   ScopeIQ — Editorial Login
+   Fraunces display · IBM Plex body · JetBrains Mono metadata
+   Paper (#F0EDE4) + Moss (#196C4A)
+   ============================================================================ */
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+const FONT_DISPLAY = "var(--font-serif), 'Fraunces', Georgia, serif";
+const FONT_BODY = "var(--font-sans), 'IBM Plex Sans', system-ui, sans-serif";
+const FONT_MONO = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+const PAPER = "#F0EDE4";
+const INK = "#0B0B0B";
+const MOSS = "#196C4A";
+const FOG = "#CFC9BB";
 
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
+function EditorialShell({ children }: { children: React.ReactNode }) {
+  const leftRef = useRef<HTMLDivElement | null>(null);
+  const blobRef = useRef<HTMLDivElement | null>(null);
+  const ruleRef = useRef<HTMLSpanElement | null>(null);
 
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    const shapes: Array<{
-      x: number;
-      y: number;
-      size: number;
-      color: string;
-      type: 'circle' | 'rect' | 'line';
-      angle: number;
-      speed: number;
-    }> = [];
-
-    const colors = [
-      'rgba(20, 184, 166, 0.3)', // teal
-      'rgba(14, 165, 233, 0.3)', // blue
-      'rgba(168, 85, 247, 0.3)', // purple
-      'rgba(251, 146, 60, 0.3)', // orange
-      'rgba(34, 197, 94, 0.3)', // green
-      'rgba(156, 163, 175, 0.2)', // gray
-    ];
-
-    for (let i = 0; i < 15; i++) {
-      shapes.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 200 + 100,
-        color: colors[Math.floor(Math.random() * colors.length)] || "#000",
-        type: ['circle', 'rect', 'line'][Math.floor(Math.random() * 3)] as 'circle' | 'rect' | 'line',
-        angle: Math.random() * Math.PI * 2,
-        speed: Math.random() * 0.0005 + 0.0002,
+  useLayoutEffect(() => {
+    const root = leftRef.current;
+    if (!root) return;
+    const ctx = gsap.context(() => {
+      const words = root.querySelectorAll<HTMLElement>("[data-word]");
+      gsap.from(words, {
+        y: 40,
+        opacity: 0,
+        filter: "blur(8px)",
+        stagger: 0.05,
+        duration: 1,
+        ease: "power3.out",
+        delay: 0.1,
       });
-    }
-
-    let animationId: number;
-    const animate = () => {
-      ctx.fillStyle = 'rgba(17, 24, 39, 0.05)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      shapes.forEach((shape) => {
-        shape.angle += shape.speed;
-        const offsetX = Math.cos(shape.angle) * 20;
-        const offsetY = Math.sin(shape.angle) * 20;
-
-        ctx.save();
-        ctx.translate(shape.x + offsetX, shape.y + offsetY);
-
-        if (shape.type === 'circle') {
-          ctx.beginPath();
-          ctx.arc(0, 0, shape.size, 0, Math.PI * 2);
-          ctx.fillStyle = shape.color;
-          ctx.fill();
-        } else if (shape.type === 'rect') {
-          ctx.rotate(shape.angle);
-          ctx.fillStyle = shape.color;
-          ctx.fillRect(-shape.size / 2, -shape.size / 2, shape.size, shape.size);
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(-shape.size, 0);
-          ctx.lineTo(shape.size, 0);
-          ctx.strokeStyle = shape.color;
-          ctx.lineWidth = 4;
-          ctx.stroke();
-        }
-
-        ctx.restore();
+      gsap.from(root.querySelectorAll("[data-meta]"), {
+        opacity: 0,
+        y: 12,
+        duration: 0.7,
+        stagger: 0.08,
+        ease: "power3.out",
+        delay: 0.4,
       });
-
-      animationId = requestAnimationFrame(animate);
-    };
-
-    animate();
-    return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      cancelAnimationFrame(animationId);
-    };
+      gsap.to(blobRef.current, {
+        x: 50,
+        y: -30,
+        scale: 1.15,
+        repeat: -1,
+        yoyo: true,
+        duration: 8,
+        ease: "sine.inOut",
+      });
+      gsap.to(ruleRef.current, {
+        scaleX: 1,
+        duration: 1.4,
+        ease: "power3.inOut",
+        delay: 0.3,
+      });
+    }, root);
+    return () => ctx.revert();
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 w-full h-full"
-      style={{ background: 'linear-gradient(135deg, #111827 0%, #1f2937 100%)' }}
-    />
+    <main
+      style={{ background: PAPER, color: INK, fontFamily: FONT_BODY }}
+      className="relative min-h-screen w-full overflow-hidden"
+    >
+      {/* grain */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[60] opacity-[0.06] mix-blend-multiply"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
+        }}
+      />
+
+      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-2">
+        {/* ── LEFT: Editorial manifesto ────────────────────────────── */}
+        <aside
+          ref={leftRef}
+          className="relative hidden overflow-hidden px-10 py-12 lg:flex lg:flex-col lg:justify-between xl:px-16"
+          style={{
+            background: `linear-gradient(180deg, ${PAPER} 0%, #E8E4D8 100%)`,
+          }}
+        >
+          <div
+            ref={blobRef}
+            aria-hidden
+            style={{
+              background: `radial-gradient(closest-side, ${MOSS}33, transparent 70%)`,
+            }}
+            className="pointer-events-none absolute -left-32 top-20 h-[520px] w-[520px] rounded-full blur-3xl"
+          />
+
+          {/* top bar */}
+          <div className="relative flex items-center justify-between">
+            <Link
+              href="/"
+              data-meta
+              style={{ fontFamily: FONT_MONO }}
+              className="group inline-flex items-center gap-3 text-[11px] uppercase tracking-[0.22em] text-ink/70 transition-colors hover:text-[color:var(--moss,#196C4A)]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-1" />
+              Back to ScopeIQ
+            </Link>
+            <span
+              data-meta
+              style={{ fontFamily: FONT_MONO }}
+              className="text-[11px] uppercase tracking-[0.22em] text-ink/55"
+            >
+              §00 · Sign in
+            </span>
+          </div>
+
+          {/* headline */}
+          <div className="relative">
+            <div
+              data-meta
+              style={{ fontFamily: FONT_MONO, color: MOSS }}
+              className="mb-8 inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em]"
+            >
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: MOSS }} />
+              Vol. I — Ledger
+            </div>
+
+            <h1
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontVariationSettings: "'opsz' 144, 'SOFT' 50",
+              }}
+              className="flex flex-wrap gap-x-4 gap-y-2 font-light leading-[0.95] tracking-[-0.02em] text-[clamp(3rem,6.5vw,5.75rem)]"
+            >
+              {["Bill", "what", "you", "built."].map((w, i) => (
+                <span
+                  key={i}
+                  data-word
+                  className="inline-block"
+                  style={i === 3 ? { color: MOSS, fontStyle: "italic" } : undefined}
+                >
+                  {w}
+                </span>
+              ))}
+            </h1>
+
+            <div
+              className="mt-10 h-[2px] w-64 origin-left scale-x-0"
+              style={{ background: MOSS }}
+              ref={ruleRef as any}
+            />
+
+            <p
+              data-meta
+              className="mt-8 max-w-md text-[1rem] leading-[1.6] text-ink/75"
+            >
+              Every hour you build deserves a line on the invoice. Sign in to
+              check who&rsquo;s leaking revenue today — and stop it before
+              Friday.
+            </p>
+          </div>
+
+          {/* footer: stats */}
+          <div
+            className="relative grid grid-cols-3 gap-6 border-t pt-6"
+            style={{ borderColor: FOG }}
+          >
+            {[
+              { k: "Revenue recovered", v: "17.8%" },
+              { k: "Flag detection", v: "4.2s" },
+              { k: "Brief uplift", v: "83%" },
+            ].map((s) => (
+              <div key={s.k} data-meta>
+                <div
+                  style={{ fontFamily: FONT_MONO }}
+                  className="text-[10px] uppercase tracking-[0.22em] text-ink/55"
+                >
+                  {s.k}
+                </div>
+                <div
+                  style={{ fontFamily: FONT_DISPLAY }}
+                  className="mt-1 text-[1.75rem] font-light tabular-nums leading-none"
+                >
+                  {s.v}
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {/* ── RIGHT: Form ──────────────────────────────────────────── */}
+        <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8 lg:px-14">
+          {children}
+        </section>
+      </div>
+    </main>
   );
-};
+}
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isRegistered = searchParams.get('registered') === 'true';
+  const isRegistered = searchParams.get("registered") === "true";
 
-  const [authMode, setAuthMode] = useState<'magic' | 'password'>('magic');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [authMode, setAuthMode] = useState<"magic" | "password">("magic");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const ctx = gsap.context(() => {
+      gsap.from(el.querySelectorAll("[data-card-item]"), {
+        y: 18,
+        opacity: 0,
+        duration: 0.7,
+        stagger: 0.06,
+        ease: "power3.out",
+        delay: 0.2,
+      });
+    }, el);
+    return () => ctx.revert();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,12 +246,11 @@ function LoginForm() {
     setError(null);
 
     try {
-      if (authMode === 'password') {
+      if (authMode === "password") {
         const { error: authError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-
         if (authError) {
           setError(authError.message);
           setIsLoading(false);
@@ -150,7 +262,7 @@ function LoginForm() {
           email,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
-          }
+          },
         });
         if (authError) {
           setError(authError.message);
@@ -168,213 +280,333 @@ function LoginForm() {
 
   if (magicLinkSent) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900 px-4">
-        <AbstractArtBackground />
+      <EditorialShell>
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="relative z-10 w-full max-w-md rounded-2xl bg-white/95 backdrop-blur-sm p-10 shadow-2xl text-center"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-md"
         >
-          <div className="mb-6 flex justify-center">
-            <div className="rounded-full bg-teal-100 p-4">
-              <Mail className="h-10 w-10 text-teal-600" />
-            </div>
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Check your email</h2>
-          <p className="text-gray-600 mb-10 leading-relaxed">
-            We've sent a magic link to <span className="font-bold text-gray-900">{email}</span>.
-            Click the link in the email to sign in instantly.
-          </p>
-          <Button
-            variant="outline"
-            className="w-full h-12 rounded-xl border-gray-200 hover:bg-gray-50"
-            onClick={() => setMagicLinkSent(false)}
+          <div
+            className="relative overflow-hidden rounded-3xl border bg-white/80 p-10 text-center shadow-[0_40px_80px_-40px_rgba(25,108,74,0.35)] backdrop-blur"
+            style={{ borderColor: "rgba(25,108,74,0.18)" }}
           >
-            Back to login
-          </Button>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full"
+              style={{ background: `radial-gradient(closest-side, ${MOSS}55, transparent 70%)` }}
+            />
+            <div className="relative mb-6 flex justify-center">
+              <div
+                className="flex h-16 w-16 items-center justify-center rounded-full"
+                style={{ background: `${MOSS}15` }}
+              >
+                <Mail className="h-7 w-7" style={{ color: MOSS }} />
+              </div>
+            </div>
+            <h2
+              style={{ fontFamily: FONT_DISPLAY }}
+              className="relative mb-4 text-[2.25rem] font-light leading-[1.05] tracking-[-0.02em]"
+            >
+              Check your <em style={{ color: MOSS }}>inbox.</em>
+            </h2>
+            <p className="relative mb-8 leading-relaxed text-ink/70">
+              A magic link just landed at{" "}
+              <span className="font-medium text-ink">{email}</span>. Click it to
+              sign in instantly — no password required.
+            </p>
+            <Button
+              variant="outline"
+              className="relative h-12 w-full rounded-full border-ink/15 font-medium hover:bg-ink/5"
+              style={{ fontFamily: FONT_MONO, fontSize: "12px", letterSpacing: "0.18em", textTransform: "uppercase" }}
+              onClick={() => setMagicLinkSent(false)}
+            >
+              Back to sign in
+            </Button>
+          </div>
         </motion.div>
-      </div>
+      </EditorialShell>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900 overflow-hidden">
-      <AbstractArtBackground />
-
-      <div className="relative z-10 w-full max-w-md p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+    <EditorialShell>
+      <div ref={cardRef} className="w-full max-w-[460px]">
+        {/* Top meta row (mobile-visible brand) */}
+        <div
+          data-card-item
+          className="mb-8 flex items-center justify-between lg:hidden"
         >
-          <div className="rounded-3xl bg-white/95 backdrop-blur-md p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] border border-white/20">
-            {/* Header */}
-            <div className="mb-10 text-center">
-              <h1 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">
-                Welcome back
-              </h1>
-              <p className="text-sm font-medium text-gray-500">
-                New to ScopeIQ?{' '}
-                <Link href="/register" className="text-teal-600 hover:text-teal-700 font-bold transition-colors">
-                  Create account
-                </Link>
-              </p>
-            </div>
+          <Link
+            href="/"
+            style={{ fontFamily: FONT_MONO }}
+            className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/60"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            ScopeIQ
+          </Link>
+          <span
+            style={{ fontFamily: FONT_MONO }}
+            className="text-[11px] uppercase tracking-[0.22em] text-ink/55"
+          >
+            §00 · Sign in
+          </span>
+        </div>
 
-            {/* Auth Mode Toggle */}
-            <div className="mb-8">
-              <div className="flex rounded-2xl bg-gray-100/80 p-1.5 backdrop-blur-sm">
+        {/* Header */}
+        <div data-card-item className="mb-10">
+          <span
+            style={{ fontFamily: FONT_MONO, color: MOSS }}
+            className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em]"
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: MOSS }} />
+            Members only
+          </span>
+          <h1
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontVariationSettings: "'opsz' 144, 'SOFT' 40",
+            }}
+            className="mt-4 text-[clamp(2.25rem,4vw,3.25rem)] font-light leading-[1.02] tracking-[-0.02em]"
+          >
+            Welcome <em style={{ color: MOSS }}>back.</em>
+          </h1>
+          <p className="mt-3 text-[0.95rem] leading-relaxed text-ink/65">
+            New to ScopeIQ?{" "}
+            <Link
+              href="/register"
+              className="font-medium underline decoration-[1.5px] underline-offset-[6px] transition-colors hover:no-underline"
+              style={{ color: MOSS }}
+            >
+              Create an account
+            </Link>
+          </p>
+        </div>
+
+        {/* Auth mode switch */}
+        <div data-card-item className="mb-7">
+          <div
+            className="relative flex rounded-full border p-1"
+            style={{
+              borderColor: "rgba(11,11,11,0.12)",
+              background: "rgba(11,11,11,0.035)",
+            }}
+          >
+            {(["magic", "password"] as const).map((m) => {
+              const active = authMode === m;
+              return (
                 <button
+                  key={m}
                   type="button"
-                  onClick={() => setAuthMode('magic')}
-                  className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${authMode === 'magic'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-800'
-                    }`}
+                  onClick={() => setAuthMode(m)}
+                  style={{
+                    fontFamily: FONT_MONO,
+                    background: active ? INK : "transparent",
+                    color: active ? PAPER : "rgba(11,11,11,0.55)",
+                  }}
+                  className="flex-1 rounded-full px-4 py-2.5 text-[11px] uppercase tracking-[0.22em] transition-all"
                 >
-                  Magic link
+                  {m === "magic" ? "Magic link" : "Password"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('password')}
-                  className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${authMode === 'password'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-800'
-                    }`}
-                >
-                  Password
-                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Success */}
+        <AnimatePresence>
+          {isRegistered && !error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: "auto", marginBottom: 20 }}
+              className="overflow-hidden"
+            >
+              <div
+                className="flex items-center gap-3 rounded-xl border px-4 py-3.5 text-sm"
+                style={{
+                  borderColor: `${MOSS}33`,
+                  background: `${MOSS}0D`,
+                  color: MOSS,
+                }}
+              >
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span className="font-medium">Account created. Please sign in.</span>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Error */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: "auto", marginBottom: 20 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="flex items-center gap-3 rounded-xl border border-[#D64C2C]/30 bg-[#D64C2C]/8 px-4 py-3.5 text-sm text-[#C23B1D]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#D64C2C]/15 text-[11px] font-bold">!</span>
+                <span className="font-medium">{error}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Form */}
+        <form data-card-item onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2.5">
+            <Label
+              htmlFor="email"
+              style={{ fontFamily: FONT_MONO }}
+              className="ml-1 text-[10.5px] uppercase tracking-[0.22em] text-ink/60"
+            >
+              Email address
+            </Label>
+            <div className="relative group">
+              <Mail
+                className="absolute left-4 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-ink/35 transition-colors group-focus-within:text-[color:var(--moss,#196C4A)]"
+              />
+              <Input
+                id="email"
+                type="email"
+                placeholder="name@studio.co"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{ fontFamily: FONT_BODY, fontSize: "1rem" }}
+                className="h-14 rounded-2xl border-ink/12 bg-white/70 pl-12 font-medium text-ink placeholder:text-ink/35 focus:border-[color:var(--moss,#196C4A)] focus:bg-white focus:ring-4 focus:ring-[color:var(--moss,#196C4A)]/15"
+                required
+              />
             </div>
+          </div>
 
-            {/* Success Message for Registration */}
-            <AnimatePresence>
-              {isRegistered && !error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  animate={{ opacity: 1, height: 'auto', marginBottom: 20 }}
-                  className="overflow-hidden"
-                >
-                  <div className="p-4 rounded-xl bg-teal-50 border border-teal-100 text-sm font-bold text-teal-700 flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-teal-600" />
-                    Account created successfully! Please sign in.
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Error Message */}
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  animate={{ opacity: 1, height: 'auto', marginBottom: 20 }}
-                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-sm font-bold text-red-600 flex items-center gap-3">
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-black underline decoration-red-600">!</span>
-                    {error}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-bold text-gray-700 ml-1">
-                  Email
-                </Label>
+          <AnimatePresence mode="wait">
+            {authMode === "password" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-2.5 overflow-hidden"
+              >
+                <div className="flex items-end justify-between">
+                  <Label
+                    htmlFor="password"
+                    style={{ fontFamily: FONT_MONO }}
+                    className="ml-1 text-[10.5px] uppercase tracking-[0.22em] text-ink/60"
+                  >
+                    Password
+                  </Label>
+                  <Link
+                    href="/forgot-password"
+                    style={{ fontFamily: FONT_MONO }}
+                    className="text-[10.5px] uppercase tracking-[0.22em] text-ink/55 transition-colors hover:text-[color:var(--moss,#196C4A)]"
+                  >
+                    Forgot?
+                  </Link>
+                </div>
                 <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-teal-600 transition-colors" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-12 h-14 rounded-2xl border-gray-200 bg-gray-50/50 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all font-medium"
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ fontFamily: FONT_BODY, fontSize: "1rem" }}
+                    className="h-14 rounded-2xl border-ink/12 bg-white/70 pr-12 font-medium text-ink placeholder:text-ink/35 focus:border-[color:var(--moss,#196C4A)] focus:bg-white focus:ring-4 focus:ring-[color:var(--moss,#196C4A)]/15"
                     required
                   />
-                </div>
-              </div>
-
-              <AnimatePresence mode="wait">
-                {authMode === 'password' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-2"
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-ink/40 transition-colors hover:text-[color:var(--moss,#196C4A)]"
                   >
-                    <Label htmlFor="password" className="text-sm font-bold text-gray-700 ml-1">
-                      Password
-                    </Label>
-                    <div className="relative group">
-                      <Input
-                        id="password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pr-12 h-14 rounded-2xl border-gray-200 bg-gray-50/50 focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all font-medium"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-teal-600 transition-colors"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-5 w-5" />
-                        ) : (
-                          <Eye className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full h-14 bg-gray-900 hover:bg-black text-white rounded-2xl font-bold text-base shadow-lg shadow-gray-200 transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    {authMode === 'magic' ? 'Sending Link...' : 'Signing in...'}
-                  </span>
-                ) : authMode === 'magic' ? (
-                  'Send magic link'
-                ) : (
-                  'Sign in'
-                )}
-              </Button>
-            </form>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            style={{
+              fontFamily: FONT_MONO,
+              background: INK,
+              color: PAPER,
+              letterSpacing: "0.22em",
+            }}
+            className="group relative mt-2 h-14 w-full overflow-hidden rounded-full text-[12px] uppercase shadow-lg transition-all hover:-translate-y-[1px] hover:opacity-95 active:translate-y-0 disabled:opacity-60"
+          >
+            {isLoading ? (
+              <span className="relative flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {authMode === "magic" ? "Sending link" : "Signing in"}
+              </span>
+            ) : (
+              <span className="relative inline-flex items-center gap-3">
+                {authMode === "magic" ? "Send magic link" : "Sign in"}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </span>
+            )}
+            {/* hover shine */}
+            <span
+              aria-hidden
+              style={{
+                background: `linear-gradient(120deg, transparent 0%, ${MOSS}55 50%, transparent 100%)`,
+              }}
+              className="absolute inset-0 -translate-x-full skew-x-[-20deg] transition-transform duration-700 group-hover:translate-x-full"
+            />
+          </Button>
+        </form>
 
-            {/* Divider */}
-            <div className="my-8 flex items-center">
-              <div className="flex-1 border-t border-gray-100"></div>
-              <span className="px-4 text-[10px] uppercase tracking-widest font-black text-gray-400">Secure Auth</span>
-              <div className="flex-1 border-t border-gray-100"></div>
-            </div>
+        {/* Divider */}
+        <div data-card-item className="my-8 flex items-center gap-4">
+          <div className="flex-1 border-t" style={{ borderColor: "rgba(11,11,11,0.1)" }} />
+          <span
+            style={{ fontFamily: FONT_MONO }}
+            className="text-[10px] uppercase tracking-[0.28em] text-ink/45"
+          >
+            or continue with
+          </span>
+          <div className="flex-1 border-t" style={{ borderColor: "rgba(11,11,11,0.1)" }} />
+        </div>
 
-            {/* Social Login */}
-            <GoogleAuthButton label="Continue with Google" />
-          </div>
-        </motion.div>
+        <div data-card-item>
+          <GoogleAuthButton label="Continue with Google" />
+        </div>
+
+        <p
+          data-card-item
+          style={{ fontFamily: FONT_MONO }}
+          className="mt-10 text-center text-[10px] uppercase tracking-[0.22em] text-ink/45"
+        >
+          By signing in you agree to our{" "}
+          <Link href="/terms" className="underline-offset-4 hover:underline">
+            Terms
+          </Link>{" "}
+          · <Link href="/privacy" className="underline-offset-4 hover:underline">Privacy</Link>
+        </p>
       </div>
-    </div>
+    </EditorialShell>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="fixed inset-0 bg-gray-900 flex items-center justify-center text-white">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div
+          className="flex min-h-screen items-center justify-center"
+          style={{ background: PAPER, color: INK, fontFamily: FONT_MONO }}
+        >
+          <span className="text-[11px] uppercase tracking-[0.22em] opacity-60">
+            Loading…
+          </span>
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

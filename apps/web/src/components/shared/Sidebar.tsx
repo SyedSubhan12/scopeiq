@@ -58,7 +58,7 @@ function SidebarSectionLabel({
   }
 
   return (
-    <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[rgb(var(--text-muted))]">
+    <p className="px-3 font-mono text-[9.5px] font-medium uppercase tracking-[0.22em] text-[rgb(var(--text-muted))]">
       {children}
     </p>
   );
@@ -89,7 +89,7 @@ function SidebarLink({
           expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-3",
           isActive
             ? "border-primary/15 text-[rgb(var(--primary-dark))] shadow-[0_10px_30px_-24px_rgba(15,110,86,0.9)]"
-            : "border-transparent text-[rgb(var(--text-secondary))] hover:border-[rgb(var(--border-subtle))] hover:bg-white hover:text-[rgb(var(--text-primary))]",
+            : "border-transparent text-[rgb(var(--text-secondary))] hover:border-[rgb(var(--border-subtle))] hover:bg-[rgb(var(--surface-subtle))] hover:text-[rgb(var(--text-primary))]",
         )}
       >
         {/* Sliding active background — shares layoutId across all nav items */}
@@ -286,7 +286,7 @@ function SidebarPanel({
 
       <div className="border-t border-[rgb(var(--border-subtle))] p-3">
         {expanded ? (
-          <div className="rounded-3xl border border-[rgb(var(--border-subtle))] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(248,250,252,1)_100%)] p-3 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.45)]">
+          <div className="rounded-3xl border border-[rgb(var(--border-subtle))] bg-[linear-gradient(180deg,rgb(var(--surface-base))_0%,rgb(var(--surface-subtle))_100%)] p-3 shadow-[0_24px_50px_-36px_rgba(11,11,11,0.28)]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
@@ -420,7 +420,7 @@ export function Sidebar() {
         <aside
           aria-label="Application sidebar"
           className={cn(
-            "relative flex h-full flex-col border-r border-[rgb(var(--border-subtle))] bg-white/95 shadow-[16px_0_40px_-36px_rgba(15,23,42,0.5)] backdrop-blur-xl transition-[width] duration-200 ease-out",
+            "relative flex h-full flex-col border-r border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-base))]/96 shadow-[16px_0_40px_-36px_rgba(11,11,11,0.22)] backdrop-blur-xl transition-[width] duration-200 ease-out",
             COLLAPSED_WIDTH,
             expanded && EXPANDED_WIDTH,
           )}
@@ -481,7 +481,7 @@ export function Sidebar() {
             {/* Drawer */}
             <motion.aside
               aria-label="Mobile navigation"
-              className="relative z-10 flex h-full w-[min(88vw,320px)] flex-col border-r border-[rgb(var(--border-subtle))] bg-white shadow-[16px_0_48px_-28px_rgba(15,23,42,0.55)]"
+              className="relative z-10 flex h-full w-[min(88vw,320px)] flex-col border-r border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-base))] shadow-[16px_0_48px_-28px_rgba(11,11,11,0.38)]"
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
