@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { useWorkspaceStore } from "@/stores/workspace.store";
 
 export type PersonaType = "solo" | "studio" | "agency";
 export type ServiceType =
@@ -29,9 +30,19 @@ interface OnboardingContextValue {
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-    const [persona, setPersona] = useState<PersonaType | null>(null);
-    const [serviceType, setServiceType] = useState<ServiceType | null>(null);
-    const [painPoint, setPainPoint] = useState<PainPoint | null>(null);
+    // Hydrate from DB-backed settingsJson so page refreshes don't lose path routing
+    const settingsJson = useWorkspaceStore((s) => s.settingsJson);
+    const ob = (settingsJson.onboarding ?? {}) as Record<string, unknown>;
+
+    const [persona, setPersona] = useState<PersonaType | null>(
+        (ob.persona as PersonaType) ?? null
+    );
+    const [serviceType, setServiceType] = useState<ServiceType | null>(
+        (ob.serviceType as ServiceType) ?? null
+    );
+    const [painPoint, setPainPoint] = useState<PainPoint | null>(
+        (ob.painPoint as PainPoint) ?? null
+    );
 
     return (
         <OnboardingContext.Provider

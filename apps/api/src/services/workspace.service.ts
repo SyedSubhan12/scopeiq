@@ -16,10 +16,12 @@ export type AiPolicyUpdate = Partial<
 >;
 
 const REQUIRED_ONBOARDING_STEPS = [
-  "workspace_named",
-  "service_type",
-  "brief_link",
-  "sandbox",
+  "persona_selected",
+  "workspace_configured",
+  "pain_point_selected",
+  "path_setup_complete",
+  "team_invited",
+  "setup_complete",
 ] as const;
 
 export const workspaceService = {
@@ -39,6 +41,7 @@ export const workspaceService = {
     workspaceId: string,
     step: string,
     complete: boolean,
+    metadata?: Record<string, unknown>,
   ) {
     const workspace = await workspaceRepository.getById(workspaceId);
     if (!workspace) throw new NotFoundError("Workspace", workspaceId);
@@ -61,6 +64,13 @@ export const workspaceService = {
       completedSteps.includes(s),
     );
 
+    // Merge step metadata into settingsJson.onboarding so it survives page refresh
+    const existingSettings = (workspace.settingsJson as Record<string, unknown>) ?? {};
+    const existingOnboarding = (existingSettings.onboarding as Record<string, unknown>) ?? {};
+    const updatedSettings = metadata
+      ? { ...existingSettings, onboarding: { ...existingOnboarding, ...metadata } }
+      : existingSettings;
+
     const updated = await workspaceRepository.update(workspaceId, {
       onboardingProgress: {
         completedSteps,
@@ -68,6 +78,7 @@ export const workspaceService = {
           ? (progress.completedAt ?? new Date().toISOString())
           : undefined,
       },
+      ...(metadata ? { settingsJson: updatedSettings } : {}),
     });
 
     return updated;

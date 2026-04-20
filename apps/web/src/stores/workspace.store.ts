@@ -15,6 +15,7 @@ interface WorkspaceState {
     brandColor: string;
     logoUrl: string | null;
     onboardingProgress: OnboardingProgress;
+    settingsJson: Record<string, unknown>;
     features: Record<string, boolean>;
     hydrated: boolean;
     loading: boolean;
@@ -36,6 +37,7 @@ const initialState = {
     brandColor: "#0F6E56",
     logoUrl: null,
     onboardingProgress: { completedSteps: [] },
+    settingsJson: {},
     features: {},
     hydrated: false,
     loading: false,
@@ -70,6 +72,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 brandColor: (ws.brandColor as string) ?? "#0F6E56",
                 logoUrl: (ws.logoUrl as string) ?? null,
                 onboardingProgress: progress,
+                settingsJson: (ws.settingsJson as Record<string, unknown>) ?? {},
                 features: (ws.features as Record<string, boolean>) ?? {},
                 isOnboarded,
                 hydrated: true,
