@@ -95,12 +95,12 @@ export function BriefBuilderSetup() {
                     Step 4 of 6 · Brief Builder
                 </p>
                 <h2 className="text-3xl font-bold leading-tight" style={{ color: "#F4F1EC", fontFamily: "var(--font-serif)", fontStyle: "italic" }}>
-                    Build your first
+                    Set your brief
                     <br />
-                    client intake form
+                    clarity threshold.
                 </h2>
                 <p className="text-sm" style={{ color: "rgba(244,241,236,0.5)" }}>
-                    Start from a template matched to your work type, or build from scratch.
+                    Briefs below your threshold score are held automatically. Clients are asked to clarify before work begins.
                 </p>
             </div>
 
@@ -151,7 +151,7 @@ export function BriefBuilderSetup() {
             {score !== null && (
                 <div className="ob-bb-score rounded-2xl border p-5" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                     <p className="text-xs font-semibold tracking-widest uppercase text-center mb-4" style={{ color: "rgba(244,241,236,0.3)", fontFamily: "var(--font-mono)" }}>
-                        Clarity score preview
+                        Clarity score — briefs below 70 are held
                     </p>
                     <ScoreRing score={score} />
                 </div>

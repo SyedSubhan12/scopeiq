@@ -22,33 +22,62 @@ interface ScopeFlagCardProps {
   onDetail?: () => void;
 }
 
+/**
+ * Spec Section 5.3 — Severity visual mapping.
+ * DO NOT deviate. Colors set inline via CSS custom properties (AP-001).
+ *
+ * | Severity | Border token          | Bg token           | Badge bg      | Badge text    |
+ * |----------|-----------------------|--------------------|---------------|---------------|
+ * | high     | --flag-border-high    | --flag-bg-high     | #DC2626       | white         |
+ * | medium   | --flag-border-medium  | --flag-bg-medium   | #92400E       | #FFFBEB       |
+ * | low      | --flag-border-low     | --flag-bg-low      | #1D4ED8       | white         |
+ */
 const SEVERITY_CONFIG: Record<string, {
   Icon: React.ElementType;
-  badge: string;
-  iconClass: string;
   label: string;
-  borderClass: string;
+  /** Inline style object for the card container (border + background) */
+  cardStyle: React.CSSProperties;
+  /** Badge background color */
+  badgeBg: string;
+  /** Badge text color */
+  badgeText: string;
+  /** Icon color class */
+  iconStyle: React.CSSProperties;
 }> = {
   high: {
     Icon: AlertCircle,
-    badge: "bg-red-100 text-red-700 border-red-200",
-    iconClass: "text-red-500",
     label: "High",
-    borderClass: "border-l-red-500",
+    cardStyle: {
+      borderLeftColor: "var(--flag-border-high)",
+      backgroundColor: "var(--flag-bg-high)",
+    },
+    badgeBg: "var(--color-danger)",
+    badgeText: "#FFFFFF",
+    iconStyle: { color: "var(--color-danger)" },
   },
   medium: {
     Icon: AlertTriangle,
-    badge: "bg-amber-100 text-amber-700 border-amber-200",
-    iconClass: "text-amber-500",
     label: "Medium",
-    borderClass: "border-l-amber-500",
+    cardStyle: {
+      borderLeftColor: "var(--flag-border-medium)",
+      backgroundColor: "var(--flag-bg-medium)",
+    },
+    /* AP-002: badge text on amber bg must use #92400E, not #D97706 */
+    badgeBg: "var(--color-warning-surface)",
+    badgeText: "var(--color-warning-text)",
+    iconStyle: { color: "var(--color-warning)" },
   },
   low: {
     Icon: Info,
-    badge: "bg-blue-100 text-blue-700 border-blue-200",
-    iconClass: "text-blue-500",
     label: "Low",
-    borderClass: "border-l-blue-500",
+    cardStyle: {
+      borderLeftColor: "var(--flag-border-low)",
+      backgroundColor: "var(--flag-bg-low)",
+    },
+    /* Darker blue for text contrast per spec Section 2.3 */
+    badgeBg: "var(--color-info)",
+    badgeText: "#FFFFFF",
+    iconStyle: { color: "var(--color-info)" },
   },
 };
 
@@ -192,17 +221,20 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
         <Card
           className={cn(
             "border-l-4 p-4 transition-all",
-            cfg.borderClass,
             !isPending && "opacity-70",
           )}
+          style={cfg.cardStyle}
         >
           <div className="flex items-start gap-3">
-            <Icon className={cn("mt-0.5 h-5 w-5 shrink-0", cfg.iconClass)} />
+            <Icon className={cn("mt-0.5 h-5 w-5 shrink-0")} style={cfg.iconStyle} />
 
             <div className="min-w-0 flex-1">
               {/* Badges row */}
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", cfg.badge)}>
+                <span
+                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
+                  style={{ backgroundColor: cfg.badgeBg, color: cfg.badgeText }}
+                >
                   {cfg.label}
                 </span>
                 <Badge status={statusCfg.badgeStatus as any} className="text-[10px]">
@@ -286,9 +318,10 @@ export function ScopeFlagCard({ flag, projectId, onDetail }: ScopeFlagCardProps)
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     size="sm"
+                    variant="primary"
                     onClick={() => setShowSoftAsk(true)}
                     disabled={isActing}
-                    className="bg-[#1D9E75] text-xs hover:bg-[#178862]"
+                    className="text-xs"
                   >
                     <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
                     Quick Note

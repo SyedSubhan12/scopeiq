@@ -121,12 +121,12 @@ export function ScopeFlagList({ projectId }: ScopeFlagListProps) {
           icon={ShieldAlert}
           title={
             statusFilter === "pending"
-              ? "No pending flags"
+              ? "No scope flags"
               : `No ${statusFilter} flags`
           }
           description={
             statusFilter === "pending"
-              ? "All scope items have been processed. Great job!"
+              ? "SOW is active. All incoming messages are being monitored."
               : "No flags match the current filters."
           }
         />

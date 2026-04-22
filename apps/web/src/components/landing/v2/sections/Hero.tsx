@@ -158,15 +158,13 @@ export function Hero() {
           variants={item}
           className="mt-6 max-w-xl text-lg leading-relaxed text-gray-400"
         >
-          ScopeIQ catches vague briefs before work starts, automates client approvals, and flags
-          out-of-scope requests in under 5 seconds — protecting your revenue on every project,
-          automatically.
+          The average creative agency loses 15–25% of annual revenue to scope creep. ScopeIQ flags out-of-scope requests in under 5 seconds, generates change orders from your rate card, and holds vague briefs before work begins.
         </motion.p>
 
         {/* CTAs */}
         <motion.div variants={item} className="mt-9 flex flex-wrap justify-center gap-3">
           <GlowButton href="/register" variant="primary">
-            Start Free Trial
+            See how it works
             <ArrowRight className="h-4 w-4" />
           </GlowButton>
           <GlowButton href="#product-showcase" variant="ghost">

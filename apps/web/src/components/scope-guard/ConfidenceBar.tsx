@@ -9,16 +9,23 @@ interface ConfidenceBarProps {
   className?: string | undefined;
 }
 
+/**
+ * Spec Section 5.3 — Confidence display thresholds:
+ * < 60%  → green  (success — borderline; only in test suite, flags need >0.60)
+ * 60–79% → amber  (warning)
+ * ≥ 80%  → red    (danger)
+ * All colors via CSS custom properties — AP-001
+ */
 function getConfidenceColor(confidence: number): string {
-  if (confidence > 0.8) return "#1D9E75";
-  if (confidence >= 0.5) return "rgb(var(--status-amber))";
-  return "rgb(var(--status-red))";
+  if (confidence >= 0.8) return "var(--color-danger)";
+  if (confidence >= 0.6) return "var(--color-warning)";
+  return "var(--color-success)";
 }
 
 function getConfidenceLabel(confidence: number): string {
-  if (confidence > 0.8) return "High confidence";
-  if (confidence >= 0.5) return "Medium confidence";
-  return "Low confidence";
+  if (confidence >= 0.8) return "High match";
+  if (confidence >= 0.6) return "Medium match";
+  return "Low match";
 }
 
 export function ConfidenceBar({ confidence, size = "md", className }: ConfidenceBarProps) {

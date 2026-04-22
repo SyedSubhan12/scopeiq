@@ -174,6 +174,7 @@ function SidebarPanel({
   supportItems,
   onNavigate,
   onLogout,
+  hideHeader = false,
 }: {
   pathname: string;
   expanded: boolean;
@@ -184,33 +185,36 @@ function SidebarPanel({
   supportItems: NavDef[];
   onNavigate: (() => void) | undefined;
   onLogout: () => Promise<void>;
+  hideHeader?: boolean;
 }) {
   return (
     <>
-      <div className="flex h-16 items-center border-b border-[rgb(var(--border-subtle))] px-3">
-        <Link
-          href="/dashboard"
-          {...(onNavigate ? { onClick: onNavigate } : {})}
-          className={cn(
-            "flex min-w-0 items-center rounded-2xl transition-colors hover:bg-[rgb(var(--surface-subtle))]",
-            expanded ? "gap-3 px-2 py-2" : "mx-auto h-11 w-11 justify-center",
-          )}
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] font-serif text-sm font-bold tracking-[0.18em] text-white shadow-[0_16px_30px_-20px_rgba(10,88,67,0.85)]">
-            SQ
-          </span>
-          {expanded ? (
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-[rgb(var(--text-primary))]">
-                {workspaceName}
-              </span>
-              <span className="block text-xs text-[rgb(var(--text-muted))]">
-                ScopeIQ workspace
-              </span>
+      {!hideHeader && (
+        <div className="flex h-16 items-center border-b border-[rgb(var(--border-subtle))] px-3">
+          <Link
+            href="/dashboard"
+            {...(onNavigate ? { onClick: onNavigate } : {})}
+            className={cn(
+              "flex min-w-0 items-center rounded-2xl transition-colors hover:bg-[rgb(var(--surface-subtle))]",
+              expanded ? "gap-3 px-2 py-2" : "mx-auto h-11 w-11 justify-center",
+            )}
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary-dark))] font-serif text-sm font-bold tracking-[0.18em] text-white shadow-[0_16px_30px_-20px_rgba(10,88,67,0.85)]">
+              SQ
             </span>
-          ) : null}
-        </Link>
-      </div>
+            {expanded ? (
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-[rgb(var(--text-primary))]">
+                  {workspaceName}
+                </span>
+                <span className="block text-xs text-[rgb(var(--text-muted))]">
+                  ScopeIQ workspace
+                </span>
+              </span>
+            ) : null}
+          </Link>
+        </div>
+      )}
 
       <ScrollArea className="min-h-0 flex-1">
         <div
@@ -286,7 +290,7 @@ function SidebarPanel({
 
       <div className="border-t border-[rgb(var(--border-subtle))] p-3">
         {expanded ? (
-          <div className="rounded-3xl border border-[rgb(var(--border-subtle))] bg-[linear-gradient(180deg,rgb(var(--surface-base))_0%,rgb(var(--surface-subtle))_100%)] p-3 shadow-[0_24px_50px_-36px_rgba(11,11,11,0.28)]">
+          <div className="rounded-3xl border border-[rgb(var(--border-subtle))] bg-[linear-gradient(180deg,#FFFFFF_0%,rgb(var(--surface-subtle))_100%)] p-3 shadow-[0_24px_50px_-36px_rgba(11,11,11,0.28)]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--text-muted))]">
@@ -420,7 +424,7 @@ export function Sidebar() {
         <aside
           aria-label="Application sidebar"
           className={cn(
-            "relative flex h-full flex-col border-r border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-base))]/96 shadow-[16px_0_40px_-36px_rgba(11,11,11,0.22)] backdrop-blur-xl transition-[width] duration-200 ease-out",
+            "relative flex h-full flex-col border-r border-[rgb(var(--border-subtle))] bg-white shadow-[16px_0_40px_-36px_rgba(11,11,11,0.22)] transition-[width] duration-200 ease-out",
             COLLAPSED_WIDTH,
             expanded && EXPANDED_WIDTH,
           )}
@@ -470,7 +474,7 @@ export function Sidebar() {
             {/* Backdrop */}
             <motion.button
               type="button"
-              className="absolute inset-0 bg-slate-950/38 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/45"
               onClick={() => setMobileSidebarOpen(false)}
               aria-label="Close navigation"
               initial={{ opacity: 0 }}
@@ -481,7 +485,7 @@ export function Sidebar() {
             {/* Drawer */}
             <motion.aside
               aria-label="Mobile navigation"
-              className="relative z-10 flex h-full w-[min(88vw,320px)] flex-col border-r border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-base))] shadow-[16px_0_48px_-28px_rgba(11,11,11,0.38)]"
+              className="relative z-10 flex h-full w-[min(88vw,320px)] flex-col border-r border-[rgb(var(--border-subtle))] bg-white shadow-[16px_0_48px_-28px_rgba(11,11,11,0.38)]"
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
@@ -519,6 +523,7 @@ export function Sidebar() {
                 supportItems={supportItems}
                 onNavigate={() => setMobileSidebarOpen(false)}
                 onLogout={handleLogout}
+                hideHeader={true}
               />
             </motion.aside>
 

@@ -70,7 +70,7 @@ function computeAlerts(
         projectId,
         projectName: name,
         flagCount: recentFlags.length,
-        message: `${name} has ${recentFlags.length} scope flags in the last 14 days. This client may be expanding scope repeatedly.`,
+        message: `${name} — ${recentFlags.length} scope flags in 14 days. Same client, recurring pattern. Consider a scope conversation or revised SOW.`,
       });
     }
   }
@@ -164,7 +164,7 @@ function AlertBanner({
             isRepeat ? "text-amber-800" : "text-orange-800",
           )}
         >
-          {isRepeat ? "Repeat scope pattern detected" : "SOW missing"}
+          {isRepeat ? "Repeat scope expansion — {N} flags in 14 days".replace("{N}", String(alert.flagCount)) : "SOW missing"}
         </p>
         <p
           className={cn(
