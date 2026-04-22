@@ -87,6 +87,15 @@ interface ChangeOrderSummary {
     respondedAt: string | null;
 }
 
+interface SubmittedBrief {
+    id: string;
+    title: string;
+    status: string;
+    submittedAt: string | null;
+    scopeScore: number | null;
+    templateId: string | null;
+}
+
 interface PortalSession {
     token: string;
     project: {
@@ -113,6 +122,7 @@ interface PortalSession {
     pendingBrief: PendingBrief | null;
     clarificationBrief: PendingBrief | null;
     clarificationRequest: ClarificationRequest | null;
+    submittedBriefs: SubmittedBrief[];
     pendingChangeOrders: ChangeOrderSummary[];
     loading: boolean;
     error: string | null;
@@ -127,6 +137,7 @@ const defaultSession: PortalSession = {
     pendingBrief: null,
     clarificationBrief: null,
     clarificationRequest: null,
+    submittedBriefs: [],
     pendingChangeOrders: [],
     loading: true,
     error: null,
@@ -174,6 +185,7 @@ export function PortalSessionProvider({
                     pendingBrief: data.pendingBrief,
                     clarificationBrief: data.clarificationBrief,
                     clarificationRequest: data.clarificationRequest,
+                    submittedBriefs: data.submittedBriefs ?? [],
                     pendingChangeOrders: data.pendingChangeOrders ?? [],
                     loading: false,
                     error: null,

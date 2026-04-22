@@ -20,22 +20,26 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
 
   const tokenHash = Buffer.from(token, "utf8").length === 64 ? token : createHash("sha256").update(token).digest("hex");
 
-  // Try projects.portal_token first (legacy direct project tokens)
-  const [project] = await db
-    .select()
+  // Try projects.portal_token first (direct project tokens)
+  const projectCandidates = await db
+    .select({
+      id: projects.id,
+      workspaceId: projects.workspaceId,
+      portalToken: projects.portalToken,
+    })
     .from(projects)
-    .where(and(
-      eq(projects.portalToken, token),
-      isNull(projects.deletedAt),
-    ))
-    .limit(1);
+    .where(isNull(projects.deletedAt))
+    .limit(100);
 
-  if (project) {
-    c.set("portalProjectId", project.id);
-    c.set("portalWorkspaceId", project.workspaceId);
-    c.set("portalClientId", null);
-    await next();
-    return;
+  for (const project of projectCandidates) {
+    if (!project.portalToken) continue;
+    if (constantTimeCompare(token, project.portalToken)) {
+      c.set("portalProjectId", project.id);
+      c.set("portalWorkspaceId", project.workspaceId);
+      c.set("portalClientId", null);
+      await next();
+      return;
+    }
   }
 
   // Try clients.portal_token_hash with constant-time comparison
@@ -47,9 +51,7 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
       tokenExpiresAt: clients.tokenExpiresAt,
     })
     .from(clients)
-    .where(and(
-      isNull(clients.deletedAt),
-    ))
+    .where(isNull(clients.deletedAt))
     .limit(100);
 
   for (const client of clientCandidates) {
@@ -74,5 +76,5 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
     }
   }
 
-  throw new UnauthorizedError("Invalid portal token");
+  throw new UnauthorizedError("Invalid or expired token");
 });

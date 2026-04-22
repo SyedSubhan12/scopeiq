@@ -2,8 +2,13 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { getRedisConnection } from "../lib/redis.js";
 
-const PORTAL_RATE_LIMIT_MAX = 10;
-const PORTAL_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+// Rate limits: 100 req/hour for localhost (dev), 10 req/hour for others (prod)
+const getPortalRateLimit = (ip: string) => {
+  if (ip === "127.0.0.1" || ip === "localhost" || ip === "::1") {
+    return { max: 1000, windowMs: 60 * 60 * 1000 }; // 1000 req/hour for localhost
+  }
+  return { max: 10, windowMs: 60 * 60 * 1000 }; // 10 req/hour for others
+};
 
 interface RedisRateLimitResult {
   success: boolean;
@@ -38,15 +43,17 @@ async function checkRedisRateLimit(ip: string, max: number, windowMs: number): P
 /**
  * Rate limiter for public portal endpoints.
  * Uses Redis sliding window counter.
- * 10 requests per hour per IP.
+ * 1000 requests per hour for localhost (dev).
+ * 10 requests per hour for other IPs (prod).
  */
 export const portalRateLimiter = createMiddleware(async (c, next) => {
-  const ip = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "127.0.0.1";
+  const { max, windowMs } = getPortalRateLimit(ip);
 
   try {
-    const result = await checkRedisRateLimit(ip, PORTAL_RATE_LIMIT_MAX, PORTAL_RATE_LIMIT_WINDOW_MS);
+    const result = await checkRedisRateLimit(ip, max, windowMs);
 
-    c.header("X-RateLimit-Limit", String(PORTAL_RATE_LIMIT_MAX));
+    c.header("X-RateLimit-Limit", String(max));
     c.header("X-RateLimit-Remaining", String(result.remaining));
     c.header("X-RateLimit-Reset", String(Math.ceil(result.reset / 1000)));
 

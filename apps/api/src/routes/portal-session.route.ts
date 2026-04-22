@@ -351,6 +351,32 @@ portalSessionRouter.get("", async (c) => {
           })),
         }));
 
+  // Fetch all submitted briefs for history/archive view
+  const submittedBriefs = await db
+    .select()
+    .from(briefs)
+    .where(
+      and(
+        eq(briefs.projectId, projectId),
+        eq(briefs.workspaceId, workspaceId),
+        isNull(briefs.deletedAt),
+      ),
+    )
+    .orderBy(desc(briefs.submittedAt), desc(briefs.updatedAt))
+    .then((results) =>
+      results
+        .filter((b) => b.submittedAt !== null)
+        .slice(0, 10)
+        .map((b) => ({
+          id: b.id,
+          title: b.title,
+          status: b.status,
+          submittedAt: b.submittedAt,
+          scopeScore: b.scopeScore,
+          templateId: b.templateId,
+        })),
+    );
+
   // Fetch health stats
   const health = await analyticsService.getProjectHealth(workspaceId, projectId);
 
@@ -430,6 +456,7 @@ portalSessionRouter.get("", async (c) => {
             }
           : null,
       clarificationRequest,
+      submittedBriefs,
       pendingChangeOrders: sentChangeOrders.map((changeOrder) => ({
         id: changeOrder.id,
         title: changeOrder.title,

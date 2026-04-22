@@ -12,18 +12,20 @@ import { gsap } from "@/animations/utils/gsap.config";
 import { useStepTransition } from "@/animations/hooks/useStepTransition";
 import { useReducedMotion } from "@/animations/context/ReducedMotionProvider";
 import { PhaseProgress } from "./PhaseProgress";
-import { buildWelcomeTimeline } from "@/animations/timelines/welcome.timeline";
 import { buildPersonaTimeline } from "@/animations/timelines/persona.timeline";
 import { buildWorkspaceTimeline } from "@/animations/timelines/workspace.timeline";
 import { buildSandboxTimeline } from "@/animations/timelines/sandbox.timeline";
+import { buildInviteTimeline } from "@/animations/timelines/invite.timeline";
+import { buildCompletionTimeline } from "@/animations/timelines/completion.timeline";
 import type { TransitionDirection } from "@/animations/context/AnimationContext";
 
-// Map step index → GSAP entrance timeline builder
 const ENTRANCE_TIMELINES = [
-    buildWelcomeTimeline,
-    buildPersonaTimeline,
-    buildWorkspaceTimeline,
-    buildSandboxTimeline,
+    buildPersonaTimeline,    // step 0 — Welcome + Persona
+    buildWorkspaceTimeline,  // step 1 — Workspace Setup
+    buildSandboxTimeline,    // step 2 — Pain Point Router
+    buildSandboxTimeline,    // step 3 — Path Setup (4A/4B/4C)
+    buildInviteTimeline,     // step 4 — Invite Team
+    buildCompletionTimeline, // step 5 — Setup Complete
 ] as const;
 
 interface OnboardingShellProps {
@@ -122,7 +124,7 @@ export function OnboardingShell({
         <div className="ob-wizard-shell flex flex-col" style={{ minHeight: "100svh" }}>
 
             {/* ── Header ───────────────────────────────────── */}
-            <header className="ob-header flex items-center justify-between px-6 py-5 md:px-10">
+            <header className="ob-header flex items-center justify-between px-6 py-5 md:px-10" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 {/* Logo mark */}
                 <div className="flex items-center gap-2.5">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -133,7 +135,7 @@ export function OnboardingShell({
                     />
                     <span
                         className="text-lg font-bold"
-                        style={{ color: "#0F6E56" }}
+                        style={{ color: "#0F6E56", fontFamily: "var(--font-sans)" }}
                     >
                         ScopeIQ
                     </span>
@@ -145,7 +147,7 @@ export function OnboardingShell({
                 {/* Step counter */}
                 <span
                     className="text-xs font-medium"
-                    style={{ color: "rgb(var(--text-muted))" }}
+                    style={{ color: "rgba(244,241,236,0.3)", fontFamily: "var(--font-mono)" }}
                 >
                     {currentStep + 1} / {steps.length}
                 </span>
@@ -153,30 +155,21 @@ export function OnboardingShell({
 
             {/* ── Continuous progress bar ───────────────────── */}
             <div
-                className="ob-progress-track h-0.5 w-full"
-                style={{ background: "rgba(15,110,86,0.12)" }}
+                className="ob-progress-track h-px w-full"
+                style={{ background: "rgba(15,110,86,0.1)" }}
             >
                 <div
                     className="ob-progress-fill h-full"
                     style={{
                         width: `${progressPct}%`,
-                        background: "linear-gradient(90deg, #0F6E56, #1D9E75)",
+                        background: "linear-gradient(90deg, #0F6E56, #1DB98A)",
                         transition: reducedMotion
                             ? "width 0.1s linear"
                             : "width 0.5s cubic-bezier(0.4,0,0.2,1)",
                         willChange: "width",
+                        boxShadow: "0 0 8px rgba(15,110,86,0.6)",
                     }}
                 />
-            </div>
-
-            {/* ── Step label strip ──────────────────────────── */}
-            <div className="flex justify-center pt-4 pb-1">
-                <p
-                    className="text-xs font-medium tracking-widest uppercase"
-                    style={{ color: "#0F6E56" }}
-                >
-                    {steps[currentStep]}
-                </p>
             </div>
 
             {/* ── Double-buffer content area ─────────────────── */}
@@ -206,7 +199,7 @@ export function OnboardingShell({
             {/* ── Footer ───────────────────────────────────── */}
             <footer
                 className="flex items-center justify-center gap-1.5 px-6 py-4 text-xs"
-                style={{ color: "rgb(var(--text-muted))" }}
+                style={{ color: "rgba(244,241,236,0.2)", borderTop: "1px solid rgba(255,255,255,0.05)" }}
             >
                 <span>Secured by</span>
                 <span className="font-semibold" style={{ color: "#0F6E56" }}>

@@ -9,13 +9,15 @@ import { z } from "zod";
 
 const onboardingStepSchema = z.object({
   step: z.enum([
-    "workspace_named",
-    "first_client",
-    "first_project",
-    "brief_template",
-    "portal_tour",
+    "persona_selected",
+    "workspace_configured",
+    "pain_point_selected",
+    "path_setup_complete",
+    "team_invited",
+    "setup_complete",
   ]),
   complete: z.boolean().default(true),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export const workspaceRouter = new Hono();
@@ -47,11 +49,12 @@ workspaceRouter.patch(
   zValidator("json", onboardingStepSchema),
   async (c) => {
     const workspaceId = c.get("workspaceId");
-    const { step, complete } = c.req.valid("json");
+    const { step, complete, metadata } = c.req.valid("json");
     const workspace = await workspaceService.updateOnboardingStep(
       workspaceId,
       step,
       complete,
+      metadata,
     );
     return c.json({ data: workspace });
   },
