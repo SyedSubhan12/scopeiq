@@ -35,3 +35,13 @@ Test helper fixtures: `apps/web/tests/e2e/helpers.ts`
 
 **Why:** Real DB (no mocks) enforced for E2E. Prior incident where mocked tests passed but prod migration failed.
 **How to apply:** Never mock the database for integration/E2E tests. Unit service tests mock the repository layer only.
+
+## Live API test credentials (2026-04-20 audit)
+- API: http://localhost:4000, Web: http://localhost:3000
+- DB: PostgreSQL localhost:5433, database `scopeiq`, user `scopeiq`, password `scopeiq_dev`
+- Redis: localhost:6372 (NOT 6379) — rate limiter uses this port, redis-cli defaults to 6379
+- Supabase: https://ncsmshzgbmutxfzghlim.supabase.co
+- Test JWT: set TestPass123! on syedsubhans132@gmail.com (auth_uid 4fa94e94...) via admin API
+- Test workspace: 4ca7779e-4405-4809-a18f-72b35a362f3e (Acme), user 108160a2...
+- Portal token (Q4 project): 8ef6f85fa262a6b1d4367d6405f2e5dde4b01b7843ce452eb8f667a616184d5c
+- Portal rate limit key: ratelimit:portal:unknown — always reset with `redis-cli -p 6372 del ratelimit:portal:unknown` before portal tests

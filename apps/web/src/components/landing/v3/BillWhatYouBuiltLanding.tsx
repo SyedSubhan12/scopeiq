@@ -500,15 +500,23 @@ function HeroBackground() {
     const W = () => canvas.offsetWidth;
     const H = () => canvas.offsetHeight;
 
-    const COUNT = 36;
+    const isMobile = window.innerWidth < 768;
+    const COUNT = isMobile ? 12 : 36;
     const nodes: BriefNode[] = Array.from({ length: COUNT }, () => {
       const roll = Math.random();
       const kind: NodeKind =
-        roll < 0.48 ? "scored"   :
-        roll < 0.72 ? "brief"    :
-        roll < 0.88 ? "flagged"  : "approved";
+        roll < 0.48 ? "scored" :
+          roll < 0.72 ? "brief" :
+            roll < 0.88 ? "flagged" : "approved";
+
+      // On mobile, keep nodes more towards the center-right to avoid clashing with the left-aligned text
+      // if it was left-aligned. Actually the user wants them centered.
+      const x = isMobile
+        ? (0.2 + Math.random() * 0.6) * W()
+        : Math.random() * W();
+
       return {
-        x: Math.random() * W(),
+        x,
         y: Math.random() * H(),
         vx: (Math.random() - 0.5) * 0.14,
         vy: (Math.random() - 0.5) * 0.14,
@@ -519,12 +527,12 @@ function HeroBackground() {
     });
 
     const NODE_RGB: Record<NodeKind, string> = {
-      brief:    "25,106,73",
-      scored:   "25,106,73",
-      flagged:  "214,76,44",
+      brief: "25,106,73",
+      scored: "25,106,73",
+      flagged: "214,76,44",
       approved: "25,106,73",
     };
-    const CONNECT = 200;
+    const CONNECT = isMobile ? 120 : 200;
     const SCAN_SPEED = 0.28;
 
     function draw() {
@@ -594,17 +602,16 @@ function HeroBackground() {
         }
       }
 
-      // Horizontal scan beam — AI scoring a document
+      // Horizontal scan beam
       const bx = scanX - 100;
       if (bx < w + 120) {
         const sg = ctx.createLinearGradient(bx, 0, bx + 140, 0);
-        sg.addColorStop(0,   "rgba(25,106,73,0)");
+        sg.addColorStop(0, "rgba(25,106,73,0)");
         sg.addColorStop(0.5, "rgba(25,106,73,0.07)");
-        sg.addColorStop(1,   "rgba(25,106,73,0.01)");
+        sg.addColorStop(1, "rgba(25,106,73,0.01)");
         ctx.fillStyle = sg;
         ctx.fillRect(bx, 0, 140, h);
 
-        // Leading edge line
         ctx.beginPath();
         ctx.moveTo(bx + 100, 0);
         ctx.lineTo(bx + 100, h);
@@ -613,12 +620,12 @@ function HeroBackground() {
         ctx.stroke();
       }
 
-      // Radar rings — scope detection, top-right corner
-      const rx = w * 0.82;
-      const ry = h * 0.22;
+      // Radar rings — Center on mobile, top-right on desktop
+      const rx = isMobile ? w * 0.5 : w * 0.82;
+      const ry = isMobile ? h * 0.35 : h * 0.22;
       for (let i = 0; i < 4; i++) {
         const phase = ((time * 0.35 + i * 0.62) % 1);
-        const r = phase * Math.min(w, h) * 0.55;
+        const r = phase * Math.min(w, h) * (isMobile ? 0.4 : 0.55);
         const alpha = (1 - phase) * 0.18;
         ctx.beginPath();
         ctx.arc(rx, ry, r, 0, Math.PI * 2);
@@ -627,7 +634,7 @@ function HeroBackground() {
         ctx.stroke();
       }
 
-      // Center pulse — subtle heartbeat from heading area
+      // Center pulse
       const cx = w * 0.5;
       const cy = h * 0.28;
       const cp = ((time * 0.5) % 1);
@@ -1254,15 +1261,15 @@ function LiveFlagDemo() {
                           __html:
                             step >= 2 && i === 0
                               ? m.text.replace(
-                                  "one more direction",
-                                  `<mark style="background:${EMBER};color:${PAPER};padding:0 4px;border-radius:2px">one more direction</mark>`,
-                                )
+                                "one more direction",
+                                `<mark style="background:${EMBER};color:${PAPER};padding:0 4px;border-radius:2px">one more direction</mark>`,
+                              )
                               : step >= 3 && i === 1
-                              ? m.text.replace(
+                                ? m.text.replace(
                                   "tweak the hero copy",
                                   `<mark style="background:${EMBER};color:${PAPER};padding:0 4px;border-radius:2px">tweak the hero copy</mark>`,
                                 )
-                              : m.text,
+                                : m.text,
                         }}
                       />
                     </div>
@@ -1374,7 +1381,7 @@ function MetricsSection() {
           >
             &ldquo;We stopped eating revisions in month one. Change orders are boring now —
             which is exactly what I wanted. <em style={{ color: MOSS }}>ScopeIQ pays for itself by lunch
-            on Tuesdays.</em>&rdquo;
+              on Tuesdays.</em>&rdquo;
             <footer
               style={{ fontFamily: FONT_MONO }}
               className="mt-6 text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink)]/55"

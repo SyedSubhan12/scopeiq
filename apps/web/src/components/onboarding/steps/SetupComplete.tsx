@@ -20,7 +20,7 @@ const PATH_ACTIONS = {
     scope_guard: { text: "Upload your first real SOW and activate Scope Guard on an active project.", cta: "Upload SOW", href: "/dashboard/scope-guard/new" },
     approval_portal: { text: "Your client portal link is ready. Send it to a client waiting on review.", cta: "Copy Portal Link", href: "/dashboard/approvals" },
     brief_builder: { text: "Share your brief form with a new client.", cta: "Copy Brief Link", href: "/dashboard/briefs" },
-    full_tour: { text: "Start with Scope Guard — upload your first SOW to activate protection.", cta: "Upload SOW", href: "/dashboard/scope-guard/new" },
+    full_tour: { text: "Upload your SOW. From this point, ScopeIQ monitors every client message against what you've contracted to deliver.", cta: "Upload SOW", href: "/dashboard/scope-guard/new" },
 };
 
 const CONFETTI_COLORS = ["#0F6E56", "#1DB98A", "#F4F1EC", "#34D399", "#6EE7B7"];
@@ -92,19 +92,19 @@ export function SetupComplete() {
                     className="text-4xl font-bold leading-tight"
                     style={{ color: "#F4F1EC", fontFamily: "var(--font-serif)", fontStyle: "italic", textShadow: "0 0 60px rgba(15,110,86,0.3)" }}
                 >
-                    Your ScopeIQ workspace
+                    Scope monitoring
                     <br />
-                    is ready.
+                    is active.
                 </h2>
                 <p className="text-sm" style={{ color: "rgba(244,241,236,0.5)" }}>
-                    Here&apos;s what to do next to protect your first project.
+                    Your SOW is the protection layer. Upload it to begin.
                 </p>
             </div>
 
             {/* Checklist */}
             <div className="ob-complete-checklist rounded-2xl border p-5 space-y-2.5" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                 <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: "rgba(244,241,236,0.25)", fontFamily: "var(--font-mono)" }}>
-                    Quick wins
+                    Protection checklist
                 </p>
                 {CHECKLIST.map((item) => (
                     <div key={item.label} className="flex items-center gap-3">

@@ -57,7 +57,7 @@ export function FlagDetectionBanner({
         >
           <Loader2 className="h-4 w-4 animate-spin text-[#1D9E75]" />
           <span className="text-sm text-[rgb(var(--text-secondary))]">
-            Scanning for scope changes
+            Analyzing message against SOW
           </span>
           <ScanningDots />
         </motion.div>
@@ -86,12 +86,12 @@ export function FlagDetectionBanner({
           )}>
             {(flagCount ?? 0) > 0
               ? `${flagCount} flag${(flagCount ?? 0) !== 1 ? "s" : ""} detected in `
-              : "No flags detected in "}
+              : "No scope flags. All messages within contract — "}
             <span ref={latencyRef}>0</span>
             ms
           </span>
           {(flagCount ?? 0) === 0 && (
-            <span className="text-xs text-emerald-600">— within SLA</span>
+            <span className="text-xs text-emerald-600">— SOW check complete</span>
           )}
         </motion.div>
       ) : null}

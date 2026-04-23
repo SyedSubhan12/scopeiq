@@ -4,84 +4,261 @@
 
 @layer base {
   :root {
-    /* === BRAND COLORS === */
-    --primary: 25 108 74;          /* #196C4A — moss */
-    --primary-mid: 34 138 96;      /* #228A60 */
-    --primary-light: 225 238 232;  /* #E1EEE8 */
-    --primary-dark: 18 82 56;      /* #125238 */
+    /* ================================================================
+       TIER 1 — PRIMITIVE VALUES
+       Reference only. Never use raw-* vars in components.
+       ================================================================ */
 
-    /* === STATUS COLORS === */
-    --status-red: 220 38 38;       /* #DC2626 */
-    --status-amber: 217 119 6;     /* #D97706 */
-    --status-green: 5 150 105;     /* #059669 */
-    --status-blue: 37 99 235;      /* #2563EB */
+    /* Action / Brand */
+    --raw-teal-600: #0F6E56;
+    --raw-teal-500: #1D9E75;
+    --raw-teal-400: #2EB88A;
+    --raw-teal-100: #A7E0CB;
+    --raw-teal-50: #E1F5EE;
+    --raw-teal-700: #0A5240;
 
-    /* === TEXT COLORS === */
-    --text-primary: 13 27 42;      /* #0D1B2A */
-    --text-secondary: 75 85 99;    /* #4B5563 */
-    --text-muted: 156 163 175;     /* #9CA3AF */
+    /* Status */
+    --raw-red-600: #DC2626;
+    --raw-red-50: #FEF2F2;
+    --raw-amber-600: #D97706;
+    --raw-amber-800: #92400E;
+    --raw-amber-50: #FFFBEB;
+    --raw-green-600: #059669;
+    --raw-green-50: #ECFDF5;
+    --raw-blue-600: #2563EB;
+    --raw-blue-700: #1D4ED8;
+    --raw-blue-50: #EFF6FF;
 
-    /* === SURFACE COLORS === */
-    --surface-base: 250 248 242;   /* #FAF8F2 — warm paper */
-    --surface-subtle: 240 237 228; /* #F0EDE4 — cream paper */
-    --surface-raised: 232 228 216; /* #E8E4D8 */
-    --surface-overlay: 220 215 200;/* #DCD7C8 */
+    /* Neutrals */
+    --raw-slate-900: #0D1B2A;
+    --raw-slate-600: #4B5563;
+    --raw-slate-400: #9CA3AF;
+    --raw-slate-200: #E5E7EB;
+    --raw-slate-100: #F3F4F6;
+    --raw-slate-50: #F8FAFC;
+    --raw-white: #FFFFFF;
+    --raw-border: #D1D5DB;
 
-    /* === BORDER COLORS === */
-    --border-default: 209 213 219; /* #D1D5DB */
-    --border-subtle: 229 231 235;  /* #E5E7EB */
-    --border-strong: 156 163 175;  /* #9CA3AF */
+    /* Pending */
+    --raw-orange-50: #FFF7ED;
+    --raw-orange-800: #9A3412;
 
-    /* === SHADOW SCALE === */
-    --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
-    --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
-    --shadow-glow: 0 0 0 3px rgba(25,108,74,0.22);
+    /* Neutral badge */
+    --raw-gray-100: #F3F4F6;
+    --raw-gray-600: #4B5563;
 
-    /* === EASING CURVES === */
+
+    /* ================================================================
+       TIER 2 — SEMANTIC TOKENS
+       Role-based, reference Tier 1. These are the only tokens exposed
+       to workspace white-label overrides.
+       ================================================================ */
+
+    /* Action / Primary */
+    --color-action-primary: var(--raw-teal-600);
+    /* #0F6E56 */
+    --color-action-hover: var(--raw-teal-500);
+    /* #1D9E75 */
+    --color-action-press: var(--raw-teal-700);
+    /* #0A5240 */
+    --color-action-subtle: var(--raw-teal-50);
+    /* #E1F5EE */
+
+    /* Status — NOT exposed to workspace overrides */
+    --color-danger: var(--raw-red-600);
+    /* #DC2626 */
+    --color-warning: var(--raw-amber-600);
+    /* #D97706 */
+    --color-warning-text: var(--raw-amber-800);
+    /* #92400E — use for body text on light bg */
+    --color-success: var(--raw-green-600);
+    /* #059669 */
+    --color-info: var(--raw-blue-600);
+    /* #2563EB */
+    --color-info-text: var(--raw-blue-700);
+    /* #1D4ED8 — use for small body text */
+
+    /* Status surfaces */
+    --color-danger-surface: var(--raw-red-50);
+    /* #FEF2F2 */
+    --color-warning-surface: var(--raw-amber-50);
+    /* #FFFBEB */
+    --color-success-surface: var(--raw-green-50);
+    /* #ECFDF5 */
+    --color-info-surface: var(--raw-blue-50);
+    /* #EFF6FF */
+    --color-pending-surface: var(--raw-orange-50);
+    /* #FFF7ED */
+
+    /* Text */
+    --color-text-high: var(--raw-slate-900);
+    /* #0D1B2A — 17.4:1 on white ✅ */
+    --color-text-mid: var(--raw-slate-600);
+    /* #4B5563 — 7.6:1 on white ✅ */
+    --color-text-low: var(--raw-slate-400);
+    /* #9CA3AF — 2.9:1 — metadata only */
+
+    /* Surface */
+    --color-surface: var(--raw-white);
+    /* #FFFFFF */
+    --color-surface-raised: var(--raw-slate-50);
+    /* #F8FAFC */
+
+    /* Border */
+    --color-border: var(--raw-border);
+    /* #D1D5DB */
+    --color-border-focus: var(--raw-teal-600);
+    /* #0F6E56 */
+
+
+    /* ================================================================
+       TIER 3 — COMPONENT TOKENS
+       Contextual, reference Tier 2. Override here for component-level
+       visual adjustments without affecting global semantics.
+       ================================================================ */
+
+    /* Button — Primary */
+    --btn-primary-bg: var(--color-action-primary);
+    --btn-primary-bg-hover: var(--color-action-hover);
+    --btn-primary-bg-press: var(--color-action-press);
+
+    /* Scope Flag Card */
+    --flag-border-high: var(--color-danger);
+    --flag-bg-high: var(--color-danger-surface);
+    --flag-border-medium: var(--color-warning);
+    --flag-bg-medium: var(--color-warning-surface);
+    --flag-border-low: var(--color-info);
+    --flag-bg-low: var(--color-info-surface);
+
+    /* Revision Counter / Progress Bar */
+    --revision-bar-safe: var(--color-success);
+    --revision-bar-warning: var(--color-warning);
+    --revision-bar-critical: var(--color-danger);
+
+
+    /* ================================================================
+       TYPOGRAPHY SCALE
+       Two explicit steps: mobile (default) and desktop (≥1280px).
+       No fluid clamp() — predictable AT scaling.
+       ================================================================ */
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+
+    /* Mobile-first (375px–1279px) */
+    --text-display: 28px;
+    --text-h1: 22px;
+    --text-h2: 18px;
+    --text-h3: 16px;
+    --text-body-lg: 16px;
+    --text-body: 14px;
+    --text-sm: 12px;
+    --text-code: 13px;
+    --text-label: 11px;
+
+
+    /* ================================================================
+       SPACING — 4px base unit, all multiples of 4
+       ================================================================ */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+
+    /* ================================================================
+       BORDER RADIUS
+       ================================================================ */
+    --radius-sm: 4px;
+    /* Chips, inline code */
+    --radius-md: 6px;
+    /* Inputs, small cards */
+    --radius-lg: 8px;
+    /* Buttons, standard cards */
+    --radius-xl: 12px;
+    /* Metric cards, large modals */
+    --radius-full: 9999px;
+    /* Pills, badges */
+
+
+    /* ================================================================
+       SHADOWS
+       ================================================================ */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+
+    /* ================================================================
+       Z-INDEX SCALE — Named layers only. Never use arbitrary values.
+       ================================================================ */
+    --z-base: 0;
+    /* Document flow */
+    --z-raised: 10;
+    /* Cards, dropdowns within content area */
+    --z-sticky: 20;
+    /* Sticky bars, table headers */
+    --z-overlay: 30;
+    /* Annotation canvas SVG overlay */
+    --z-dropdown: 40;
+    /* Select menus, tooltips */
+    --z-modal: 50;
+    /* Dialogs, at-limit modals */
+    --z-toast: 60;
+    /* Notification toasts */
+    --z-nav: 70;
+    /* Left nav sidebar on mobile */
+
+
+    /* ================================================================
+       EASING & ANIMATION
+       ================================================================ */
     --ease-out: cubic-bezier(0.0, 0, 0.2, 1);
     --ease-in: cubic-bezier(0.4, 0, 1, 1);
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     --ease-back: cubic-bezier(0.34, 1.2, 0.64, 1);
 
-    /* === ANIMATION DURATIONS === */
     --duration-fast: 150ms;
     --duration-normal: 250ms;
     --duration-slow: 350ms;
     --duration-slower: 500ms;
-
-    /* === Z-INDEX SCALE === */
-    --z-base: 0;
-    --z-dropdown: 200;
-    --z-sticky: 300;
-    --z-fixed: 400;
-    --z-modal: 500;
-    --z-popover: 600;
-    --z-tooltip: 700;
-
-    /* === BORDER RADIUS SCALE === */
-    --radius-xs: 2px;
-    --radius-sm: 4px;
-    --radius-md: 6px;
-    --radius-lg: 8px;
-    --radius-xl: 12px;
-    --radius-2xl: 16px;
-    --radius-3xl: 24px;
-    --radius-full: 9999px;
   }
 
-  [data-theme="dark"] {
-    --surface-base:    10 15 26;      /* #0A0F1A */
-    --surface-subtle:  15 23 42;      /* #0F172A */
-    --surface-raised:  30 41 59;      /* #1E293B */
-    --surface-overlay: 51 65 85;      /* #334155 */
-    --border-subtle:   51 65 85;      /* #334155 */
-    --border-default:  71 85 105;     /* #475569 */
-    --text-muted:      100 116 139;   /* #64748B */
-    --text-secondary:  148 163 184;   /* #94A3B8 */
-    --text-primary:    241 245 249;   /* #F1F5F9 */
+  /* ================================================================
+     DESKTOP TYPE SCALE — 1280px+
+     Heading sizes increase; body/label/code unchanged.
+     ================================================================ */
+  @media (min-width: 1280px) {
+    :root {
+      --text-display: 32px;
+      --text-h1: 24px;
+      --text-h2: 20px;
+    }
+  }
+
+  /* ================================================================
+     REDUCED MOTION — Disable all transitions and animations
+     ================================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --duration-fast: 0ms;
+      --duration-normal: 0ms;
+      --duration-slow: 0ms;
+      --duration-slower: 0ms;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0ms !important;
+      transition-duration: 0ms !important;
+    }
   }
 }

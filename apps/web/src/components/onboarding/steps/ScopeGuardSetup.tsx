@@ -61,12 +61,12 @@ export function ScopeGuardSetup() {
                     Step 4 of 6 · Scope Guard
                 </p>
                 <h2 className="text-3xl font-bold leading-tight" style={{ color: "#F4F1EC", fontFamily: "var(--font-serif)", fontStyle: "italic" }}>
-                    Let&apos;s catch your first
+                    Upload your SOW.
                     <br />
-                    scope creep attempt
+                    Scope monitoring begins now.
                 </h2>
                 <p className="text-sm" style={{ color: "rgba(244,241,236,0.5)" }}>
-                    Upload your SOW, try a sample, or paste a client message to see it in action.
+                    From this point, ScopeIQ monitors every client message against what you&apos;ve contracted to deliver.
                 </p>
             </div>
 
@@ -189,10 +189,10 @@ export function ScopeGuardSetup() {
                                     </span>
                                 </div>
                                 <p className="text-sm" style={{ color: "rgba(244,241,236,0.7)" }}>
-                                    <strong style={{ color: "#F4F1EC" }}>Social media templates (Canva)</strong> — not included in the signed SOW. This would add approximately 3–5 hours of unbilled work.
+                                    <strong style={{ color: "#F4F1EC" }}>Social media templates (Canva)</strong> — flagged against Section 3.1 of the SOW. A change order is ready to generate.
                                 </p>
                                 <p className="text-xs" style={{ color: "rgba(244,241,236,0.35)" }}>
-                                    This is what ScopeIQ looks like when it catches a scope creep attempt.
+                                    This is how ScopeIQ confirms a deviation.
                                 </p>
                             </div>
                         )}
