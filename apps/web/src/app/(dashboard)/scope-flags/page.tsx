@@ -74,160 +74,160 @@ export default function ScopeFlagsPage() {
 
   return (
     <PageEnter>
-    <div className="space-y-6">
-      {/* Pattern alerts — FEAT-NEW-005 */}
-      <ScopePatternAlerts
-        flags={flags}
-        projects={projects}
-        dismissed={dismissedAlerts}
-        onDismiss={(id) => setDismissedAlerts((prev) => new Set([...prev, id]))}
-      />
+      <div className="space-y-6">
+        {/* Pattern alerts — FEAT-NEW-005 */}
+        <ScopePatternAlerts
+          flags={flags}
+          projects={projects}
+          dismissed={dismissedAlerts}
+          onDismiss={(id) => setDismissedAlerts((prev) => new Set([...prev, id]))}
+        />
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-[rgb(var(--text-primary))]">
-            <ShieldAlert className="h-6 w-6 text-red-500" />
-            Scope Flags
-            {pendingCount > 0 && (
-              <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
-                {pendingCount}
-              </span>
-            )}
-          </h1>
-          <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
-            AI-detected scope creep signals across all projects
-          </p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <Filter className="h-4 w-4 text-[rgb(var(--text-muted))]" />
-          <span className="text-xs font-medium text-[rgb(var(--text-muted))]">Status:</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {STATUS_FILTERS.map((s) => {
-            const count = s === "all"
-              ? flags.length
-              : flags.filter((f) => f.status === s).length;
-            if (count === 0 && s !== "all") return null;
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setStatusFilter(s)}
-                className={cn(
-                  "relative overflow-hidden rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors",
-                  statusFilter === s
-                    ? "text-white"
-                    : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--border-subtle))]",
-                )}
-              >
-                {statusFilter === s && (
-                  <motion.span
-                    layoutId="status-filter-active"
-                    className="absolute inset-0 rounded-full bg-primary"
-                    style={{ zIndex: 0 }}
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10">
-                  {s.replace(/_/g, " ")}
-                  {count > 0 && (
-                    <span className="ml-1 text-[10px] opacity-70">({count})</span>
-                  )}
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-[rgb(var(--text-primary))]">
+              <ShieldAlert className="h-6 w-6 text-red-500" />
+              Scope Flags
+              {pendingCount > 0 && (
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                  {pendingCount}
                 </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-[rgb(var(--text-muted))]">Severity:</span>
-          <div className="flex gap-1.5">
-            {SEVERITY_FILTERS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSeverityFilter(s)}
-                className={cn(
-                  "relative overflow-hidden rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors",
-                  severityFilter === s
-                    ? "text-white"
-                    : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--border-subtle))]",
-                )}
-              >
-                {severityFilter === s && (
-                  <motion.span
-                    layoutId="severity-filter-active"
-                    className="absolute inset-0 rounded-full bg-[rgb(var(--text-primary))]"
-                    style={{ zIndex: 0 }}
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10">{s}</span>
-              </button>
-            ))}
+              )}
+            </h1>
+            <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
+              AI-detected scope creep signals across all projects
+            </p>
           </div>
         </div>
 
-        {/* Project filter */}
-        {projects.length > 0 && (
-          <div className="relative ml-auto">
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="appearance-none rounded-xl border border-[rgb(var(--border-default))] bg-white py-1.5 pl-3 pr-8 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="all">All Projects</option>
-              {projects.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-4 w-4 text-[rgb(var(--text-muted))]" />
+            <span className="text-xs font-medium text-[rgb(var(--text-muted))]">Status:</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {STATUS_FILTERS.map((s) => {
+              const count = s === "all"
+                ? flags.length
+                : flags.filter((f) => f.status === s).length;
+              if (count === 0 && s !== "all") return null;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  className={cn(
+                    "relative overflow-hidden rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors",
+                    statusFilter === s
+                      ? "text-white"
+                      : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--border-subtle))]",
+                  )}
+                >
+                  {statusFilter === s && (
+                    <motion.span
+                      layoutId="status-filter-active"
+                      className="absolute inset-0 rounded-full bg-primary"
+                      style={{ zIndex: 0 }}
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10">
+                    {s.replace(/_/g, " ")}
+                    {count > 0 && (
+                      <span className="ml-1 text-[10px] opacity-70">({count})</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-[rgb(var(--text-muted))]">Severity:</span>
+            <div className="flex gap-1.5">
+              {SEVERITY_FILTERS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSeverityFilter(s)}
+                  className={cn(
+                    "relative overflow-hidden rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors",
+                    severityFilter === s
+                      ? "text-white"
+                      : "bg-[rgb(var(--surface-subtle))] text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--border-subtle))]",
+                  )}
+                >
+                  {severityFilter === s && (
+                    <motion.span
+                      layoutId="severity-filter-active"
+                      className="absolute inset-0 rounded-full bg-[rgb(var(--text-primary))]"
+                      style={{ zIndex: 0 }}
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10">{s}</span>
+                </button>
               ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--text-muted))]" />
+            </div>
+          </div>
+
+          {/* Project filter */}
+          {projects.length > 0 && (
+            <div className="relative ml-auto">
+              <select
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                className="appearance-none rounded-xl border border-[rgb(var(--border-default))] bg-white py-1.5 pl-3 pr-8 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="all">All Projects</option>
+                {projects.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--text-muted))]" />
+            </div>
+          )}
+        </div>
+
+        {/* Flag list */}
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 w-full" />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <Card className="py-16 text-center">
+            <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-[rgb(var(--text-muted))]" />
+            <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">
+              {statusFilter === "all" ? "No scope flags yet" : `No ${statusFilter.replace(/_/g, " ")} flags`}
+            </p>
+            <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
+              Flags are created automatically when AI detects scope creep in client messages.
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            <AnimatePresence initial={false}>
+              {filtered.map((flag: any) => (
+                <motion.div
+                  key={flag.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -24, height: 0, marginBottom: 0 }}
+                  transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                >
+                  <FlagCard
+                    flag={flag}
+                    onAction={(id, status) => handleAction(id, status)}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>
-
-      {/* Flag list */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 w-full" />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <Card className="py-16 text-center">
-          <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-[rgb(var(--text-muted))]" />
-          <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">
-            {statusFilter === "all" ? "No scope flags yet" : `No ${statusFilter.replace(/_/g, " ")} flags`}
-          </p>
-          <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
-            Flags are created automatically when AI detects scope creep in client messages.
-          </p>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          <AnimatePresence initial={false}>
-            {filtered.map((flag: any) => (
-              <motion.div
-                key={flag.id}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, x: -24, height: 0, marginBottom: 0 }}
-                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-              >
-                <FlagCard
-                  flag={flag}
-                  onAction={(id, status) => handleAction(id, status)}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
-    </div>
     </PageEnter>
   );
 }
@@ -257,7 +257,7 @@ function FlagCard({ flag, onAction }: { flag: any; onAction: (id: string, status
           </p>
           {flag.snippet && (
             <p className="mt-1.5 rounded-lg bg-[rgb(var(--surface-subtle))] px-3 py-2 text-xs text-[rgb(var(--text-secondary))] italic">
-              "{flag.snippet}"
+              &quot;{flag.snippet}&quot;
             </p>
           )}
           <div className="mt-2 flex items-center gap-3 text-xs text-[rgb(var(--text-muted))]">

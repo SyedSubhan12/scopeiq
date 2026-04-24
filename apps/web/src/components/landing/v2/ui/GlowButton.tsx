@@ -42,9 +42,17 @@ export const GlowButton = forwardRef<HTMLButtonElement, Props>(function GlowButt
     );
   }
 
-  const buttonRest = rest as ButtonHTMLAttributes<HTMLButtonElement>;
+  const { style: buttonStyle, ...buttonRest } = rest as ButtonHTMLAttributes<HTMLButtonElement>;
   return (
-    <motion.button ref={ref} {...animationProps} className={cls} {...buttonRest}>
+    <motion.button
+      ref={ref}
+      {...animationProps}
+      className={cls}
+      // Cast away the exactOptionalPropertyTypes conflict between ButtonHTMLAttributes
+      // and HTMLMotionProps — framer-motion handles the overlap fine at runtime.
+      {...(buttonRest as unknown as import("framer-motion").HTMLMotionProps<"button">)}
+      style={buttonStyle as import("framer-motion").MotionStyle}
+    >
       {children}
     </motion.button>
   );

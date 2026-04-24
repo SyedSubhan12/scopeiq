@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import React from "react";
+import { motion, type MotionStyle } from "framer-motion";
 import {
   Check,
   FileText,
@@ -122,10 +123,9 @@ export function Features() {
                 delay: i * 0.08,
               }}
               className="group relative flex flex-col rounded-3xl border border-black/5 bg-[#F9F9F9] p-8 text-black transition-colors hover:border-[rgba(29,158,117,0.3)]"
-              style={{
-                // custom property consumed by the hover glow pseudo-element
-                "--accent": f.accent,
-              } as React.CSSProperties}
+              style={
+                ({ "--accent": f.accent }) as unknown as MotionStyle
+              }
             >
               {/* Accent glow on hover (subtle for light mode) */}
               <div

@@ -47,7 +47,7 @@ export function ChangeOrderEditor({
 }: ChangeOrderEditorProps) {
   const { toast } = useToast();
   const createCO = useCreateChangeOrder();
-  const updateCO = existingId ? useUpdateChangeOrder(existingId) : null;
+  const updateCO = useUpdateChangeOrder(existingId ?? "");
 
   const [title, setTitle] = useState(existingData?.title ?? "");
   const [description, setDescription] = useState(existingData?.description ?? "");
@@ -85,7 +85,7 @@ export function ChangeOrderEditor({
 
     setIsSubmitting(true);
     try {
-      if (existingId && updateCO) {
+      if (existingId) {
         const patchData: {
           title: string;
           description?: string;

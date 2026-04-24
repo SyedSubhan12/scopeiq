@@ -468,8 +468,8 @@ function HeroBackground() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    // Non-null assert: we return early above if ctx is null; tsc can't narrow across closures
+    const ctx = canvas.getContext("2d")!;
 
     let animId: number;
     let time = 0;
