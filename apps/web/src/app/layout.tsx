@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+export const dynamic = "force-dynamic";
+
 import { Inter, JetBrains_Mono, Sora, DM_Sans, Fraunces, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/providers";
