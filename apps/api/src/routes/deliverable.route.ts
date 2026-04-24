@@ -15,6 +15,9 @@ import {
   deliverableDeleteResponseSchema,
   approvalEventResponseSchema,
 } from "./deliverable.schemas.js";
+
+type CreateDeliverableInput = z.output<typeof createDeliverableSchema>;
+type UploadUrlInput = z.output<typeof uploadUrlSchema>;
 import { submitFeedbackSchema, feedbackResponseSchema } from "./feedback.schemas.js";
 
 export const deliverableRouter = new Hono();
@@ -52,7 +55,7 @@ deliverableRouter.post(
   async (c) => {
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
-    const body = c.req.valid("json");
+    const body = c.req.valid("json") as CreateDeliverableInput;
     const deliverable = await deliverableService.create(workspaceId, userId, body);
     return c.json(deliverableResponseSchema.parse({ data: deliverable }), 201);
   },
@@ -85,7 +88,7 @@ deliverableRouter.post(
   async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
-    const body = c.req.valid("json");
+    const body = c.req.valid("json") as UploadUrlInput;
     const result = await deliverableService.getUploadUrl(workspaceId, id, body);
     return c.json({ data: result });
   },

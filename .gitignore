@@ -48,3 +48,4 @@ venv/
 .venv/
 .pytest_cache/
 .claude/worktrees/
+.vercel
