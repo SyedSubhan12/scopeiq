@@ -303,7 +303,7 @@ export function DeliverableViewer({
                 {fileDisplayName(fileType)}
               </p>
               <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
-                This file type can't be previewed in the browser.
+                This file type can&apos;t be previewed in the browser.
               </p>
             </div>
             <a

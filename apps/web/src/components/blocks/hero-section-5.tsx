@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { InfiniteSlider } from '@/components/ui/infinite-slider'
 import { ProgressiveBlur } from '@/components/ui/progressive-blur'
 import { cn } from '@/lib/utils'
-import { ChevronRight, PlayCircle } from 'lucide-react'
+import { ChevronRight, Menu, PlayCircle, X } from 'lucide-react'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import gsap from '@/lib/gsap-setup'
 import { Navbar } from '@/components/landing/v2/Navbar'
@@ -25,15 +25,15 @@ export function HeroSection() {
             .join(' ');
 
         const spans = h1Ref.current.querySelectorAll('span span');
-        
+
         const ctx = gsap.context(() => {
-            gsap.fromTo(spans, 
-                { 
+            gsap.fromTo(spans,
+                {
                     y: 100,
                     opacity: 0,
                     filter: 'blur(10px)'
-                }, 
-                { 
+                },
+                {
                     y: 0,
                     opacity: 1,
                     filter: 'blur(0px)',
@@ -93,17 +93,17 @@ export function HeroSection() {
                                     </span>
                                     The new standard for agencies
                                 </motion.div>
-                                
+
                                 <h1
                                     ref={h1Ref}
                                     className="mt-8 max-w-4xl text-balance text-6xl font-extrabold tracking-tight md:text-7xl lg:mt-12 xl:text-9xl text-black">
                                     Bill what you <span className="text-[#0F6E56]">build.</span>
                                 </h1>
-                                
+
                                 <motion.p
                                     variants={itemVariants}
                                     className="mt-8 max-w-2xl text-balance text-lg text-black/80 md:text-xl leading-relaxed">
-                                    ScopeIQ automates scope enforcement for creative teams. 
+                                    ScopeIQ automates scope enforcement for creative teams.
                                     Catch vague briefs, automate approvals, and recover lost revenue automatically.
                                 </motion.p>
 
@@ -130,8 +130,8 @@ export function HeroSection() {
                                         </Link>
                                     </Button>
                                 </motion.div>
-                                
-                                <motion.div 
+
+                                <motion.div
                                     variants={itemVariants}
                                     className="mt-16 flex items-center justify-center gap-8 lg:justify-start">
                                     <div className="flex -space-x-3">
@@ -148,7 +148,7 @@ export function HeroSection() {
 
                             </div>
                         </motion.div>
-                        
+
                         <motion.div
                             style={{ y: y1, opacity }}
                             className="aspect-[2/3] absolute inset-0 -z-10 overflow-hidden rounded-b-[3rem] border-b border-black/5 sm:aspect-video lg:rounded-b-[5rem]">

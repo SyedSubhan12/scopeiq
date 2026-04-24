@@ -127,7 +127,7 @@ export default function HelpPage() {
         <div>
           <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">Still need help?</p>
           <p className="mt-0.5 text-xs text-[rgb(var(--text-muted))]">
-            Reach out to us and we'll get back to you within 24 hours.
+            Reach out to us and we&apos;ll get back to you within 24 hours.
           </p>
         </div>
         <a

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 
 type Props = {
   children: string;
@@ -57,10 +57,8 @@ export function RevealText({
     return () => io.disconnect();
   }, [children, delay, stagger]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const Component = Tag as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <Component ref={ref as any} className={className}>{children}</Component>;
+  const Component = Tag as React.ElementType;
+  return <Component ref={ref as React.RefObject<HTMLElement>} className={className}>{children}</Component>;
 }
 
 function escape(s: string): string {

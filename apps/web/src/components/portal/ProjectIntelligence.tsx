@@ -80,7 +80,7 @@ export function ProjectIntelligence({ health }: ProjectIntelligenceProps) {
                     <div>
                         <p className="text-sm font-bold text-amber-900">Intelligence Nudge</p>
                         <p className="text-xs text-amber-800/80 leading-relaxed mt-1">
-                            We've detected {pendingFlags} potential scope deviation{pendingFlags > 1 ? 's' : ''}.
+                            We&apos;ve detected {pendingFlags} potential scope deviation{pendingFlags > 1 ? 's' : ''}.
                             Our team is currently reviewing these to ensure your project remains on track.
                             No action is required from your side at this moment.
                         </p>
