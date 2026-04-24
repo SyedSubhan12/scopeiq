@@ -15,6 +15,28 @@ const nextConfig = {
   // for the browser. The web app talks to the API via HTTP only.
   transpilePackages: ["@novabots/ui", "@novabots/types"],
 
+  async rewrites() {
+    return [
+      {
+        source: "/auth/v1/:path*",
+        destination: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/:path*`,
+      },
+      {
+        source: "/rest/v1/:path*",
+        destination: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/:path*`,
+      },
+      {
+        source: "/storage/v1/:path*",
+        destination: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/:path*`,
+      },
+      {
+        source: "/realtime/v1/:path*",
+        destination: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/realtime/v1/:path*`,
+      },
+    ];
+  },
+
+
   // Optimize compilation speed for development
   experimental: {
     // Speed up module resolution for large icon libraries
