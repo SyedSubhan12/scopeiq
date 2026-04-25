@@ -6,6 +6,7 @@ import { db, users, workspaces, eq } from "@novabots/db";
 import { ValidationError } from "@novabots/types";
 import { env } from "../lib/env.js";
 import { rateLimiter } from "../middleware/rate-limiter.js";
+import { seedSandboxWorkspace } from "../services/sandbox-seeder.js";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -71,6 +72,12 @@ authRouter.post("/register", rateLimiter(3, 60 * 60 * 1000), zValidator("json", 
         role: "owner",
       })
       .returning();
+
+    // Fire-and-forget: seed demo sandbox data so the user can explore every
+    // feature without needing a real client. Errors are non-fatal.
+    seedSandboxWorkspace(workspace.id, user!.id).catch((err: unknown) => {
+      console.error("[sandbox-seeder] Failed to seed sandbox:", err);
+    });
 
     return c.json({
       data: {
