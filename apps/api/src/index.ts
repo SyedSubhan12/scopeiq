@@ -25,6 +25,8 @@ import { inviteRouter } from "./routes/invite.route.js";
 import { scopeFlagRouter } from "./routes/scope-flag.route.js";
 import { changeOrderRouter } from "./routes/change-order.route.js";
 import { messageIngestRouter } from "./routes/message-ingest.route.js";
+import { messagesRouter } from "./routes/messages.route.js";
+import { portalMessagesRouter } from "./routes/portal-messages.route.js";
 import { notificationRouter } from "./routes/notification.route.js";
 import { analyticsRouter } from "./routes/analytics.route.js";
 import { aiRouter } from "./routes/ai.route.js";
@@ -76,6 +78,7 @@ v1.route("/invites", inviteRouter);
 v1.route("/scope-flags", scopeFlagRouter);
 v1.route("/change-orders", changeOrderRouter);
 v1.route("/messages", messageIngestRouter);
+v1.route("/thread-messages", messagesRouter);
 v1.route("/notifications", notificationRouter);
 v1.route("/analytics", analyticsRouter);
 v1.route("/ai", aiRouter);
@@ -106,6 +109,7 @@ app.use("/portal/*", portalRateLimiter);
 app.route("/portal/session", portalSessionRouter);
 app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/change-orders", portalChangeOrderRouter);
+app.route("/portal/messages", portalMessagesRouter);
 // Catch-all token route must come last
 app.route("/portal", portalRouter);
 
