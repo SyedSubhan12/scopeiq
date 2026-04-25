@@ -26,4 +26,5 @@ export * from "./messages.schema";
 export * from "./invitations.schema";
 export * from "./brief-embeds.schema";
 export * from "./marketplace-installs.schema";
+export * from "./project-intelligence.schema";
 export * from "./relations";
