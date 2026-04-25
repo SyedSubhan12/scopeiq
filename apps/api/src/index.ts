@@ -25,6 +25,8 @@ import { inviteRouter } from "./routes/invite.route.js";
 import { scopeFlagRouter } from "./routes/scope-flag.route.js";
 import { changeOrderRouter } from "./routes/change-order.route.js";
 import { messageIngestRouter } from "./routes/message-ingest.route.js";
+import { messagesRouter } from "./routes/messages.route.js";
+import { portalMessagesRouter } from "./routes/portal-messages.route.js";
 import { notificationRouter } from "./routes/notification.route.js";
 import { analyticsRouter } from "./routes/analytics.route.js";
 import { aiRouter } from "./routes/ai.route.js";
@@ -41,17 +43,20 @@ import { startBriefScoringWorker } from "./services/brief-scoring-worker.service
 import { startClarificationEmailWorker } from "./services/clarification-email.service.js";
 import { startDomainVerificationWorker } from "./jobs/verify-domain.job.js";
 import { startSlaBreachWorker, scheduleSlaBreachSweep } from "./jobs/scope-flag-sla.job.js";
+import { intelligenceRouter } from "./routes/intelligence.route.js";
 import { briefEmbedRouter } from "./routes/brief-embed.route.js";
 import { oembedRouter } from "./routes/oembed.route.js";
 import { publicBriefEmbedRouter } from "./routes/public-brief-embed.route.js";
 import { ensureBucketExists } from "./lib/storage.js";
 import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
+import { securityHeadersMiddleware } from "./middleware/security-headers.js";
 
 const app = new Hono();
 
 // Middleware
 app.use("*", logger());
 app.use("*", corsConfig);
+app.use("*", securityHeadersMiddleware());
 app.onError(errorHandler);
 
 // Routes
@@ -73,12 +78,14 @@ v1.route("/invites", inviteRouter);
 v1.route("/scope-flags", scopeFlagRouter);
 v1.route("/change-orders", changeOrderRouter);
 v1.route("/messages", messageIngestRouter);
+v1.route("/thread-messages", messagesRouter);
 v1.route("/notifications", notificationRouter);
 v1.route("/analytics", analyticsRouter);
 v1.route("/ai", aiRouter);
 v1.route("/billing", billingRouter);
 v1.route("/dashboard", dashboardRouter);
 v1.route("/sow", sowRouter);
+v1.route("/intelligence", intelligenceRouter);
 v1.route("/brief-embeds", briefEmbedRouter);
 v1.route("/oembed", oembedRouter);
 
@@ -102,6 +109,7 @@ app.use("/portal/*", portalRateLimiter);
 app.route("/portal/session", portalSessionRouter);
 app.route("/portal/deliverables", portalDeliverableRouter);
 app.route("/portal/change-orders", portalChangeOrderRouter);
+app.route("/portal/messages", portalMessagesRouter);
 // Catch-all token route must come last
 app.route("/portal", portalRouter);
 

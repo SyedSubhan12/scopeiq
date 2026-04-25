@@ -6,6 +6,7 @@ import { updateWorkspaceSchema, updateAiPolicySchema } from "./workspace.schemas
 import { getUploadUrl, validateMimeType } from "../lib/storage.js";
 import { stripUndefined } from "../lib/strip-undefined.js";
 import { z } from "zod";
+import { db, workspaces, eq } from "@novabots/db";
 
 const onboardingStepSchema = z.object({
   step: z.enum([
@@ -94,3 +95,45 @@ workspaceRouter.post(
     return c.json({ data: { uploadUrl, objectKey, publicUrl } }, 200);
   },
 );
+
+// ---------------------------------------------------------------------------
+// GET /v1/workspaces/me/sandbox-status
+// Returns the current sandbox/demo mode status for the workspace.
+// ---------------------------------------------------------------------------
+
+interface SandboxSettingsJson {
+  sandbox_mode?: boolean;
+  demo_client_id?: string;
+  demo_project_id?: string;
+  sandbox_expires_at?: string;
+}
+
+workspaceRouter.get("/me/sandbox-status", async (c) => {
+  const workspaceId = c.get("workspaceId");
+
+  const [row] = await db
+    .select({ settingsJson: workspaces.settingsJson })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+
+  if (!row) {
+    return c.json({
+      data: {
+        sandbox_mode: false,
+        sandbox_expires_at: null,
+        demo_project_id: null,
+      },
+    });
+  }
+
+  const settings = (row.settingsJson ?? {}) as SandboxSettingsJson;
+
+  return c.json({
+    data: {
+      sandbox_mode: settings.sandbox_mode ?? false,
+      sandbox_expires_at: settings.sandbox_expires_at ?? null,
+      demo_project_id: settings.demo_project_id ?? null,
+    },
+  });
+});

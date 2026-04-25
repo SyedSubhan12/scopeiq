@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createMiddleware } from "hono/factory";
 import { UnauthorizedError } from "@novabots/types";
-import { db, projects, clients, eq, and, isNull, constantTimeCompare } from "@novabots/db";
+import { db, projects, clients, eq, and, isNull, constantTimeCompare, verifyPortalToken } from "@novabots/db";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -31,9 +31,15 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
     .where(isNull(projects.deletedAt))
     .limit(100);
 
+  // After running the scrypt migration (see packages/db/src/security/portal-tokens.ts),
+  // all portal_token values will be in `salt:hash` format and verifyPortalToken handles them.
+  // Until then, constantTimeCompare handles legacy plaintext tokens.
   for (const project of projectCandidates) {
     if (!project.portalToken) continue;
-    if (constantTimeCompare(token, project.portalToken)) {
+    const matches = project.portalToken.includes(':')
+      ? verifyPortalToken(token, project.portalToken)
+      : constantTimeCompare(token, project.portalToken);
+    if (matches) {
       c.set("portalProjectId", project.id);
       c.set("portalWorkspaceId", project.workspaceId);
       c.set("portalClientId", null);

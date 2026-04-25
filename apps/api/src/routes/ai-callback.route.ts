@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import { aiRateLimitMiddleware } from "../middleware/ai-rate-limiter.js";
 import {
   db,
   writeAuditLog,
@@ -23,6 +24,7 @@ import type { ClauseType, SowStatus } from "@novabots/db";
 import { dispatchScopeFlagAlertJob } from "../jobs/scope-flag-alert.job.js";
 import { dispatchClarificationEmail } from "../services/clarification-email.service.js";
 import { computeSlaDeadline } from "../services/scope-flag.service.js";
+import { logProjectEvent } from "../repositories/project-intelligence.repository.js";
 
 // ---------------------------------------------------------------------------
 // Middleware — shared-secret validation
@@ -210,7 +212,13 @@ aiCallbackRouter.post("/sow-parsed", zValidator("json", sowParsedSchema), async 
 });
 
 // POST /api/ai-callback/scope-checked
-aiCallbackRouter.post("/scope-checked", zValidator("json", scopeCheckedSchema), async (c) => {
+aiCallbackRouter.post(
+  "/scope-checked",
+  aiRateLimitMiddleware("check_scope", (c) =>
+    c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "ai-service",
+  ),
+  zValidator("json", scopeCheckedSchema),
+  async (c) => {
   const payload = c.req.valid("json");
 
   // Idempotency: check if message already processed
@@ -318,6 +326,16 @@ aiCallbackRouter.post("/scope-checked", zValidator("json", scopeCheckedSchema), 
       .catch((err) => {
         console.error(`[ScopeFlagAlert] Failed to dispatch alert job: ${err.message}`);
       });
+
+    logProjectEvent({
+      workspaceId: project.workspaceId,
+      projectId: payload.projectId,
+      eventType: "scope_flag_created",
+      entityType: "scope_flag",
+      entityId: result.flagId,
+      summary: `Out-of-scope request detected (${payload.suggestedSeverity ?? "medium"}): ${payload.reasoning.slice(0, 80)}`,
+      metadata: { confidence: result.confidence, flagId: result.flagId, messageId: payload.messageId },
+    }).catch(() => undefined);
   }
 
   return c.json({ ok: true, ...result }, 200);
@@ -424,6 +442,16 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
     return { changeOrderId: payload.changeOrderId, title: payload.title, totalAmountCents: payload.totalAmountCents };
   });
 
+  logProjectEvent({
+    workspaceId: flag.workspaceId,
+    projectId: flag.projectId,
+    eventType: "change_order_generated",
+    entityType: "change_order",
+    entityId: result.changeOrderId,
+    summary: `Change order generated for ${result.title}`,
+    metadata: { changeOrderId: result.changeOrderId, totalAmountCents: result.totalAmountCents, scopeFlagId: payload.scopeFlagId },
+  }).catch(() => undefined);
+
   return c.json({ status: "ok", ...result }, 200);
 });
 
@@ -522,8 +550,18 @@ aiCallbackRouter.post("/brief-scored", zValidator("json", briefScoredSchema), as
       },
     });
 
-    return { briefId: payload.briefId, score: payload.score, briefStatus: payload.status };
+    return { briefId: payload.briefId, score: payload.score, briefStatus: payload.status, projectId: briefProject?.projectId ?? null };
   });
+
+  logProjectEvent({
+    workspaceId: existingBrief.workspaceId,
+    projectId: result.projectId ?? payload.briefId,
+    eventType: "brief_scored",
+    entityType: "brief",
+    entityId: payload.briefId,
+    summary: `Brief scored ${payload.score}/100 — ${payload.flagCount ?? payload.flags.length} flags raised`,
+    metadata: { score: payload.score, flagCount: payload.flagCount ?? payload.flags.length, status: payload.status },
+  }).catch(() => undefined);
 
   // If clarification is needed, dispatch clarification email (outside transaction)
   if (payload.status === "clarification_needed" && payload.flags.length > 0) {

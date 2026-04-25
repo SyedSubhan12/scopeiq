@@ -12,12 +12,13 @@ from app.services.callback_service import post_callback
 
 logger = structlog.get_logger()
 
-# Sprint 4 FEAT-SG-002: Scope Flag Detection confidence tuning.
-# Strategic doc targets: <5s p95 latency, drop low-confidence noise below 0.30,
-# map severity to confidence buckets so UX matches AI certainty.
-CONFIDENCE_MIN = 0.30  # Below this is noise — never flag
-CONFIDENCE_HIGH = 0.80
-CONFIDENCE_MEDIUM = 0.50
+# v2 post-processing rules (from scope_guard_prompt.py):
+# - Create scope_flag ONLY if: is_in_scope=False AND confidence > 0.60
+# - Confidence 0.61-0.74 → severity capped at LOW regardless of AI output
+CONFIDENCE_MIN = 0.60  # Below this is noise — never flag (v2: raised from 0.30)
+CONFIDENCE_LOW_CAP = 0.74  # At or below this → severity capped at LOW
+CONFIDENCE_HIGH = 0.90  # v2 calibration: 0.90+ = SOW explicitly excludes by name
+CONFIDENCE_MEDIUM = 0.75  # v2 calibration: 0.75-0.89 = specific scope mismatch
 SLA_LATENCY_MS = 5000
 
 # Default scope-guard confidence threshold when workspace has no override.
@@ -137,17 +138,21 @@ async def process_scope_check(job, token):
                 success=True,
             )
 
-            # 3. Sprint 4 confidence tuning: drop noise below CONFIDENCE_MIN,
-            #    bucket severity by confidence so UX matches AI certainty.
+            # 3. v2 post-processing rules: drop noise below CONFIDENCE_MIN (0.60),
+            #    cap severity to LOW for borderline confidence (0.61-0.74),
+            #    bucket remaining severity by confidence so UX matches AI certainty.
             # Also respect workspace-level scopeGuardThreshold — flags are only
             # created when confidence meets or exceeds the workspace admin's setting.
             effective_min = max(CONFIDENCE_MIN, scope_guard_threshold)
-            if result.is_deviation and result.confidence >= effective_min:
+            if result.is_deviation and result.confidence > effective_min:
                 flag_id = str(uuid4())
                 tuned_severity = severity_for_confidence(
                     result.confidence,
                     fallback=result.suggested_severity,
                 )
+                # v2 rule: confidence 0.61-0.74 → severity capped at LOW
+                if result.confidence <= CONFIDENCE_LOW_CAP:
+                    tuned_severity = "low"
                 sla_ok = duration_ms <= SLA_LATENCY_MS
                 # Use Pydantic attribute access (not .get()) — result is a ScopeAnalysisResult model
                 await conn.execute(
@@ -183,6 +188,7 @@ async def process_scope_check(job, token):
                     sla_ok=sla_ok,
                 )
             elif result.is_deviation:
+                # v2: confidence did not exceed threshold — log but do not create flag
                 logger.info(
                     "scope_flag_dropped_low_confidence",
                     project_id=project_id,

@@ -7,7 +7,7 @@ import { PortalDeliverableView } from "@/components/portal/PortalDeliverableView
 import { PoweredByBadge } from "@/components/portal/PoweredByBadge";
 import type { Deliverable } from "@/hooks/useDeliverables";
 import { Skeleton } from "@novabots/ui";
-import { AlertCircle, CheckSquare, ArrowLeft } from "lucide-react";
+import { AlertCircle, CheckSquare, ArrowLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
 
 function ReviewPageContent() {
@@ -71,13 +71,22 @@ function ReviewPageContent() {
               Approve or request changes on each deliverable below.
             </p>
           </div>
-          <Link
-            href={`/portal/${token}`}
-            className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border-default))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-subtle))]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Portal
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/${token}/messages`}
+              className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border-default))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-subtle))]"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Messages
+            </Link>
+            <Link
+              href={`/portal/${token}`}
+              className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border-default))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-subtle))]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Portal
+            </Link>
+          </div>
         </div>
 
         {deliverables.length === 0 ? (

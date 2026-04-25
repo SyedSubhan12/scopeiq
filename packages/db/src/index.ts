@@ -4,3 +4,4 @@ export * from "drizzle-orm";
 export { writeAuditLog } from "./audit.js";
 export { generatePortalToken, generateUlid, hashPortalToken, constantTimeCompare } from "./helpers.js";
 export type { PortalTokenResult } from "./helpers.js";
+export { verifyPortalToken } from "./security/portal-tokens.js";
