@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { aiRateLimitMiddleware } from "../middleware/ai-rate-limiter.js";
 
 export const aiRouter = new Hono();
 
@@ -7,7 +8,7 @@ export const aiRouter = new Hono();
 if (process.env.DEV_MODE === "true") {
   const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 
-  aiRouter.post("/predict-clarity", async (c) => {
+  aiRouter.post("/predict-clarity", aiRateLimitMiddleware("score_brief"), async (c) => {
     const body = await c.req.json();
 
     const res = await fetch(`${AI_SERVICE_URL}/predict-clarity`, {

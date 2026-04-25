@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import { aiRateLimitMiddleware } from "../middleware/ai-rate-limiter.js";
 import {
   db,
   writeAuditLog,
@@ -210,7 +211,13 @@ aiCallbackRouter.post("/sow-parsed", zValidator("json", sowParsedSchema), async 
 });
 
 // POST /api/ai-callback/scope-checked
-aiCallbackRouter.post("/scope-checked", zValidator("json", scopeCheckedSchema), async (c) => {
+aiCallbackRouter.post(
+  "/scope-checked",
+  aiRateLimitMiddleware("check_scope", (c) =>
+    c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "ai-service",
+  ),
+  zValidator("json", scopeCheckedSchema),
+  async (c) => {
   const payload = c.req.valid("json");
 
   // Idempotency: check if message already processed

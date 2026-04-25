@@ -46,12 +46,14 @@ import { oembedRouter } from "./routes/oembed.route.js";
 import { publicBriefEmbedRouter } from "./routes/public-brief-embed.route.js";
 import { ensureBucketExists } from "./lib/storage.js";
 import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
+import { securityHeadersMiddleware } from "./middleware/security-headers.js";
 
 const app = new Hono();
 
 // Middleware
 app.use("*", logger());
 app.use("*", corsConfig);
+app.use("*", securityHeadersMiddleware());
 app.onError(errorHandler);
 
 // Routes

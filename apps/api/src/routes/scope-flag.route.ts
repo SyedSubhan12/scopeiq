@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { authMiddleware } from "../middleware/auth.js";
+import { aiRateLimitMiddleware } from "../middleware/ai-rate-limiter.js";
 import { scopeFlagService } from "../services/scope-flag.service.js";
 import { dispatchGenerateChangeOrderJob } from "../jobs/generate-change-order.job.js";
 import { dispatchSoftAskJob } from "../jobs/soft-ask.job.js";
@@ -105,7 +106,7 @@ scopeFlagRouter.patch(
     },
 );
 
-scopeFlagRouter.post("/:id/generate-change-order", authMiddleware, async (c) => {
+scopeFlagRouter.post("/:id/generate-change-order", authMiddleware, aiRateLimitMiddleware("generate_change_order"), async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
 
