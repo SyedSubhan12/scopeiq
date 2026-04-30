@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, FileText, ArrowRight, X, Check } from "lucide-react";
 import { Button } from "@novabots/ui";
 import { useRevisionLimitModal } from "@/stores/revision-limit-modal.store";
+import { fetchWithAuth } from "@/lib/api";
 
 const DEFAULT_ADDON_PRICE = 500;
 
@@ -20,7 +21,18 @@ export function RevisionLimitModal() {
     description: `Unlock ${Math.min(3, data.maxRevisions)} additional revision round(s) for this deliverable.`,
   };
 
-  const handleRequestQuote = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleRequestQuote = async () => {
+    if (!data || !acknowledged) return;
+    setSubmitting(true);
+    try {
+      await fetchWithAuth(`/v1/deliverables/${data.deliverableId}/revision-limit-acknowledged`, { method: "POST" });
+    } catch {
+      // best-effort — audit log failure doesn't block the user
+    } finally {
+      setSubmitting(false);
+    }
     closeModal();
   };
 
@@ -126,8 +138,8 @@ export function RevisionLimitModal() {
               </Button>
               <Button
                 size="sm"
-                onClick={handleRequestQuote}
-                disabled={!acknowledged}
+                onClick={() => { void handleRequestQuote(); }}
+                disabled={!acknowledged || submitting}
                 className="gap-1.5"
               >
                 Request Additional Rounds

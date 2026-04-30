@@ -19,6 +19,7 @@ import {
 type CreateDeliverableInput = z.output<typeof createDeliverableSchema>;
 type UploadUrlInput = z.output<typeof uploadUrlSchema>;
 import { submitFeedbackSchema, feedbackResponseSchema } from "./feedback.schemas.js";
+import { db, writeAuditLog, deliverables, eq, and } from "@novabots/db";
 
 export const deliverableRouter = new Hono();
 
@@ -178,5 +179,42 @@ deliverableRouter.patch(
     const { comment } = c.req.valid("json");
     const result = await deliverableService.requestRevision(workspaceId, id, userId, null, comment);
     return c.json(approvalEventResponseSchema.parse({ data: result }));
+  },
+);
+
+deliverableRouter.post(
+  "/:id/revision-limit-acknowledged",
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const id = c.req.param("id");
+
+    const [deliverable] = await db
+      .select({ id: deliverables.id, revisionRound: deliverables.revisionRound, maxRevisions: deliverables.maxRevisions })
+      .from(deliverables)
+      .where(and(eq(deliverables.id, id), eq(deliverables.workspaceId, workspaceId)))
+      .limit(1);
+
+    if (!deliverable) {
+      return c.json({ error: "Deliverable not found" }, 404);
+    }
+
+    await db.transaction(async (trx) => {
+      await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
+        workspaceId,
+        actorId: userId,
+        actorType: "user",
+        entityType: "deliverable",
+        entityId: id,
+        action: "update",
+        metadata: {
+          action: "revision_limit_acknowledged",
+          currentRound: deliverable.revisionRound,
+          maxRevisions: deliverable.maxRevisions,
+        },
+      });
+    });
+
+    return c.json({ ok: true });
   },
 );

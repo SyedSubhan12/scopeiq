@@ -5,6 +5,7 @@ import { usePortalSession } from "@/hooks/usePortalSession";
 import { PortalHeader } from "@/components/portal/PortalHeader";
 import { PortalDeliverableView } from "@/components/portal/PortalDeliverableView";
 import { PoweredByBadge } from "@/components/portal/PoweredByBadge";
+import { ScopeMeter } from "@/components/shared/ScopeMeter";
 import type { Deliverable } from "@/hooks/useDeliverables";
 import { Skeleton } from "@novabots/ui";
 import { AlertCircle, CheckSquare, ArrowLeft, MessageSquare } from "lucide-react";
@@ -88,6 +89,26 @@ function ReviewPageContent() {
             </Link>
           </div>
         </div>
+
+        {/* Scope meter — shown to client when deliverables exist (FR-SG-006) */}
+        {deliverables.length > 0 && (
+          <div className="mb-6 flex items-center gap-4 rounded-2xl border border-[rgb(var(--border-default))] bg-white p-4">
+            <ScopeMeter
+              deliverables={deliverables.map((d) => ({
+                status: d.status as "draft" | "delivered" | "in_review" | "changes_requested" | "approved",
+                revisionRound: d.revisionRound,
+                maxRevisions: d.maxRevisions,
+              }))}
+              className="shrink-0"
+            />
+            <div>
+              <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">Project Scope</p>
+              <p className="mt-0.5 text-xs text-[rgb(var(--text-muted))]">
+                Tracks deliverable approvals and revision usage.
+              </p>
+            </div>
+          </div>
+        )}
 
         {deliverables.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[rgb(var(--border-default))] bg-white p-16 text-center">
