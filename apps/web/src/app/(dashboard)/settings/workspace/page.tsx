@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Building, Upload, X } from "lucide-react";
+import { Save, Building, Upload, X, Globe, Copy, CheckCircle, XCircle, Clock } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -12,7 +12,8 @@ import {
   useToast,
   cn,
 } from "@novabots/ui";
-import { useWorkspace, useUpdateWorkspace } from "@/hooks/useWorkspace";
+import { useWorkspace, useUpdateWorkspace, useDomainStatus, useSetCustomDomain, useRequestDomainVerification } from "@/hooks/useWorkspace";
+import { useWorkspaceStore } from "@/stores/workspace.store";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
 
@@ -21,6 +22,12 @@ export default function WorkspaceSettingsPage() {
   const updateWorkspace = useUpdateWorkspace();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const plan = useWorkspaceStore((s) => s.plan);
+
+  // Domain hooks
+  const domainStatus = useDomainStatus();
+  const setCustomDomain = useSetCustomDomain();
+  const requestDomainVerification = useRequestDomainVerification();
 
   const workspace = data?.data;
 
@@ -30,6 +37,14 @@ export default function WorkspaceSettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Domain local state
+  const [domainInput, setDomainInput] = useState("");
+  const [dnsInstructions, setDnsInstructions] = useState<{
+    dnsRecord: { recordType: string; host: string; value: string; ttlSeconds: number };
+    verificationToken: string;
+    customDomain: string;
+  } | null>(null);
+
   useEffect(() => {
     if (workspace) {
       setWsName(workspace.name ?? "");
@@ -38,6 +53,13 @@ export default function WorkspaceSettingsPage() {
       setLogoPreview(workspace.logoUrl ?? null);
     }
   }, [workspace]);
+
+  useEffect(() => {
+    const fetched = domainStatus.data?.data.customDomain;
+    if (fetched != null) {
+      setDomainInput(fetched);
+    }
+  }, [domainStatus.data]);
 
   const handleSaveWorkspace = async () => {
     if (!wsName.trim()) {
@@ -147,7 +169,7 @@ export default function WorkspaceSettingsPage() {
         </p>
       </div>
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>General</CardTitle>
         </CardHeader>
@@ -313,6 +335,160 @@ export default function WorkspaceSettingsPage() {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Custom Domain */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-[rgb(var(--text-muted))]" />
+            <CardTitle>Custom Domain</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {plan === "free" || plan === "solo" ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--surface-subtle))]">
+                <Globe className="h-6 w-6 text-[rgb(var(--text-muted))]" />
+              </div>
+              <p className="text-sm font-medium text-[rgb(var(--text-primary))]">
+                Custom domain requires Studio or Agency plan
+              </p>
+              <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
+                White-label your client portal with your own domain.
+              </p>
+              <a
+                href="/settings/billing"
+                className="mt-4 inline-flex items-center rounded-lg bg-[rgb(var(--surface-subtle))] px-4 py-2 text-sm font-medium text-[rgb(var(--text-primary))] transition-colors hover:bg-[rgb(var(--border-subtle))]"
+              >
+                Upgrade plan
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Domain input + save */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-[rgb(var(--text-primary))]">
+                  Custom Domain
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    value={domainInput}
+                    onChange={(e) => setDomainInput(e.target.value)}
+                    placeholder="youragency.com"
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={setCustomDomain.isPending || !domainInput.trim()}
+                    onClick={() => {
+                      void setCustomDomain.mutateAsync(domainInput.trim()).then(() => {
+                        toast("success", "Domain saved");
+                      }).catch(() => {
+                        toast("error", "Failed to save domain");
+                      });
+                    }}
+                  >
+                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                    {setCustomDomain.isPending ? "Saving..." : "Save Domain"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Verification status badge */}
+              {(() => {
+                const status = domainStatus.data?.data.domainVerificationStatus;
+                if (!status) return null;
+                if (status === "pending") {
+                  return (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                      <Clock className="h-3.5 w-3.5" />
+                      Verification pending
+                    </div>
+                  );
+                }
+                if (status === "verified") {
+                  return (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Domain verified
+                    </div>
+                  );
+                }
+                if (status === "failed") {
+                  return (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
+                      <XCircle className="h-3.5 w-3.5" />
+                      Verification failed — check DNS record and try again
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Start verification button — only when a domain is saved */}
+              {domainStatus.data?.data.customDomain && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={requestDomainVerification.isPending}
+                  onClick={() => {
+                    void requestDomainVerification.mutateAsync().then((res) => {
+                      setDnsInstructions(res.data);
+                    }).catch(() => {
+                      toast("error", "Failed to start verification");
+                    });
+                  }}
+                >
+                  {requestDomainVerification.isPending ? "Starting..." : "Start Verification"}
+                </Button>
+              )}
+
+              {/* DNS record instructions */}
+              {dnsInstructions && (
+                <div className="space-y-2">
+                  <div className="rounded-lg border border-[rgb(var(--border-default))] bg-[rgb(var(--surface-subtle))] p-4 font-mono text-xs text-[rgb(var(--text-primary))]">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-10 shrink-0 text-[rgb(var(--text-muted))]">Type</span>
+                        <span>{dnsInstructions.dnsRecord.recordType}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-10 shrink-0 text-[rgb(var(--text-muted))]">Host</span>
+                        <span className="break-all">{dnsInstructions.dnsRecord.host}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-10 shrink-0 text-[rgb(var(--text-muted))]">Value</span>
+                        <span className="flex-1 break-all">{dnsInstructions.dnsRecord.value}</span>
+                        <button
+                          type="button"
+                          aria-label="Copy DNS value"
+                          className={cn(
+                            "ml-1 shrink-0 rounded p-1 text-[rgb(var(--text-muted))] transition-colors",
+                            "hover:bg-[rgb(var(--border-default))] hover:text-[rgb(var(--text-primary))]",
+                          )}
+                          onClick={() => {
+                            void navigator.clipboard.writeText(dnsInstructions.dnsRecord.value);
+                            toast("success", "Copied to clipboard");
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-10 shrink-0 text-[rgb(var(--text-muted))]">TTL</span>
+                        <span>{dnsInstructions.dnsRecord.ttlSeconds} seconds</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[rgb(var(--text-muted))]">
+                    DNS changes can take up to 24 hours to propagate
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

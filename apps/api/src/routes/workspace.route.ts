@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { authMiddleware } from "../middleware/auth.js";
 import { workspaceService } from "../services/workspace.service.js";
+import { domainService } from "../services/domain.service.js";
+import { dispatchVerifyDomainJob } from "../jobs/verify-domain.job.js";
 import { updateWorkspaceSchema, updateAiPolicySchema } from "./workspace.schemas.js";
 import { getUploadUrl, validateMimeType } from "../lib/storage.js";
 import { stripUndefined } from "../lib/strip-undefined.js";
@@ -136,4 +138,51 @@ workspaceRouter.get("/me/sandbox-status", async (c) => {
       demo_project_id: settings.demo_project_id ?? null,
     },
   });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /v1/workspaces/me/domain
+// Sets the custom domain for the workspace. Does not trigger verification —
+// the client must call POST /me/domain/verify separately.
+// ---------------------------------------------------------------------------
+
+const setDomainSchema = z.object({
+  domain: z.string().min(3).max(255),
+});
+
+workspaceRouter.patch(
+  "/me/domain",
+  zValidator("json", setDomainSchema),
+  async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const { domain } = c.req.valid("json");
+    await workspaceService.updateWorkspace(workspaceId, userId, { customDomain: domain });
+    return c.json({ data: { customDomain: domain } });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// POST /v1/workspaces/me/domain/verify
+// Generates a DNS TXT verification token and dispatches a background job.
+// Returns the DNS record instructions the client should display to the user.
+// ---------------------------------------------------------------------------
+
+workspaceRouter.post("/me/domain/verify", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const userId = c.get("userId");
+  const result = await domainService.requestDomainVerification(workspaceId, userId);
+  void dispatchVerifyDomainJob(workspaceId);
+  return c.json({ data: result });
+});
+
+// ---------------------------------------------------------------------------
+// GET /v1/workspaces/me/domain/status
+// Returns the current domain verification status without triggering any job.
+// ---------------------------------------------------------------------------
+
+workspaceRouter.get("/me/domain/status", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const status = await domainService.getDomainStatus(workspaceId);
+  return c.json({ data: status });
 });

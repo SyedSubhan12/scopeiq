@@ -11,6 +11,9 @@ export interface WorkspaceRecord {
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   reminderSettings?: unknown;
+  customDomain?: string | null;
+  domainVerificationStatus?: "pending" | "verified" | "failed" | null;
+  domainVerifiedAt?: string | null;
 }
 
 export function getWorkspaceQueryOptions() {
@@ -34,6 +37,52 @@ export function useUpdateWorkspace() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["workspace"] });
+    },
+  });
+}
+
+export function useDomainStatus() {
+  return useQuery({
+    queryKey: ["workspace", "domain-status"],
+    queryFn: () =>
+      fetchWithAuth("/v1/workspaces/me/domain/status") as Promise<{
+        data: {
+          customDomain: string | null;
+          domainVerificationStatus: "pending" | "verified" | "failed" | null;
+          domainVerifiedAt: string | null;
+        };
+      }>,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useSetCustomDomain() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (domain: string) =>
+      fetchWithAuth("/v1/workspaces/me/domain", {
+        method: "PATCH",
+        body: JSON.stringify({ domain }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace", "domain-status"] });
+    },
+  });
+}
+
+export function useRequestDomainVerification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      fetchWithAuth("/v1/workspaces/me/domain/verify", { method: "POST" }) as Promise<{
+        data: {
+          dnsRecord: { recordType: string; host: string; value: string; ttlSeconds: number };
+          verificationToken: string;
+          customDomain: string;
+        };
+      }>,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace", "domain-status"] });
     },
   });
 }
