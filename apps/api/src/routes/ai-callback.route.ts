@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { aiRateLimitMiddleware } from "../middleware/ai-rate-limiter.js";
+import { recordScopeFlagDuration } from "../lib/axiom.js";
 import {
   db,
   writeAuditLog,
@@ -366,6 +367,17 @@ aiCallbackRouter.post(
       flagId,
     };
   });
+
+  // Fire Axiom SLA metric — best-effort, never throws.
+  // durationMs is the wall-clock ms of the AI analysis computed in scope_guard_worker.py.
+  // slaMet is sent explicitly by the worker (duration_ms <= 5000); fall back to the
+  // same 5 000 ms threshold if the field is absent for any reason.
+  if (payload.durationMs != null) {
+    recordScopeFlagDuration(
+      payload.durationMs,
+      payload.slaMet ?? payload.durationMs <= 5000,
+    );
+  }
 
   // Dispatch 2-hour delayed email alert for new scope flags (outside transaction)
   if (result.flagId) {

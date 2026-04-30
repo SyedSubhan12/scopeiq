@@ -1,15 +1,9 @@
 import { db, users, workspaces, eq } from "@novabots/db";
-import { workspaceRepository } from "../repositories/workspace.repository.js";
 import { User } from "@supabase/supabase-js";
 
 export const userSyncService = {
-    /**
-     * Ensures that a Supabase-authenticated user has a corresponding
-     * record in our application database and an associated workspace.
-     * This handles 'lazy provisioning' for first-time OAuth signups.
-     */
     async ensureUser(authUser: User) {
-        // 1. Check if user already exists
+        // Fast path — user already exists (vast majority of requests)
         const [existingUser] = await db
             .select()
             .from(users)
@@ -20,33 +14,49 @@ export const userSyncService = {
             return existingUser;
         }
 
-        // 2. User doesn't exist - create a default workspace first
-        console.log(`[UserSync] Provisioning new user for ${authUser.email}`);
+        // Slow path — first-ever request for this OAuth user.
+        // Run inside a transaction so workspace + user are created atomically.
+        // onConflictDoNothing on the user insert handles the edge case where two
+        // concurrent first-requests race past the fast-path read simultaneously.
+        return await db.transaction(async (trx) => {
+            const emailPrefix = authUser.email?.split("@")[0] ?? "user";
 
-        const emailPrefix = authUser.email?.split("@")[0] || "user";
-        const slug = `${emailPrefix}-${Date.now().toString(36)}`;
+            const [workspace] = await trx
+                .insert(workspaces)
+                .values({
+                    name: `${emailPrefix}'s Workspace`,
+                    slug: `${emailPrefix}-${Date.now().toString(36)}`,
+                })
+                .returning();
 
-        const workspace = await workspaceRepository.create({
-            name: `${emailPrefix}'s Workspace`,
-            slug,
+            if (!workspace) {
+                throw new Error("Failed to create default workspace for new user");
+            }
+
+            const [user] = await trx
+                .insert(users)
+                .values({
+                    workspaceId: workspace.id,
+                    authUid: authUser.id,
+                    email: authUser.email!,
+                    fullName: authUser.user_metadata?.full_name ?? emailPrefix,
+                    role: "owner",
+                })
+                .onConflictDoNothing()
+                .returning();
+
+            if (user) {
+                return user;
+            }
+
+            // Another concurrent request won the race — return their user record.
+            const [raceWinner] = await trx
+                .select()
+                .from(users)
+                .where(eq(users.authUid, authUser.id))
+                .limit(1);
+
+            return raceWinner!;
         });
-
-        if (!workspace) {
-            throw new Error("Failed to create default workspace for new user");
-        }
-
-        // 3. Create the user record
-        const [user] = await db
-            .insert(users)
-            .values({
-                workspaceId: workspace.id,
-                authUid: authUser.id,
-                email: authUser.email!,
-                fullName: authUser.user_metadata?.full_name || emailPrefix,
-                role: "owner",
-            })
-            .returning();
-
-        return user!;
     },
 };

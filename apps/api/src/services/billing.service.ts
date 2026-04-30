@@ -16,7 +16,8 @@ import { NotFoundError, ValidationError, AppError } from "@novabots/types";
 
 // Environment variables for Stripe
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_PRICE_ID_SOLO = process.env.STRIPE_PRICE_ID_SOLO;
+// v3.0: STRIPE_PRICE_ID_SOLO removed — 'solo' tier is retired (migrated to 'free').
+// 'free' has no Stripe price ID: it's $0 and requires no subscription checkout.
 const STRIPE_PRICE_ID_STUDIO = process.env.STRIPE_PRICE_ID_STUDIO;
 const STRIPE_PRICE_ID_AGENCY = process.env.STRIPE_PRICE_ID_AGENCY;
 const APP_BASE_URL = process.env.APP_BASE_URL ?? "http://localhost:3000";
@@ -25,31 +26,38 @@ if (!STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required");
 }
 
-const stripe = new Stripe(STRIPE_SECRET_KEY, {
+// Exported so take-rate.service.ts can reuse the same Stripe client instance.
+export const stripe = new Stripe(STRIPE_SECRET_KEY, {
   apiVersion: "2024-12-18.acacia" as Stripe.LatestApiVersion,
 });
 
-// Price ID lookup map
+// v3.0 Price ID map — 'free' has no Stripe price ID (it's a $0 plan, no checkout needed).
+// 'solo' is a retired legacy tier; entries kept for historical webhook lookups only.
 const PRICE_ID_MAP: Record<string, string | undefined> = {
-  solo: STRIPE_PRICE_ID_SOLO,
   studio: STRIPE_PRICE_ID_STUDIO,
   agency: STRIPE_PRICE_ID_AGENCY,
 };
 
-// Plan configuration with features and pricing (in cents)
+// v3.0 Plan configuration — take-rate model (PRD §4.1)
+// Prices are the recurring subscription add-on in cents; take-rate is applied on top.
+// free:   $0/mo + 4% take-rate (default for all new workspaces)
+// studio: $49/mo + 3% take-rate (optional, 5 users, studio-wide scope meter)
+// agency: $99/mo + 2.5% take-rate (optional, API access, unlimited users)
 const PLAN_CONFIG = {
-  solo: {
-    price: 7900,
+  free: {
+    price: 0,
+    takeRatePct: 0.04,
     features: {
       maxUsers: 1,
-      maxClients: 5,
+      maxClients: 3,
       whiteLabel: false,
       apiAccess: false,
       customDomain: false,
     },
   },
   studio: {
-    price: 12900,
+    price: 4900,
+    takeRatePct: 0.03,
     features: {
       maxUsers: 5,
       maxClients: 20,
@@ -59,7 +67,8 @@ const PLAN_CONFIG = {
     },
   },
   agency: {
-    price: 19900,
+    price: 9900,
+    takeRatePct: 0.025,
     features: {
       maxUsers: -1,
       maxClients: -1,
@@ -70,6 +79,7 @@ const PLAN_CONFIG = {
   },
 } as const;
 
+// 'solo' is a retired tier — kept only for safe historical webhook handling.
 type PlanTier = keyof typeof PLAN_CONFIG;
 
 // ---------------------------------------------------------------------------
@@ -155,6 +165,11 @@ export const billingService = {
     userId: string,
     data: { planTier: PlanTier; successUrl: string; cancelUrl: string },
   ): Promise<{ checkoutUrl: string }> {
+    // Free tier has no Stripe Checkout — it's $0 and requires no subscription.
+    if (data.planTier === "free") {
+      throw new ValidationError("The free plan does not require a checkout session");
+    }
+
     // 1. Get workspace
     const [workspace] = await db
       .select()
@@ -483,13 +498,13 @@ export const billingService = {
       throw new NotFoundError("Workspace", workspaceId);
     }
 
-    // 2. Downgrade to solo (free) plan
-    const planFeatures = PLAN_CONFIG.solo.features;
+    // 2. Downgrade to free plan (v3.0 default — replaces retired 'solo' tier)
+    const planFeatures = PLAN_CONFIG.free.features;
 
     await db
       .update(workspaces)
       .set({
-        plan: "solo",
+        plan: "free",
         features: planFeatures,
         stripeSubscriptionId: null,
         updatedAt: new Date(),
@@ -507,7 +522,7 @@ export const billingService = {
       metadata: {
         event: "subscription.deleted",
         previousPlan: workspace.plan,
-        newPlan: "solo",
+        newPlan: "free",
         reason: "subscription_cancelled",
       },
     });

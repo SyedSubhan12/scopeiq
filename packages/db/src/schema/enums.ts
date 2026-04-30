@@ -86,7 +86,9 @@ export const userRoleEnum = pgEnum("user_role_enum", [
 
 export const userTypeEnum = pgEnum("user_type_enum", ["agency", "client"]);
 
-export const planEnum = pgEnum("plan_enum", ["solo", "studio", "agency"]);
+// v3.0: 'free' added as new default. 'solo' kept in enum to avoid destructive pg type change.
+// Application logic must treat 'solo' as 'free'. New workspaces always start at 'free'.
+export const planEnum = pgEnum("plan_enum", ["free", "solo", "studio", "agency"]);
 
 export const auditActionEnum = pgEnum("audit_action_enum", [
   "create",
@@ -109,6 +111,7 @@ export const messageSourceEnum = pgEnum("message_source_enum", [
   "portal",
   "email_forward",
   "manual_input",
+  "system",
 ]);
 
 export const messageStatusEnum = pgEnum("message_status_enum", [

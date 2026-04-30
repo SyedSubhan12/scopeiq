@@ -11,7 +11,7 @@ export function GoogleAuthButton({ label = "Continue with Google" }: { label?: s
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         try {
-            const siteUrl = window.location.origin;
+            const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {

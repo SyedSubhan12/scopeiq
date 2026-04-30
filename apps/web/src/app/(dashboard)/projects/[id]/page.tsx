@@ -369,6 +369,7 @@ function PortalLinkBadge({ portalToken }: { portalToken?: string }) {
 import { ScopeGuardTab } from "@/components/scope/ScopeGuardTab";
 import { ChangeOrdersTab } from "@/components/scope/ChangeOrdersTab";
 import { ActivityLogTab } from "@/components/shared/ActivityLogTab";
+import { useRealtimeDeliverables } from "@/hooks/useRealtimeDeliverables";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -377,6 +378,8 @@ export default function ProjectDetailPage() {
   const { data, isLoading } = useProject(id);
   const activeTab = useUIStore((s) => s.activeTab);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
+
+  useRealtimeDeliverables(id);
 
   if (isLoading) {
     return (

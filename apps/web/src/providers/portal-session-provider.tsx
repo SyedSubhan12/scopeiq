@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useEffect, useRef, useState, ReactNode } from "react";
 import { setPortalToken } from "@/lib/portal-auth";
+import { supabase } from "@/lib/supabase";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -157,6 +158,10 @@ export function PortalSessionProvider({
         token: portalToken,
     });
 
+    // Keep a stable ref to fetchSession so the realtime subscription can call
+    // it without needing to re-subscribe when the function identity changes.
+    const fetchSessionRef = useRef<() => Promise<void>>(async () => { /* initialised below */ });
+
     useEffect(() => {
         if (!portalToken) {
             setSession((s) => ({ ...s, loading: false, error: "No portal token provided" }));
@@ -199,12 +204,46 @@ export function PortalSessionProvider({
             }
         };
 
+        fetchSessionRef.current = fetchSession;
         void fetchSession();
 
         return () => {
             setPortalToken(null);
         };
     }, [portalToken]);
+
+    // Real-time subscription: refresh session deliverables when the Supabase
+    // postgres_changes event fires for this project (FR-AP-003).
+    const projectId = session.project.id || null;
+    const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+    useEffect(() => {
+        if (!projectId) return;
+
+        const channel = supabase
+            .channel(`portal-deliverables-${projectId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "deliverables",
+                    filter: `project_id=eq.${projectId}`,
+                },
+                () => {
+                    void fetchSessionRef.current();
+                },
+            )
+            .subscribe();
+
+        realtimeChannelRef.current = channel;
+        return () => {
+            if (realtimeChannelRef.current) {
+                void supabase.removeChannel(realtimeChannelRef.current);
+                realtimeChannelRef.current = null;
+            }
+        };
+    }, [projectId]);
 
     return (
         <PortalSessionContext.Provider value={session}>

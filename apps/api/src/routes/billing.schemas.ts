@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 export const createCheckoutSchema = z.object({
-  planTier: z.enum(["solo", "studio", "agency"]),
+  // v3.0: 'free' tier has no checkout (it's $0). Guard is enforced in billingService.
+  // 'solo' removed from accepted input — retired tier.
+  planTier: z.enum(["studio", "agency"]),
   successUrl: z.string().url(),
   cancelUrl: z.string().url(),
 });
