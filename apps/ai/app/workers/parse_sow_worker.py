@@ -1,5 +1,4 @@
 import asyncio
-import io
 import structlog
 from bullmq import Worker
 
@@ -17,6 +16,9 @@ logger = structlog.get_logger()
 # Minimum extracted text length to proceed with parsing.
 # PDFs that yield less (e.g. pure image scans) are skipped with a warning.
 _MIN_TEXT_LENGTH = 50
+
+# Overall confidence threshold below which the entire SOW is flagged for review.
+_OVERALL_CONFIDENCE_REVIEW_THRESHOLD = 0.65
 
 
 def _extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
@@ -58,7 +60,7 @@ async def _fetch_pdf_via_s3(object_key: str) -> bytes:
 
 async def _resolve_raw_text(job_data: dict) -> str:
     """
-    Return the text that should be sent to Claude.
+    Return the text that should be sent to Gemini.
 
     Priority:
       1. raw_text already present in job_data — use directly.
@@ -136,17 +138,34 @@ async def process_parse_sow(job, token):
 
         result = await parser.parse(input_data)
 
+        # Determine if the entire SOW should be flagged for review based on
+        # overall confidence being below the threshold.
+        overall_confidence = result.overall_confidence
+        sow_needs_review = (
+            overall_confidence is not None
+            and overall_confidence < _OVERALL_CONFIDENCE_REVIEW_THRESHOLD
+        )
+
         # POST results to the API callback instead of writing directly to DB
         callback_payload = {
             "jobId": job.id,
             "sowId": sow_id,
             "projectId": project_id,
+            "overallConfidence": overall_confidence,
+            "documentSummary": result.document_summary,
+            "extractionWarnings": result.extraction_warnings,
+            "sowNeedsReview": sow_needs_review,
             "clauses": [
                 {
                     "clauseType": clause.clause_type,
-                    "originalText": clause.original_text,
+                    "originalText": clause.resolved_original_text,
                     "summary": clause.summary,
                     "sortOrder": i,
+                    "confidenceScore": clause.confidence_score,
+                    "confidenceLevel": clause.confidence_level,
+                    "rawTextSource": clause.raw_text_source,
+                    "pageNumber": clause.page_number,
+                    "requiresHumanReview": clause.requires_human_review,
                 }
                 for i, clause in enumerate(result.clauses)
             ],
@@ -155,8 +174,23 @@ async def process_parse_sow(job, token):
 
         response = await post_callback("/api/ai-callback/sow-parsed", callback_payload)
 
-        logger.info("sow_clauses_submitted", sow_id=sow_id, clause_count=result.clause_count)
-        return {"status": "ok", "clause_count": result.clause_count, "callback_response": response}
+        needs_review_count = sum(1 for c in result.clauses if c.requires_human_review)
+        logger.info(
+            "sow_clauses_submitted",
+            sow_id=sow_id,
+            clause_count=result.clause_count,
+            needs_review_count=needs_review_count,
+            overall_confidence=overall_confidence,
+            sow_needs_review=sow_needs_review,
+        )
+        return {
+            "status": "ok",
+            "clause_count": result.clause_count,
+            "needs_review_count": needs_review_count,
+            "overall_confidence": overall_confidence,
+            "sow_needs_review": sow_needs_review,
+            "callback_response": response,
+        }
 
     except Exception as exc:
         logger.error("parse_sow_failed", sow_id=sow_id, error=str(exc))

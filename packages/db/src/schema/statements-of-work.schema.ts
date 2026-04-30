@@ -1,7 +1,7 @@
 import { pgTable, uuid, varchar, text, timestamp, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { workspaces } from './workspaces.schema';
 
-export type SowStatus = 'draft' | 'parsed' | 'active' | 'archived';
+export type SowStatus = 'draft' | 'parsed' | 'needs_review' | 'active' | 'archived';
 
 export const statementsOfWork = pgTable(
   "statements_of_work",

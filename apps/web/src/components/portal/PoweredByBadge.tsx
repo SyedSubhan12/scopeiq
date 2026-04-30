@@ -5,8 +5,8 @@ interface PoweredByBadgeProps {
 }
 
 export function PoweredByBadge({ plan }: PoweredByBadgeProps) {
-    // Hide on Studio+ plans (studio, agency, enterprise)
-    if (plan !== "solo") return null;
+    // Hide on paid plans — free users see the badge
+    if (["studio", "agency"].includes(plan)) return null;
 
     return (
         <div className="mt-12 flex items-center justify-center gap-1.5 py-4">

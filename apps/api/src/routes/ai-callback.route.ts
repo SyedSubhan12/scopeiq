@@ -262,7 +262,7 @@ aiCallbackRouter.post(
           confidence: payload.confidence,
           title: "AI Detection: Possible Scope Deviation",
           description: payload.reasoning,
-          severity: (payload.suggestedSeverity as any) ?? "medium",
+          severity: (payload.suggestedSeverity as "low" | "medium" | "high") ?? "medium",
           status: "pending",
           suggestedResponse: payload.suggestedResponse ?? null,
           aiReasoning: payload.reasoning,
@@ -282,6 +282,52 @@ aiCallbackRouter.post(
         .returning();
 
       flagId = flag?.id ?? null;
+    }
+
+    // FR-SG-002: bilateral scope flag notification — insert a "system" message
+    // visible to the client portal so both sides see the flag simultaneously.
+    let systemMessageId: string | null = null;
+    if (flagId && payload.isDeviation && payload.confidence > 0.60) {
+      // Resolve threadId from the triggering message so the system bubble
+      // appears in the same conversation thread the client is reading.
+      let originThreadId: string | null = null;
+      if (payload.messageId) {
+        const [originMsg] = await trx
+          .select({ threadId: messages.threadId })
+          .from(messages)
+          .where(eq(messages.id, payload.messageId))
+          .limit(1);
+        originThreadId = originMsg?.threadId ?? null;
+      }
+
+      const [systemMsg] = await trx
+        .insert(messages)
+        .values({
+          workspaceId: project.workspaceId,
+          projectId: payload.projectId,
+          authorId: null,
+          authorName: null,
+          source: "system",
+          status: "checked",
+          body: "This request appears to fall outside our current agreement. Your team has been notified and will follow up with options.",
+          threadId: originThreadId,
+          authorType: "system",
+          scopeCheckStatus: "skipped",
+        })
+        .returning({ id: messages.id });
+
+      systemMessageId = systemMsg?.id ?? null;
+
+      // Patch the scope flag's evidence jsonb to record system_message_id,
+      // so the dismissal handler can locate and update this message later.
+      if (systemMessageId) {
+        await trx
+          .update(scopeFlags)
+          .set({
+            evidence: sql`${scopeFlags.evidence} || ${JSON.stringify({ system_message_id: systemMessageId })}::jsonb`,
+          })
+          .where(eq(scopeFlags.id, flagId));
+      }
     }
 
     // Update message status
@@ -307,6 +353,7 @@ aiCallbackRouter.post(
         confidence: payload.confidence,
         flagId,
         messageId: payload.messageId,
+        systemMessageId,
         durationMs: payload.durationMs,
         slaMet: payload.slaMet,
         jobId: payload.jobId,
