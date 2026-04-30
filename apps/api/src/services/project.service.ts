@@ -1,9 +1,45 @@
 import { projectRepository } from "../repositories/project.repository.js";
-import { writeAuditLog, db, generatePortalToken, statementsOfWork, sowClauses, eq, and, isNull } from "@novabots/db";
+import { writeAuditLog, db, generatePortalToken, statementsOfWork, sowClauses, clients, workspaces, eq, and, isNull } from "@novabots/db";
 import { NotFoundError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
 import { briefService } from "./brief.service.js";
 import { deliverableService } from "./deliverable.service.js";
+import { sendPortalInvitationEmail as sendPortalInvitationEmailLib } from "../lib/resend.js";
+
+async function dispatchPortalInvitation(
+  workspaceId: string,
+  project: { id: string; name: string; clientId: string | null; portalToken: string | null },
+  appBaseUrl: string,
+): Promise<void> {
+  if (!project.clientId || !project.portalToken) return;
+
+  // Fetch client contact details
+  const [client] = await db
+    .select({ name: clients.name, contactEmail: clients.contactEmail })
+    .from(clients)
+    .where(and(eq(clients.id, project.clientId), eq(clients.workspaceId, workspaceId), isNull(clients.deletedAt)))
+    .limit(1);
+
+  if (!client?.contactEmail) return; // No email on file — skip silently
+
+  // Fetch workspace name for the "from" label
+  const [workspace] = await db
+    .select({ name: workspaces.name })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+
+  const agencyName = workspace?.name ?? "Your Agency";
+  const portalUrl = `${appBaseUrl}/portal/${project.portalToken}`;
+
+  await sendPortalInvitationEmailLib({
+    to: client.contactEmail,
+    clientName: client.name,
+    agencyName,
+    projectName: project.name,
+    portalUrl,
+  });
+}
 
 function getProjectPortalToken(): string {
   const generated = generatePortalToken();
@@ -67,6 +103,14 @@ export const projectService = {
       entityId: project.id,
       action: "create",
     });
+
+    // Send portal invitation email to client (fire and forget — does not block project creation)
+    if (clientId) {
+      const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://scopeiq.app";
+      void dispatchPortalInvitation(workspaceId, project, APP_BASE_URL).catch((err: unknown) => {
+        console.error("[ProjectService] Failed to send portal invitation email:", err);
+      });
+    }
 
     return project;
   },

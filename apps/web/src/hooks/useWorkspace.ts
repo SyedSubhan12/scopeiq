@@ -4,7 +4,7 @@ import { fetchWithAuth } from "@/lib/api";
 export interface WorkspaceRecord {
   id: string;
   name: string;
-  plan: "solo" | "studio" | "agency";
+  plan: "free" | "solo" | "studio" | "agency";
   brandColor?: string | null;
   secondaryColor?: string | null;
   logoUrl?: string | null;

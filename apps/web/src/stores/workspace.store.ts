@@ -11,7 +11,7 @@ interface WorkspaceState {
     // Data
     id: string | null;
     name: string;
-    plan: "solo" | "studio" | "agency";
+    plan: "free" | "solo" | "studio" | "agency";
     brandColor: string;
     logoUrl: string | null;
     onboardingProgress: OnboardingProgress;
@@ -33,7 +33,7 @@ interface WorkspaceState {
 const initialState = {
     id: null,
     name: "",
-    plan: "solo" as const,
+    plan: "free" as const,
     brandColor: "#0F6E56",
     logoUrl: null,
     onboardingProgress: { completedSteps: [] },
@@ -68,7 +68,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             set({
                 id: ws.id as string,
                 name: (ws.name as string) ?? "",
-                plan: (ws.plan as "solo" | "studio" | "agency") ?? "solo",
+                plan: (ws.plan as "free" | "solo" | "studio" | "agency") ?? "free",
                 brandColor: (ws.brandColor as string) ?? "#0F6E56",
                 logoUrl: (ws.logoUrl as string) ?? null,
                 onboardingProgress: progress,

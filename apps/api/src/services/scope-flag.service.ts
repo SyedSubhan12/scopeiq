@@ -1,6 +1,6 @@
 import { scopeFlagRepository } from "../repositories/scope-flag.repository.js";
 import { NotFoundError } from "@novabots/types";
-import { db, writeAuditLog, projects, sowClauses, workspaces, eq, and, isNull } from "@novabots/db";
+import { db, writeAuditLog, projects, sowClauses, workspaces, messages, scopeFlags, eq, and, isNull } from "@novabots/db";
 import type { FlagStatus } from "@novabots/db";
 import { dispatchGenerateChangeOrderJob } from "../jobs/generate-change-order.job.js";
 
@@ -76,6 +76,29 @@ export const scopeFlagService = {
                 action,
                 metadata: { oldStatus, newStatus: update.status, reason: update.reason },
             });
+
+            // FR-SG-002: when agency marks a flag as in-scope (dismissed), update the
+            // bilateral system message so the client sees "Confirmed in scope" instead
+            // of the original flag notification.
+            if (update.status === "dismissed") {
+                const [flagRecord] = await db
+                    .select({ evidence: scopeFlags.evidence })
+                    .from(scopeFlags)
+                    .where(and(eq(scopeFlags.id, id), eq(scopeFlags.workspaceId, workspaceId)))
+                    .limit(1);
+
+                const systemMessageId = (flagRecord?.evidence as Record<string, unknown> | null)?.system_message_id as string | undefined;
+
+                if (systemMessageId) {
+                    await trx
+                        .update(messages)
+                        .set({
+                            body: "Your request has been reviewed and confirmed within the scope of our current agreement.",
+                            scopeCheckStatus: "checked",
+                        })
+                        .where(eq(messages.id, systemMessageId));
+                }
+            }
 
             return result;
         });

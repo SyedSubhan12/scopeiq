@@ -2,7 +2,7 @@
 ALTER TABLE messages
   ADD COLUMN IF NOT EXISTS author_type TEXT NOT NULL DEFAULT 'agency',
   ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS thread_id TEXT REFERENCES messages(id),
+  ADD COLUMN IF NOT EXISTS thread_id UUID REFERENCES messages(id),
   ADD COLUMN IF NOT EXISTS attachments_json JSONB,
   ADD COLUMN IF NOT EXISTS scope_check_status TEXT NOT NULL DEFAULT 'pending';
 

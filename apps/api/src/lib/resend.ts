@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { render } from "@react-email/components";
 import { ApprovalReminderEmail } from "../emails/approval-reminder.js";
 import { ScopeFlagAlertEmail } from "../emails/scope-flag-alert.js";
+import { PortalInvitationEmail } from "../emails/portal-invitation.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -94,6 +95,38 @@ export async function sendScopeFlagAlertEmail(opts: SendScopeFlagAlertOptions): 
     from: FROM_EMAIL,
     to: opts.to,
     subject: "New Scope Flag requires your attention",
+    html,
+  });
+
+  if (error) throw new Error(`Resend error: ${error.message}`);
+}
+
+// ---------------------------------------------------------------------------
+// Portal Invitation Email
+// ---------------------------------------------------------------------------
+
+export interface SendPortalInvitationOptions {
+  to: string;
+  clientName: string;
+  agencyName: string;
+  projectName: string;
+  portalUrl: string;
+}
+
+export async function sendPortalInvitationEmail(opts: SendPortalInvitationOptions): Promise<void> {
+  const html = await render(
+    PortalInvitationEmail({
+      clientName: opts.clientName,
+      agencyName: opts.agencyName,
+      projectName: opts.projectName,
+      portalUrl: opts.portalUrl,
+    }),
+  );
+
+  const { error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: opts.to,
+    subject: `You've been invited to review ${opts.projectName}`,
     html,
   });
 

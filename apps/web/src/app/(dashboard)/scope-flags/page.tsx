@@ -1,29 +1,316 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { ScopePatternAlerts } from "@/components/scope-guard/ScopePatternAlerts";
 import { PageEnter } from "@/components/shared/PageEnter";
-import { ShieldAlert, Filter, FolderKanban, ChevronDown } from "lucide-react";
-import { Card, Badge, Skeleton, Button, useToast } from "@novabots/ui";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { useRowReveal } from "@/hooks/useRowReveal";
+import {
+  ShieldAlert,
+  Filter,
+  FolderKanban,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+} from "lucide-react";
+import { Card, Badge, Skeleton, Button, useToast, cn } from "@novabots/ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { fetchWithAuth } from "@/lib/api";
-import { formatDistanceToNow } from "date-fns";
-import { cn } from "@novabots/ui";
+import { formatDistanceToNow, differenceInHours, isToday, isYesterday, isThisWeek } from "date-fns";
 import { useAssetsReady } from "@/hooks/useAssetsReady";
 import { getProjectsQueryOptions, useProjects } from "@/hooks/useProjects";
 import { queryClient } from "@/lib/query-client";
 import { getScopeFlagsQueryOptions, useScopeFlags } from "@/hooks/useScopeFlags";
 
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "bg-red-100 text-red-700 border-red-200",
-  high: "bg-orange-100 text-orange-700 border-orange-200",
-  medium: "bg-amber-100 text-amber-700 border-amber-200",
-  low: "bg-blue-100 text-blue-700 border-blue-200",
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ScopeFlag {
+  id: string;
+  status: string;
+  severity: string;
+  flagType?: string;
+  reason?: string;
+  title?: string;
+  snippet?: string;
+  projectId?: string;
+  project?: { name: string } | null;
+  client?: { name: string } | null;
+  confidence?: number;
+  createdAt: string;
+  updatedAt?: string;
+  suggestedResponse?: string;
+  sowContext?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Priority scoring
+// ---------------------------------------------------------------------------
+
+function recencyBonus(createdAt: string): number {
+  const hours = differenceInHours(new Date(), new Date(createdAt));
+  if (hours < 24) return 3;
+  if (hours < 48) return 1;
+  return 0;
+}
+
+function severityWeight(severity: string): number {
+  if (severity === "high" || severity === "critical") return 3;
+  if (severity === "medium") return 2;
+  return 1;
+}
+
+function priorityScore(flag: ScopeFlag): number {
+  const sw = severityWeight(flag.severity);
+  const conf = flag.confidence ?? 0.5;
+  const rb = recencyBonus(flag.createdAt);
+  return sw * 3 + conf * 20 + rb;
+}
+
+// ---------------------------------------------------------------------------
+// Date grouping
+// ---------------------------------------------------------------------------
+
+type DateGroup = "Today" | "Yesterday" | "Earlier this week" | "Older";
+
+function dateGroup(createdAt: string): DateGroup {
+  const d = new Date(createdAt);
+  if (isToday(d)) return "Today";
+  if (isYesterday(d)) return "Yesterday";
+  if (isThisWeek(d, { weekStartsOn: 1 })) return "Earlier this week";
+  return "Older";
+}
+
+const GROUP_ORDER: DateGroup[] = ["Today", "Yesterday", "Earlier this week", "Older"];
+
+// ---------------------------------------------------------------------------
+// Filter constants
+// ---------------------------------------------------------------------------
+
+const STATUS_FILTERS = [
+  "all",
+  "pending",
+  "confirmed",
+  "dismissed",
+  "snoozed",
+  "change_order_sent",
+  "resolved",
+];
+const SEVERITY_FILTERS = ["all", "high", "medium", "low"];
+
+// ---------------------------------------------------------------------------
+// Severity dot
+// ---------------------------------------------------------------------------
+
+const SEVERITY_DOT: Record<string, string> = {
+  critical: "bg-red-500",
+  high: "bg-red-500",
+  medium: "bg-amber-400",
+  low: "bg-blue-400",
 };
 
-const STATUS_FILTERS = ["all", "pending", "confirmed", "dismissed", "snoozed", "change_order_sent", "resolved"];
-const SEVERITY_FILTERS = ["all", "high", "medium", "low"];
+function SeverityDot({ severity }: { severity: string }) {
+  return (
+    <span
+      className={cn(
+        "mt-0.5 h-2 w-2 shrink-0 rounded-full",
+        SEVERITY_DOT[severity] ?? "bg-slate-400",
+      )}
+      title={severity}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Confidence badge
+// ---------------------------------------------------------------------------
+
+function ConfidenceBadge({ value }: { value: number }) {
+  const pct = Math.round(value * 100);
+  const color =
+    pct >= 80
+      ? "bg-emerald-50 text-emerald-600"
+      : pct >= 60
+        ? "bg-amber-50 text-amber-600"
+        : "bg-slate-100 text-slate-500";
+  return (
+    <span className={cn("rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold", color)}>
+      {pct}% confidence
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Flag card
+// ---------------------------------------------------------------------------
+
+function FlagCard({
+  flag,
+  onAction,
+}: {
+  flag: ScopeFlag;
+  onAction: (id: string, status: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isPending =
+    flag.status === "pending" || flag.status === "pending_review";
+  const message = flag.reason ?? flag.title ?? "Scope signal detected";
+  const excerpt = message.length > 120 ? message.slice(0, 120) + "…" : message;
+  const projectName = flag.project?.name ?? "Unknown project";
+  const clientName = flag.client?.name;
+  const timeAgo = formatDistanceToNow(new Date(flag.createdAt), { addSuffix: true });
+  const confidence = flag.confidence ?? 0.7;
+
+  return (
+    <div
+      className={cn(
+        "reveal-row overflow-hidden rounded-xl border transition-all",
+        isPending
+          ? "border-l-4 border-[rgb(var(--border-subtle))] border-l-[var(--status-flagged)]"
+          : "border-[rgb(var(--border-subtle))] opacity-75",
+      )}
+      style={{ boxShadow: expanded ? "var(--shadow-card-hover)" : "var(--shadow-card)" }}
+    >
+      {/* Summary row */}
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-[rgb(var(--surface-subtle))]"
+      >
+        <SeverityDot severity={flag.severity} />
+
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-[rgb(var(--text-primary))]">{excerpt}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[rgb(var(--text-muted))]">
+            <span className="flex items-center gap-1">
+              <FolderKanban className="h-3 w-3" />
+              {projectName}
+            </span>
+            {clientName && (
+              <>
+                <span className="opacity-40">·</span>
+                <span>{clientName}</span>
+              </>
+            )}
+            <span className="opacity-40">·</span>
+            <span className="font-mono">{timeAgo}</span>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <ConfidenceBadge value={confidence} />
+          <StatusPill status={flag.status} size="sm" />
+          {isPending && (
+            <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <Button
+                size="sm"
+                className="h-7 rounded-md bg-emerald-600 px-2.5 text-xs hover:bg-emerald-700"
+                onClick={() => onAction(flag.id, "resolved")}
+              >
+                Confirm
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 rounded-md px-2.5 text-xs text-[rgb(var(--text-muted))] hover:text-red-500"
+                onClick={() => onAction(flag.id, "dismissed")}
+              >
+                Dismiss
+              </Button>
+            </div>
+          )}
+          {expanded ? (
+            <ChevronUp className="h-4 w-4 text-[rgb(var(--text-muted))]" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-[rgb(var(--text-muted))]" />
+          )}
+        </div>
+      </button>
+
+      {/* Expanded detail */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="expanded"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-3 border-t border-[rgb(var(--border-subtle))] px-4 py-4">
+              {/* Full message */}
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--text-muted))]">
+                  Full Message
+                </p>
+                <p className="text-sm text-[rgb(var(--text-secondary))]">{message}</p>
+              </div>
+
+              {/* SOW context */}
+              {flag.sowContext && (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--text-muted))]">
+                    SOW Context
+                  </p>
+                  <p className="rounded-lg bg-[rgb(var(--surface-subtle))] px-3 py-2 text-xs italic text-[rgb(var(--text-secondary))]">
+                    &quot;{flag.sowContext}&quot;
+                  </p>
+                </div>
+              )}
+
+              {/* Snippet */}
+              {flag.snippet && (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--text-muted))]">
+                    Detected Snippet
+                  </p>
+                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs italic text-amber-700">
+                    &quot;{flag.snippet}&quot;
+                  </p>
+                </div>
+              )}
+
+              {/* Suggested response */}
+              {flag.suggestedResponse && (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--text-muted))]">
+                    Suggested Response
+                  </p>
+                  <p className="rounded-lg border border-[rgb(var(--border-subtle))] px-3 py-2 text-xs text-[rgb(var(--text-secondary))]">
+                    {flag.suggestedResponse}
+                  </p>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-1">
+                <Link
+                  href={`/projects/${flag.projectId ?? ""}/scope-guard`}
+                  className="flex items-center gap-1 text-xs text-[rgb(var(--primary))] hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  View in project
+                </Link>
+                {flag.flagType && (
+                  <span className="font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                    {flag.flagType.replace(/_/g, " ")}
+                  </span>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function ScopeFlagsPage() {
   useAssetsReady({
@@ -43,8 +330,8 @@ export default function ScopeFlagsPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
-  const flags: any[] = data?.data ?? [];
-  const projects: any[] = projectsData?.data ?? [];
+  const flags: ScopeFlag[] = data?.data ?? [];
+  const projects: { id: string; name: string }[] = projectsData?.data ?? [];
 
   const filtered = useMemo(() => {
     return flags.filter((f) => {
@@ -55,9 +342,28 @@ export default function ScopeFlagsPage() {
     });
   }, [flags, statusFilter, severityFilter, projectFilter]);
 
+  // Priority-sort
+  const sorted = useMemo(
+    () => [...filtered].sort((a, b) => priorityScore(b) - priorityScore(a)),
+    [filtered],
+  );
+
+  // Group by date
+  const grouped = useMemo(() => {
+    const groups = new Map<DateGroup, ScopeFlag[]>();
+    for (const g of GROUP_ORDER) groups.set(g, []);
+    for (const flag of sorted) {
+      const g = dateGroup(flag.createdAt);
+      groups.get(g)!.push(flag);
+    }
+    return groups;
+  }, [sorted]);
+
   const pendingCount = flags.filter(
     (f) => f.status === "pending" || f.status === "pending_review",
   ).length;
+
+  const containerRef = useRowReveal(".reveal-row");
 
   async function handleAction(id: string, status: string) {
     try {
@@ -86,7 +392,7 @@ export default function ScopeFlagsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-[rgb(var(--text-primary))]">
+            <h1 className="flex items-center gap-2 font-display text-2xl font-bold text-[rgb(var(--text-primary))]">
               <ShieldAlert className="h-6 w-6 text-red-500" />
               Scope Flags
               {pendingCount > 0 && (
@@ -95,8 +401,8 @@ export default function ScopeFlagsPage() {
                 </span>
               )}
             </h1>
-            <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
-              AI-detected scope creep signals across all projects
+            <p className="mt-0.5 text-sm text-[rgb(var(--text-muted))]">
+              AI-detected scope creep signals — sorted by priority score
             </p>
           </div>
         </div>
@@ -109,9 +415,10 @@ export default function ScopeFlagsPage() {
           </div>
           <div className="flex flex-wrap gap-1.5">
             {STATUS_FILTERS.map((s) => {
-              const count = s === "all"
-                ? flags.length
-                : flags.filter((f) => f.status === s).length;
+              const count =
+                s === "all"
+                  ? flags.length
+                  : flags.filter((f) => f.status === s).length;
               if (count === 0 && s !== "all") return null;
               return (
                 <button
@@ -128,7 +435,7 @@ export default function ScopeFlagsPage() {
                   {statusFilter === s && (
                     <motion.span
                       layoutId="status-filter-active"
-                      className="absolute inset-0 rounded-full bg-primary"
+                      className="absolute inset-0 rounded-full bg-[rgb(var(--primary))]"
                       style={{ zIndex: 0 }}
                       transition={{ type: "spring", stiffness: 380, damping: 30 }}
                     />
@@ -179,11 +486,13 @@ export default function ScopeFlagsPage() {
               <select
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                className="appearance-none rounded-xl border border-[rgb(var(--border-default))] bg-white py-1.5 pl-3 pr-8 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="appearance-none rounded-xl border border-[rgb(var(--border-default))] bg-white py-1.5 pl-3 pr-8 text-xs text-[rgb(var(--text-primary))] outline-none focus:border-[rgb(var(--primary))] focus:ring-2 focus:ring-[rgb(var(--primary))]/20"
               >
                 <option value="all">All Projects</option>
-                {projects.map((p: any) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--text-muted))]" />
@@ -194,105 +503,65 @@ export default function ScopeFlagsPage() {
         {/* Flag list */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 w-full" />)}
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-20 w-full" />
+            ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <Card className="py-16 text-center">
             <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-[rgb(var(--text-muted))]" />
-            <p className="text-sm font-semibold text-[rgb(var(--text-primary))]">
-              {statusFilter === "all" ? "No scope flags yet" : `No ${statusFilter.replace(/_/g, " ")} flags`}
+            <p className="font-display text-sm font-semibold text-[rgb(var(--text-primary))]">
+              {statusFilter === "all"
+                ? "No scope flags yet"
+                : `No ${statusFilter.replace(/_/g, " ")} flags`}
             </p>
             <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
               Flags are created automatically when AI detects scope creep in client messages.
             </p>
           </Card>
         ) : (
-          <div className="space-y-3">
-            <AnimatePresence initial={false}>
-              {filtered.map((flag: any) => (
-                <motion.div
-                  key={flag.id}
-                  layout
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -24, height: 0, marginBottom: 0 }}
-                  transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-                >
-                  <FlagCard
-                    flag={flag}
-                    onAction={(id, status) => handleAction(id, status)}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+          <div
+            className="space-y-3"
+            ref={containerRef as React.RefObject<HTMLDivElement>}
+          >
+            {GROUP_ORDER.map((group) => {
+              const groupFlags = grouped.get(group) ?? [];
+              if (groupFlags.length === 0) return null;
+              return (
+                <div key={group}>
+                  {/* Date group header */}
+                  <div className="mb-2 flex items-center gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-muted))]">
+                      {group}
+                    </span>
+                    <div className="flex-1 border-t border-[rgb(var(--border-subtle))]" />
+                    <span className="font-mono text-[10px] text-[rgb(var(--text-muted))]">
+                      {groupFlags.length}
+                    </span>
+                  </div>
+
+                  {/* Flags in group */}
+                  <AnimatePresence initial={false}>
+                    {groupFlags.map((flag) => (
+                      <motion.div
+                        key={flag.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, x: -24, height: 0, marginBottom: 0 }}
+                        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                        className="mb-2"
+                      >
+                        <FlagCard flag={flag} onAction={handleAction} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
     </PageEnter>
-  );
-}
-
-function FlagCard({ flag, onAction }: { flag: any; onAction: (id: string, status: string) => void }) {
-  const isPending = flag.status === "pending" || flag.status === "pending_review";
-
-  return (
-    <Card className={`border-l-4 p-4 transition-all ${isPending ? "border-l-red-400" : "border-l-emerald-400 opacity-70"}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${SEVERITY_COLORS[flag.severity] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
-              {flag.severity}
-            </span>
-            <Badge status={isPending ? "flagged" : "active"} className="text-[10px]">
-              {flag.status?.replace(/_/g, " ")}
-            </Badge>
-            {flag.flagType && (
-              <span className="text-[10px] text-[rgb(var(--text-muted))] uppercase tracking-wide">
-                {flag.flagType.replace(/_/g, " ")}
-              </span>
-            )}
-          </div>
-          <p className="mt-2 text-sm font-medium text-[rgb(var(--text-primary))]">
-            {flag.reason || flag.title}
-          </p>
-          {flag.snippet && (
-            <p className="mt-1.5 rounded-lg bg-[rgb(var(--surface-subtle))] px-3 py-2 text-xs text-[rgb(var(--text-secondary))] italic">
-              &quot;{flag.snippet}&quot;
-            </p>
-          )}
-          <div className="mt-2 flex items-center gap-3 text-xs text-[rgb(var(--text-muted))]">
-            <span className="flex items-center gap-1">
-              <FolderKanban className="h-3 w-3" />
-              <Link href={`/projects/${flag.projectId}/scope-guard`} className="hover:text-primary hover:underline">
-                View project
-              </Link>
-            </span>
-            <span className="flex items-center gap-1">
-              {formatDistanceToNow(new Date(flag.createdAt), { addSuffix: true })}
-            </span>
-          </div>
-        </div>
-
-        {isPending && (
-          <div className="flex shrink-0 flex-col gap-1.5">
-            <Button
-              size="sm"
-              onClick={() => onAction(flag.id, "resolved")}
-              className="bg-emerald-600 hover:bg-emerald-700 text-xs"
-            >
-              Resolve
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onAction(flag.id, "dismissed")}
-              className="text-xs text-[rgb(var(--text-muted))] hover:text-red-500"
-            >
-              Dismiss
-            </Button>
-          </div>
-        )}
-      </div>
-    </Card>
   );
 }

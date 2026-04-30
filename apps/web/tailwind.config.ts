@@ -13,6 +13,12 @@ const config: Config = {
         ...sharedConfig.theme,
         extend: {
             ...sharedConfig.theme?.extend,
+            fontFamily: {
+                ...((sharedConfig.theme?.extend as Record<string, unknown>)?.fontFamily as Record<string, string[]> | undefined),
+                sans: ['var(--font-dm-sans)', 'system-ui', 'sans-serif'],
+                display: ['var(--font-sora)', 'system-ui', 'sans-serif'],
+                mono: ['var(--font-mono)', 'monospace'],
+            },
             boxShadow: {
                 'xs': 'var(--shadow-xs)',
                 'sm': 'var(--shadow-sm)',

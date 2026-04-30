@@ -31,6 +31,7 @@ const verificationToken = "abc123def456abc123def456abc123def456abc123def456";
 
 const baseWorkspace = {
   id: workspaceId,
+  plan: "studio",
   customDomain,
   domainVerificationStatus: "pending" as const,
   domainVerificationToken: verificationToken,

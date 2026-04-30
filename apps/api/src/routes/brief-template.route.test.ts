@@ -53,14 +53,14 @@ describe("briefTemplateRouter", () => {
       },
     ] as never);
 
-    const response = await briefTemplateRouter.fetch(new Request("http://localhost/template-1/versions"));
+    const response = await briefTemplateRouter.fetch(new Request("http://localhost/11111111-1111-4111-8111-111111111111/versions"));
     expect(response.status).toBe(200);
 
     const payload = await response.json();
 
     expect(briefTemplateService.listTemplateVersions).toHaveBeenCalledWith(
       "workspace-1",
-      "template-1",
+      "11111111-1111-4111-8111-111111111111",
     );
     expect(payload).toMatchObject({
       data: [
@@ -109,7 +109,7 @@ describe("briefTemplateRouter", () => {
     } as never);
 
     const response = await briefTemplateRouter.fetch(
-      new Request("http://localhost/template-1/publish", { method: "POST" }),
+      new Request("http://localhost/11111111-1111-4111-8111-111111111111/publish", { method: "POST" }),
     );
     expect(response.status).toBe(200);
 
@@ -117,7 +117,7 @@ describe("briefTemplateRouter", () => {
 
     expect(briefTemplateService.publishTemplate).toHaveBeenCalledWith(
       "workspace-1",
-      "template-1",
+      "11111111-1111-4111-8111-111111111111",
       "user-1",
     );
     expect(payload).toMatchObject({
@@ -155,7 +155,7 @@ describe("briefTemplateRouter", () => {
     } as never);
 
     const response = await briefTemplateRouter.fetch(
-      new Request("http://localhost/template-1/restore", {
+      new Request("http://localhost/22222222-2222-4222-8222-222222222222/restore", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -169,7 +169,7 @@ describe("briefTemplateRouter", () => {
 
     expect(briefTemplateService.restoreTemplateVersion).toHaveBeenCalledWith(
       "workspace-1",
-      "template-1",
+      "22222222-2222-4222-8222-222222222222",
       "11111111-1111-4111-8111-111111111111",
       "user-1",
     );

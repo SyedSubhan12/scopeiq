@@ -100,6 +100,17 @@ sowRouter.patch("/:id/clauses", zValidator("param", uuidParamSchema), zValidator
   return c.json({ data: updated });
 });
 
+// Get SOW clauses with confidence data, sorted for human review
+// Returns: requires_human_review first, then low→medium→high confidence, then by clause_type
+sowRouter.get("/:id/review", zValidator("param", uuidParamSchema), async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const id = c.req.param("id");
+
+  const result = await sowService.getReviewData(workspaceId, id);
+
+  return c.json({ data: result });
+});
+
 // Generic /:id route after specific sub-routes
 // Get SOW with clauses by ID
 sowRouter.get("/:id", zValidator("param", uuidParamSchema), async (c) => {

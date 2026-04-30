@@ -2,6 +2,7 @@ import { db, writeAuditLog, projects, statementsOfWork, sowClauses, eq, and, isN
 import { NotFoundError, ValidationError } from "@novabots/types";
 import { dispatchParseSowJob } from "../jobs/parse-sow.job.js";
 import { getDownloadUrl } from "../lib/storage.js";
+import { sowClauseRepository } from "../repositories/sow-clause.repository.js";
 import type { ClauseType, SowStatus } from "@novabots/db";
 
 interface CreateSowInput {
@@ -541,6 +542,34 @@ export const sowService = {
     const text = rows[0]?.originalText;
     if (!text) return null;
     return parseRevisionLimitFromText(text);
+  },
+
+  async getReviewData(workspaceId: string, sowId: string) {
+    const data = await sowClauseRepository.getReviewData(workspaceId, sowId);
+
+    if (!data) {
+      throw new NotFoundError("StatementOfWork", sowId);
+    }
+
+    const { sow, clauses } = data;
+    const needsReviewCount = clauses.filter((c) => c.requiresHumanReview).length;
+
+    return {
+      sow_id: sow.id,
+      overall_confidence: sow.overallConfidence ?? null,
+      total_clauses: clauses.length,
+      needs_review_count: needsReviewCount,
+      clauses: clauses.map((c) => ({
+        id: c.id,
+        clause_type: c.clauseType,
+        content: c.originalText,
+        confidence_score: c.confidenceScore ?? null,
+        confidence_level: c.confidenceLevel ?? null,
+        raw_text_source: c.rawTextSource ?? null,
+        page_number: c.pageNumber ?? null,
+        requires_human_review: c.requiresHumanReview,
+      })),
+    };
   },
 };
 

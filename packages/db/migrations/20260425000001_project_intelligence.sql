@@ -53,7 +53,7 @@ ALTER TABLE project_intelligence ENABLE ROW LEVEL SECURITY;
 CREATE POLICY workspace_isolation ON project_intelligence
   AS RESTRICTIVE
   FOR ALL
-  USING (workspace_id IN (
+  USING (workspace_id::uuid IN (
     SELECT w.id FROM workspaces w
     JOIN users u ON u.workspace_id = w.id
     WHERE u.id = auth.uid()

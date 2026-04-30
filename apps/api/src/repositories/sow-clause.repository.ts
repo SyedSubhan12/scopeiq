@@ -1,4 +1,4 @@
-import { db, sowClauses, statementsOfWork, projects, eq, and, isNull, desc } from "@novabots/db";
+import { db, sowClauses, statementsOfWork, projects, eq, and, isNull, desc, asc, sql } from "@novabots/db";
 import type { NewSowClause } from "@novabots/db";
 import type { ClauseType } from "@novabots/db";
 
@@ -178,5 +178,62 @@ export const sowClauseRepository = {
       .delete(sowClauses)
       .where(eq(sowClauses.sowId, sowId))
       .returning();
+  },
+
+  /**
+   * Returns all clauses for a SOW ordered for human review:
+   *  1. requires_human_review = true first
+   *  2. confidence_level: low → medium → high
+   *  3. clause_type alphabetically
+   *
+   * The workspace ownership check is enforced via the JOIN on statementsOfWork.
+   */
+  async getReviewData(workspaceId: string, sowId: string) {
+    const [sow] = await db
+      .select({
+        id: statementsOfWork.id,
+        overallConfidence: sql<number | null>`(${statementsOfWork.parsingResultJson}->>'overall_confidence')::real`,
+      })
+      .from(statementsOfWork)
+      .where(
+        and(
+          eq(statementsOfWork.id, sowId),
+          eq(statementsOfWork.workspaceId, workspaceId),
+          isNull(statementsOfWork.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!sow) return null;
+
+    const clauses = await db
+      .select({
+        id: sowClauses.id,
+        clauseType: sowClauses.clauseType,
+        originalText: sowClauses.originalText,
+        summary: sowClauses.summary,
+        confidenceScore: sowClauses.confidenceScore,
+        confidenceLevel: sowClauses.confidenceLevel,
+        rawTextSource: sowClauses.rawTextSource,
+        pageNumber: sowClauses.pageNumber,
+        requiresHumanReview: sowClauses.requiresHumanReview,
+        sortOrder: sowClauses.sortOrder,
+      })
+      .from(sowClauses)
+      .where(eq(sowClauses.sowId, sowId))
+      .orderBy(
+        // requires_human_review DESC — true rows first (true > false in pg)
+        desc(sowClauses.requiresHumanReview),
+        // confidence_level: low → medium → high (NULL last)
+        sql`CASE ${sowClauses.confidenceLevel}
+              WHEN 'low'    THEN 1
+              WHEN 'medium' THEN 2
+              WHEN 'high'   THEN 3
+              ELSE               4
+            END ASC`,
+        asc(sowClauses.clauseType),
+      );
+
+    return { sow, clauses };
   },
 };
