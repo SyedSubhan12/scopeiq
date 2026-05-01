@@ -128,6 +128,7 @@ export function IntakeForm({ brief, onSuccess, onStepChange, onValuesChange }: I
   const [submitting, setSubmitting] = useState(false);
   const [uploadingFieldKey, setUploadingFieldKey] = useState<string | null>(null);
   const [removingAttachmentId, setRemovingAttachmentId] = useState<string | null>(null);
+  const [dragOverFieldKey, setDragOverFieldKey] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
@@ -719,7 +720,33 @@ export function IntakeForm({ brief, onSuccess, onStepChange, onValuesChange }: I
                     )}
 
                     {currentField.type === "file_upload" && (
-                      <div className="space-y-4 rounded-3xl border border-dashed border-[rgb(var(--border-default))] bg-[rgb(var(--surface-subtle))]/40 p-6">
+                      <div
+                        className={cn(
+                          "space-y-4 rounded-3xl border border-dashed p-6 transition-colors",
+                          dragOverFieldKey === currentField.key
+                            ? "border-primary bg-primary/5"
+                            : "border-[rgb(var(--border-default))] bg-[rgb(var(--surface-subtle))]/40",
+                        )}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragOverFieldKey(currentField.key);
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          setDragOverFieldKey(currentField.key);
+                        }}
+                        onDragLeave={() => {
+                          setDragOverFieldKey(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragOverFieldKey(null);
+                          const file = e.dataTransfer.files[0];
+                          if (file) {
+                            void handleFileSelection(currentField, e.dataTransfer.files);
+                          }
+                        }}
+                      >
                         <div className="flex items-start gap-4">
                           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm">
                             <FileUp className="h-5 w-5 text-[rgb(var(--text-secondary))]" />

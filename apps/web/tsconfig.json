@@ -21,6 +21,9 @@
     "**/*.test.tsx",
     "**/*.spec.ts",
     "**/*.spec.tsx",
-    "**/__tests__/*"
+    "**/__tests__/*",
+    "sentry.client.config.ts",
+    "sentry.server.config.ts",
+    "e2e/**"
   ]
 }

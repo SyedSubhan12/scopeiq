@@ -7,16 +7,33 @@ import type { FlagStatus } from "@novabots/db";
 
 // Mock dependencies
 vi.mock("../../repositories/scope-flag.repository.js");
+
+// Shared select chain stub — reused by both db.select and trx.select
+const mockSelectChain = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue([]),
+};
+
+// trx stub passed to transaction callbacks — must expose update/select chains
+const mockTrx = {
+    select: vi.fn(() => mockSelectChain),
+    update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })) })),
+};
+
 vi.mock("@novabots/db", () => ({
     db: {
-        transaction: vi.fn((fn) => fn({})),
+        transaction: vi.fn((fn) => fn(mockTrx)),
+        select: vi.fn(() => mockSelectChain),
     },
     writeAuditLog: vi.fn(),
     projects: {},
     sowClauses: {},
-    eq: vi.fn(),
-    and: vi.fn(),
-    isNull: vi.fn(),
+    scopeFlags: { evidence: "evidence", id: "id", workspaceId: "workspaceId" },
+    messages: { id: "id", body: "body", scopeCheckStatus: "scopeCheckStatus" },
+    eq: vi.fn((_a, _b) => "eq_cond"),
+    and: vi.fn((...args) => args),
+    isNull: vi.fn((_a) => "is_null"),
 }));
 
 describe("ScopeFlagService", () => {

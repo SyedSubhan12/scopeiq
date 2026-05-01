@@ -416,7 +416,10 @@ export const briefService = {
     actorId: string,
     data: Record<string, unknown>,
   ) {
-    const brief = await briefRepository.update(workspaceId, briefId, stripUndefined(data));
+    // Extract overrideReason before passing to repository (not a DB column)
+    const { overrideReason, reason: _reason, ...updateData } = data;
+
+    const brief = await briefRepository.update(workspaceId, briefId, stripUndefined(updateData));
     if (!brief) {
       throw new NotFoundError("Brief", briefId);
     }
@@ -429,9 +432,11 @@ export const briefService = {
         scoringResultJson: brief.scoringResultJson ?? null,
         reviewerId: brief.reviewerId ?? null,
         reviewNote:
-          typeof (data.scoringResultJson as Record<string, unknown> | undefined)?.override_reason === "string"
-            ? ((data.scoringResultJson as Record<string, unknown>).override_reason as string)
-            : latestVersion.reviewNote ?? null,
+          typeof overrideReason === "string" && overrideReason
+            ? overrideReason
+            : typeof (updateData.scoringResultJson as Record<string, unknown> | undefined)?.override_reason === "string"
+              ? ((updateData.scoringResultJson as Record<string, unknown>).override_reason as string)
+              : latestVersion.reviewNote ?? null,
       });
     }
 
@@ -441,7 +446,10 @@ export const briefService = {
       entityType: "brief",
       entityId: briefId,
       action: "update",
-      metadata: { fields: Object.keys(data) },
+      metadata: {
+        fields: Object.keys(updateData),
+        ...(typeof overrideReason === "string" && overrideReason ? { overrideReason } : {}),
+      },
     });
 
     return brief;

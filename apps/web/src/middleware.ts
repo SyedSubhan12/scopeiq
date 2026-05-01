@@ -4,8 +4,26 @@ import type { NextRequest } from "next/server";
 const publicPaths = ["/login", "/register", "/auth/callback", "/forgot-password", "/reset-password"];
 const portalPrefix = "/portal";
 
+// Subdomains that are NOT agency portals — these are first-party hosts.
+const RESERVED_SUBDOMAINS = new Set(["www", "app", "api"]);
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ---------------------------------------------------------------------------
+  // FR-AP-001: Subdomain routing — {slug}.scopeiq.com  →  /portal/by-slug/{slug}{path}
+  // Runs before all auth checks so unauthenticated clients reach their portal.
+  // ---------------------------------------------------------------------------
+  const host = request.headers.get("host") ?? "";
+  const subdomainMatch = /^([a-z0-9-]+)\.scopeiq\.com(?::\d+)?$/.exec(host);
+  if (subdomainMatch) {
+    const slug = subdomainMatch[1] ?? "";
+    if (slug && !RESERVED_SUBDOMAINS.has(slug)) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/portal/by-slug/${slug}${pathname === "/" ? "" : pathname}`;
+      return NextResponse.rewrite(url);
+    }
+  }
 
   // 1. Root "/" — always public (marketing homepage)
   if (pathname === "/") {
@@ -69,34 +87,16 @@ export function middleware(request: NextRequest) {
 }
 
 function checkSession(request: NextRequest): boolean {
-  const cookies = request.cookies.getAll();
-  
-  // Debug: log all cookies to see what's actually present
-  console.log('[middleware:checkSession] Checking cookies:', cookies.map(c => c.name));
-  
-  // Check for actual Supabase session cookies only.
-  // Do not treat the PKCE code-verifier cookie as an authenticated session.
-  const hasSession = cookies.some(
-    (cookie) => {
-      if (!cookie.name.startsWith("sb-")) {
-        return false;
-      }
-
-      if (cookie.name.endsWith("-code-verifier")) {
-        return false;
-      }
-
-      return (
-        cookie.name === "sb-access-token" ||
-        cookie.name === "sb-refresh-token" ||
-        cookie.name.endsWith("-auth-token") ||
-        cookie.name.includes("-auth-token.")
-      );
-    },
-  );
-  
-  console.log('[middleware:checkSession] Session found:', hasSession);
-  return hasSession;
+  return request.cookies.getAll().some((cookie) => {
+    if (!cookie.name.startsWith("sb-")) return false;
+    if (cookie.name.endsWith("-code-verifier")) return false;
+    return (
+      cookie.name === "sb-access-token" ||
+      cookie.name === "sb-refresh-token" ||
+      cookie.name.endsWith("-auth-token") ||
+      cookie.name.includes("-auth-token.")
+    );
+  });
 }
 
 export const config = {

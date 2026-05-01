@@ -81,6 +81,7 @@ function MessagesPageContent() {
           brandColor={workspace.brandColor}
           clientName={project.clientName}
           agencyName={workspace.name}
+          projectId={project.id}
         />
 
         <div className="mt-8">

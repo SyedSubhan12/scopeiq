@@ -12,11 +12,14 @@ import { RevisionCounter } from "@/components/approval/RevisionCounter";
 import { FeedbackSummary } from "@/components/approval/FeedbackSummary";
 import { useDeliverables, type Deliverable } from "@/hooks/useDeliverables";
 import { useFeedback, useCreateFeedback, useResolveFeedback, type FeedbackItem } from "@/hooks/useFeedback";
+import { useRealtimeDeliverables } from "@/hooks/useRealtimeDeliverables";
 
 export default function ProjectDeliverablesPage() {
   const params = useParams();
   const projectId = params.id as string;
   const { toast } = useToast();
+
+  useRealtimeDeliverables(projectId);
 
   const [selected, setSelected] = useState<Deliverable | null>(null);
   const [showUploader, setShowUploader] = useState(false);

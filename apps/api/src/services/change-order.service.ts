@@ -1,7 +1,8 @@
 import { changeOrderRepository } from "../repositories/change-order.repository.js";
 import { NotFoundError } from "@novabots/types";
-import { db, writeAuditLog, projects, sowClauses, deliverables, scopeFlags, eq, and } from "@novabots/db";
+import { db, writeAuditLog, projects, sowClauses, deliverables, scopeFlags, workspaces, eq, and } from "@novabots/db";
 import type { ChangeOrder, ClauseType } from "@novabots/db";
+import { takeRateService } from "./take-rate.service.js";
 import { sendEmail } from "../lib/email.js";
 import { ChangeOrderSentEmail } from "../emails/index.js";
 import { ChangeOrderAcceptedEmail } from "../emails/index.js";
@@ -51,13 +52,59 @@ export const changeOrderService = {
                 createdBy: userId,
             }, trx as never);
 
+            // Code Rule 10: create payment intent at CO generation (not acceptance).
+            // Only when amount is set — draft COs without pricing skip until status→sent.
+            let intentMeta: {
+                paymentIntentId: string;
+                takeRatePct: number;
+                takeRateAmountCents: number;
+            } | null = null;
+
+            if (data.amount !== undefined && data.amount > 0) {
+                const amountCents = Math.round(data.amount * 100);
+
+                // Fetch Stripe customer ID for the workspace (optional but preferred)
+                const [ws] = await (trx as typeof db)
+                    .select({ stripeCustomerId: workspaces.stripeCustomerId })
+                    .from(workspaces)
+                    .where(eq(workspaces.id, workspaceId))
+                    .limit(1);
+
+                intentMeta = await takeRateService.createPaymentIntent({
+                    workspaceId,
+                    changeOrderId: co.id,
+                    amountCents,
+                    currency: "usd",
+                    customerId: ws?.stripeCustomerId ?? null,
+                });
+
+                await changeOrderRepository.update(
+                    workspaceId,
+                    co.id,
+                    {
+                        stripePaymentIntentId: intentMeta.paymentIntentId,
+                        takeRatePct: String(intentMeta.takeRatePct),
+                        takeRateAmountCents: intentMeta.takeRateAmountCents,
+                    },
+                    trx as never,
+                );
+            }
+
+            // Code Rule 10: payment intent creation MUST be in audit_log.
             await writeAuditLog(trx as never, {
                 workspaceId,
                 actorId: userId,
                 entityType: "change_order",
                 entityId: co.id,
                 action: "create",
-                metadata: { title: co.title },
+                metadata: {
+                    title: co.title,
+                    ...(intentMeta !== null && {
+                        paymentIntentId: intentMeta.paymentIntentId,
+                        takeRatePct: intentMeta.takeRatePct,
+                        takeRateAmountCents: intentMeta.takeRateAmountCents,
+                    }),
+                },
             });
 
             return co;
@@ -148,6 +195,13 @@ export const changeOrderService = {
             );
             if (!updated) throw new NotFoundError("ChangeOrder", changeOrderId);
 
+            // Code Rule 10: capture the payment intent inside the transaction.
+            // If capture fails, the entire tx rolls back — CO status NOT updated to accepted.
+            // Only new COs created under v3.0 will have a stripePaymentIntentId.
+            if (co.stripePaymentIntentId != null) {
+                await takeRateService.capturePaymentIntent(co.stripePaymentIntentId);
+            }
+
             // Step 2: Insert SOW clauses from scopeItemsJson if present
             // projectRow was already fetched above (with name for PDF)
             const coWithScopeItems = co as ChangeOrder;
@@ -222,6 +276,10 @@ export const changeOrderService = {
                     scopeItemsCount: scopeItems?.length ?? 0,
                     revisionLimitAdjusted: !!revisionLimitAdjustment,
                     scopeFlagResolved: !!co.scopeFlagId,
+                    paymentCaptured: co.stripePaymentIntentId != null,
+                    ...(co.stripePaymentIntentId != null && {
+                        paymentIntentId: co.stripePaymentIntentId,
+                    }),
                 },
             });
 
@@ -272,13 +330,64 @@ export const changeOrderService = {
             const result = await changeOrderRepository.update(workspaceId, id, updateData, trx as never);
             if (!result) throw new NotFoundError("ChangeOrder", id);
 
+            // Code Rule 10: if status transitions to 'sent' and no payment intent exists yet,
+            // create it now. This handles COs that were created without an amount (draft).
+            let intentMeta: {
+                paymentIntentId: string;
+                takeRatePct: number;
+                takeRateAmountCents: number;
+            } | null = null;
+
+            const isSentTransition = data.status === "sent" && oldStatus !== "sent";
+            const hasNoIntent = co.stripePaymentIntentId == null;
+            const pricing = result.pricing as Record<string, unknown> | null;
+            const amountDollars = typeof pricing?.amount === "number" ? pricing.amount : null;
+
+            if (isSentTransition && hasNoIntent && amountDollars !== null && amountDollars > 0) {
+                const amountCents = Math.round(amountDollars * 100);
+
+                const [ws] = await (trx as typeof db)
+                    .select({ stripeCustomerId: workspaces.stripeCustomerId })
+                    .from(workspaces)
+                    .where(eq(workspaces.id, workspaceId))
+                    .limit(1);
+
+                intentMeta = await takeRateService.createPaymentIntent({
+                    workspaceId,
+                    changeOrderId: id,
+                    amountCents,
+                    currency: (result.currency ?? "USD").toLowerCase(),
+                    customerId: ws?.stripeCustomerId ?? null,
+                });
+
+                await changeOrderRepository.update(
+                    workspaceId,
+                    id,
+                    {
+                        stripePaymentIntentId: intentMeta.paymentIntentId,
+                        takeRatePct: String(intentMeta.takeRatePct),
+                        takeRateAmountCents: intentMeta.takeRateAmountCents,
+                    },
+                    trx as never,
+                );
+            }
+
+            // Code Rule 10: payment intent creation MUST be in audit_log.
             await writeAuditLog(trx as never, {
                 workspaceId,
                 actorId: userId,
                 entityType: "change_order",
                 entityId: id,
                 action,
-                metadata: { oldStatus, newStatus: data.status ?? oldStatus },
+                metadata: {
+                    oldStatus,
+                    newStatus: data.status ?? oldStatus,
+                    ...(intentMeta !== null && {
+                        paymentIntentId: intentMeta.paymentIntentId,
+                        takeRatePct: intentMeta.takeRatePct,
+                        takeRateAmountCents: intentMeta.takeRateAmountCents,
+                    }),
+                },
             });
 
             return result;

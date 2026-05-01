@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { motion, LayoutGroup } from "framer-motion";
 import type { FeedbackItem } from "@/hooks/useFeedback";
 
 interface AnnotationCanvasProps {
   pins: FeedbackItem[];
   onPinClick: (pin: FeedbackItem) => void;
-  onPlacePin: (xPercent: number, yPercent: number) => void;
+  onPlacePin: (xPercent: number, yPercent: number, page?: number) => void;
   placingPin: boolean;
   /** Controlled active pin id — lifted from parent for bidirectional sync */
   activePinId?: string | null;
@@ -45,6 +45,17 @@ export function AnnotationCanvas({
     [placingPin, onPlacePin],
   );
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!placingPin) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onPlacePin(50, 50); // center placement as keyboard fallback
+      }
+    },
+    [placingPin, onPlacePin],
+  );
+
   // Callback ref: fires when a button mounts for the first time → run GSAP entrance
   const attachPinRef = useCallback(
     (id: string) => (el: HTMLButtonElement | null) => {
@@ -74,7 +85,16 @@ export function AnnotationCanvas({
     <div
       className={`absolute inset-0 ${placingPin ? "cursor-crosshair" : ""}`}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={placingPin ? 0 : -1}
+      role={placingPin ? "button" : undefined}
+      aria-label={placingPin ? "Deliverable canvas — press Enter to place a pin at center, or click anywhere" : undefined}
     >
+      {placingPin && (
+        <span className="sr-only">
+          Press Enter or Space to place a feedback pin at the center of the image. Use Tab to navigate existing pins.
+        </span>
+      )}
       <LayoutGroup>
         {pins.map((pin, index) => {
           const annotation = pin.annotationJson;
@@ -108,6 +128,7 @@ export function AnnotationCanvas({
                 e.stopPropagation();
                 onPinClick(pin);
               }}
+              tabIndex={isResolved ? -1 : 0}
               title={pin.body}
               aria-label={`Feedback pin ${index + 1}: ${pin.body}`}
             >

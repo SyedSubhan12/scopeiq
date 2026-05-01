@@ -1,3 +1,6 @@
+import { initSentry } from "./lib/sentry.js";
+initSentry();
+
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { logger } from "./middleware/logger.js";
@@ -5,7 +8,7 @@ import { errorHandler } from "./middleware/error.js";
 import { corsConfig } from "./lib/cors.js";
 import { healthRouter } from "./routes/health.route.js";
 import { authRouter } from "./routes/auth.route.js";
-import { workspaceRouter } from "./routes/workspace.route.js";
+import { workspaceRouter, workspacePublicRouter } from "./routes/workspace.route.js";
 import { projectRouter } from "./routes/project.route.js";
 import { clientRouter } from "./routes/client.route.js";
 import { rateCardRouter } from "./routes/rate-card.route.js";
@@ -90,6 +93,9 @@ v1.route("/brief-embeds", briefEmbedRouter);
 v1.route("/oembed", oembedRouter);
 
 app.route("/v1", v1);
+
+// Public workspace slug resolution (no auth, used by subdomain routing)
+app.route("/v1/workspaces", workspacePublicRouter);
 
 // Public embed endpoints (open CORS, rate-limited)
 app.route("/public/brief-embed", publicBriefEmbedRouter);

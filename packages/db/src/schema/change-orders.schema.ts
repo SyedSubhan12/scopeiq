@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, integer, jsonb, index, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, timestamp, integer, jsonb, index, doublePrecision, numeric } from "drizzle-orm/pg-core";
 import { changeOrderStatusEnum } from './enums';
 import { workspaces } from './workspaces.schema';
 import { projects } from './projects.schema';
@@ -29,6 +29,9 @@ export const changeOrders = pgTable(
     signedPdfKey: text("signed_pdf_key"),
     signedPdfHash: text("signed_pdf_hash"),
     pdfUrl: text("pdf_url"),
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
+    takeRatePct: numeric("take_rate_pct", { precision: 5, scale: 4 }),
+    takeRateAmountCents: integer("take_rate_amount_cents"),
     createdBy: uuid("created_by"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

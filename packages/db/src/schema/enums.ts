@@ -74,6 +74,7 @@ export const clauseTypeEnum = pgEnum("clause_type_enum", [
   "timeline",
   "exclusion",
   "payment_term",
+  "acceptance_criteria",
   "other",
 ]);
 

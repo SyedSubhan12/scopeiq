@@ -1,0 +1,22 @@
+# Uptime monitor configuration
+# Import this into Better Uptime (betteruptime.com) or UptimeRobot
+# to enforce the 99.5% monthly SLA on paid plans
+
+monitors:
+  - name: ScopeIQ API Health
+    url: https://api.scopeiq.com/health
+    interval: 60  # seconds
+    alert_after: 2  # consecutive failures
+    regions: [us-east, eu-west]
+
+  - name: ScopeIQ Web Portal
+    url: https://app.scopeiq.com
+    interval: 60
+    alert_after: 2
+    regions: [us-east, eu-west]
+
+  - name: ScopeIQ Client Portal
+    url: https://app.scopeiq.com/portal
+    interval: 300
+    alert_after: 3
+    regions: [us-east, eu-west]

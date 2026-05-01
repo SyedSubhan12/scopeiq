@@ -6,11 +6,47 @@ import { db, writeAuditLog } from "@novabots/db";
 
 // Mock dependencies
 vi.mock("../../repositories/change-order.repository.js");
+vi.mock("../take-rate.service.js", () => ({
+    takeRateService: {
+        getTakeRatePct: vi.fn().mockResolvedValue(0.04),
+        createPaymentIntent: vi.fn().mockResolvedValue({
+            paymentIntentId: "pi_test_mock",
+            takeRatePct: 0.04,
+            takeRateAmountCents: 200,
+        }),
+        capturePaymentIntent: vi.fn().mockResolvedValue({ id: "pi_test_mock", status: "succeeded" }),
+    },
+}));
+
+// trx stub — supports select chain for workspace customer ID lookup and update chains
+const mockTrxCO = {
+    select: vi.fn(() => ({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([{ stripeCustomerId: null }]),
+    })),
+    update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })) })),
+};
+
 vi.mock("@novabots/db", () => ({
     db: {
-        transaction: vi.fn((fn) => fn({})),
+        transaction: vi.fn((fn) => fn(mockTrxCO)),
+        select: vi.fn(() => ({
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue([]),
+        })),
     },
     writeAuditLog: vi.fn(),
+    workspaces: { id: "id", stripeCustomerId: "stripeCustomerId" },
+    projects: { id: "id", sowId: "sowId", name: "name" },
+    sowClauses: {},
+    deliverables: {},
+    scopeFlags: {},
+    changeOrders: {},
+    eq: vi.fn((_a, _b) => "eq_cond"),
+    and: vi.fn((...args) => args),
+    isNull: vi.fn((_a) => "is_null"),
 }));
 
 describe("ChangeOrderService", () => {

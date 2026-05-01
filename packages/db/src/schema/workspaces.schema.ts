@@ -5,7 +5,7 @@ export const workspaces = pgTable("workspaces", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
-  plan: planEnum("plan").notNull().default("solo"),
+  plan: planEnum("plan").notNull().default("free"),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }).unique(),
   logoUrl: text("logo_url"),

@@ -15,6 +15,7 @@ import {
 import { useWorkspace, useUpdateWorkspace } from "@/hooks/useWorkspace";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
+import { SlackIntegrationCard } from "@/components/settings/SlackIntegrationCard";
 
 export default function WorkspaceSettingsPage() {
   const { data, isLoading } = useWorkspace();
@@ -315,6 +316,12 @@ export default function WorkspaceSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="mt-6">
+        <SlackIntegrationCard
+          workspace={{ settingsJson: workspace?.settingsJson ?? null }}
+        />
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   timestamp,
   integer,
   date,
+  jsonb,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -30,6 +31,8 @@ export const projects = pgTable(
     endDate: date("end_date"),
     portalToken: varchar("portal_token", { length: 64 }).unique(),
     portalEnabled: varchar("portal_enabled", { length: 5 }).default("false"),
+    /** Flexible project-level settings (e.g. remindersPaused: boolean) */
+    settingsJson: jsonb("settings_json").default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

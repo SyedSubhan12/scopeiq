@@ -15,6 +15,7 @@ import {
   messages,
   projects,
   clients,
+  workspaces,
   eq,
   and,
   isNull,
@@ -262,7 +263,7 @@ aiCallbackRouter.post(
           confidence: payload.confidence,
           title: "AI Detection: Possible Scope Deviation",
           description: payload.reasoning,
-          severity: (payload.suggestedSeverity as "low" | "medium" | "high") ?? "medium",
+          severity: (payload.suggestedSeverity as any) ?? "medium",
           status: "pending",
           suggestedResponse: payload.suggestedResponse ?? null,
           aiReasoning: payload.reasoning,
@@ -282,52 +283,6 @@ aiCallbackRouter.post(
         .returning();
 
       flagId = flag?.id ?? null;
-    }
-
-    // FR-SG-002: bilateral scope flag notification — insert a "system" message
-    // visible to the client portal so both sides see the flag simultaneously.
-    let systemMessageId: string | null = null;
-    if (flagId && payload.isDeviation && payload.confidence > 0.60) {
-      // Resolve threadId from the triggering message so the system bubble
-      // appears in the same conversation thread the client is reading.
-      let originThreadId: string | null = null;
-      if (payload.messageId) {
-        const [originMsg] = await trx
-          .select({ threadId: messages.threadId })
-          .from(messages)
-          .where(eq(messages.id, payload.messageId))
-          .limit(1);
-        originThreadId = originMsg?.threadId ?? null;
-      }
-
-      const [systemMsg] = await trx
-        .insert(messages)
-        .values({
-          workspaceId: project.workspaceId,
-          projectId: payload.projectId,
-          authorId: null,
-          authorName: null,
-          source: "system",
-          status: "checked",
-          body: "This request appears to fall outside our current agreement. Your team has been notified and will follow up with options.",
-          threadId: originThreadId,
-          authorType: "system",
-          scopeCheckStatus: "skipped",
-        })
-        .returning({ id: messages.id });
-
-      systemMessageId = systemMsg?.id ?? null;
-
-      // Patch the scope flag's evidence jsonb to record system_message_id,
-      // so the dismissal handler can locate and update this message later.
-      if (systemMessageId) {
-        await trx
-          .update(scopeFlags)
-          .set({
-            evidence: sql`${scopeFlags.evidence} || ${JSON.stringify({ system_message_id: systemMessageId })}::jsonb`,
-          })
-          .where(eq(scopeFlags.id, flagId));
-      }
     }
 
     // Update message status
@@ -353,7 +308,6 @@ aiCallbackRouter.post(
         confidence: payload.confidence,
         flagId,
         messageId: payload.messageId,
-        systemMessageId,
         durationMs: payload.durationMs,
         slaMet: payload.slaMet,
         jobId: payload.jobId,
@@ -373,6 +327,39 @@ aiCallbackRouter.post(
       .catch((err) => {
         console.error(`[ScopeFlagAlert] Failed to dispatch alert job: ${err.message}`);
       });
+
+    // Fire-and-forget Slack scope flag notification
+    void (async () => {
+      try {
+        const [ws] = await db
+          .select({ settingsJson: workspaces.settingsJson })
+          .from(workspaces)
+          .where(eq(workspaces.id, project.workspaceId))
+          .limit(1);
+        const settings = (ws?.settingsJson ?? {}) as Record<string, unknown>;
+        const accessToken = settings["slackAccessToken"] as string | undefined;
+        const channelId = settings["slackChannelId"] as string | undefined;
+        if (accessToken && channelId) {
+          // Look up project name for the notification
+          const [projectRecord] = await db
+            .select({ name: projects.name })
+            .from(projects)
+            .where(and(eq(projects.id, payload.projectId), isNull(projects.deletedAt)))
+            .limit(1);
+          const { sendSlackScopeFlag } = await import("../lib/slack.js");
+          await sendSlackScopeFlag({
+            accessToken,
+            channelId,
+            projectName: projectRecord?.name ?? "Unknown project",
+            messageText: payload.reasoning,
+            confidence: payload.confidence,
+            flagId: result.flagId!, // non-null: we are inside `if (result.flagId)` block
+          });
+        }
+      } catch (err) {
+        console.error("[Slack] Failed to send scope flag notification:", err);
+      }
+    })();
 
     logProjectEvent({
       workspaceId: project.workspaceId,

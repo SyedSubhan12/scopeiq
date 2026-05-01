@@ -72,6 +72,31 @@ const STATUS_MAP: Record<string, StatusConfig> = {
     bg: "bg-red-50",
     text: "text-red-500",
   },
+  // Scope-check status pills (FR-SG-001)
+  in_scope: {
+    dot: "#059669",
+    label: "In Scope",
+    bg: "bg-emerald-50",
+    text: "text-emerald-600",
+  },
+  checked: {
+    dot: "#059669",
+    label: "In Scope",
+    bg: "bg-emerald-50",
+    text: "text-emerald-600",
+  },
+  pending_check: {
+    dot: "#d97706",
+    label: "Pending",
+    bg: "bg-amber-50",
+    text: "text-amber-600",
+  },
+  scope_pending: {
+    dot: "#d97706",
+    label: "Pending",
+    bg: "bg-amber-50",
+    text: "text-amber-600",
+  },
   completed: {
     dot: "#6366f1",
     label: "Completed",

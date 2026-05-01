@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowLeft, Clock, Shield } from "lucide-react";
-import { Card, Badge, Button, Dialog, Input } from "@novabots/ui";
+import { Card, Badge, Button, Dialog, Textarea } from "@novabots/ui";
 import { ClarityScoreRing } from "./ClarityScoreRing";
 import { BriefFlagCard } from "./BriefFlagCard";
 import type { Brief } from "@/hooks/useBriefs";
@@ -36,8 +36,10 @@ export function BriefDetail({
 
   const config = statusConfig[brief.status];
 
+  const overrideReasonValid = overrideReason.trim().length >= 10;
+
   const handleOverride = () => {
-    if (overrideReason.trim() && onOverrideBrief) {
+    if (overrideReasonValid && onOverrideBrief) {
       onOverrideBrief(overrideReason.trim());
       setShowOverrideModal(false);
       setOverrideReason("");
@@ -149,13 +151,19 @@ export function BriefDetail({
           </p>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-[rgb(var(--text-primary))]">
-              Reason <span className="text-red-500">*</span>
+              Reason for override <span className="text-red-500">*</span>
             </label>
-            <Input
+            <Textarea
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
-              placeholder="e.g. Client provided additional context via email"
+              placeholder="Explain why this brief should proceed despite the clarity issues..."
+              rows={3}
             />
+            {overrideReason.length > 0 && !overrideReasonValid && (
+              <p className="mt-1 text-xs text-status-red">
+                Please enter at least 10 characters ({overrideReason.trim().length}/10)
+              </p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button size="sm" onClick={() => setShowOverrideModal(false)}>
@@ -164,7 +172,7 @@ export function BriefDetail({
             <Button
               size="sm"
               onClick={handleOverride}
-              disabled={!overrideReason.trim() || overriding}
+              disabled={!overrideReasonValid || overriding}
             >
               {overriding ? "Overriding..." : "Confirm Override"}
             </Button>

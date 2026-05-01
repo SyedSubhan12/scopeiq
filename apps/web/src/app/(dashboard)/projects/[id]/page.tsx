@@ -30,6 +30,7 @@ const tabs = [
   { key: "change-orders", label: "Change Orders" },
   { key: "health", label: "Health" },
   { key: "log", label: "Activity Log" },
+  { key: "reminders", label: "Reminders" },
 ];
 
 function HealthTab({ projectId }: { projectId: string }) {
@@ -369,6 +370,8 @@ function PortalLinkBadge({ portalToken }: { portalToken?: string }) {
 import { ScopeGuardTab } from "@/components/scope/ScopeGuardTab";
 import { ChangeOrdersTab } from "@/components/scope/ChangeOrdersTab";
 import { ActivityLogTab } from "@/components/shared/ActivityLogTab";
+import { ReminderSequenceCard } from "@/components/approval/ReminderSequenceCard";
+import { ReminderLogTimeline } from "@/components/approval/ReminderLogTimeline";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -462,7 +465,16 @@ export default function ProjectDetailPage() {
         {activeTab === "change-orders" && <ChangeOrdersTab projectId={id} />}
         {activeTab === "health" && <HealthTab projectId={id} />}
         {activeTab === "log" && (
-          <ActivityLogTab workspaceId={project.workspaceId} />
+          <>
+            <ActivityLogTab workspaceId={project.workspaceId} />
+            <ReminderLogTimeline projectId={id} />
+          </>
+        )}
+        {activeTab === "reminders" && (
+          <ReminderSequenceCard
+            projectId={id}
+            remindersPaused={Boolean(project.remindersPaused)}
+          />
         )}
       </div>
     </div>

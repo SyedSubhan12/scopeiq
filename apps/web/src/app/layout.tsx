@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import type React from "react";
 export const dynamic = "force-dynamic";
 
 import { Inter, JetBrains_Mono, Sora, DM_Sans, Fraunces, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/providers";
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({
     subsets: ["latin"],
@@ -82,9 +82,10 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${sora.variable} ${dmSans.variable} ${fraunces.variable} ${ibmPlex.variable} font-sans antialiased`} style={{ '--font-dm-sans': 'var(--font-body)', '--font-sora': 'var(--font-display)', '--font-mono': 'var(--font-mono)' } as React.CSSProperties} suppressHydrationWarning>
+        <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${sora.variable} ${dmSans.variable} ${fraunces.variable} ${ibmPlex.variable} font-sans antialiased`} suppressHydrationWarning>
             <body className="antialiased" suppressHydrationWarning>
                 <Providers>{children}</Providers>
+                <Analytics />
             </body>
         </html>
     );

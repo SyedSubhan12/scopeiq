@@ -39,6 +39,13 @@ function verifyResendSignature(payload: string, signature: string | undefined): 
  *
  * Handles Resend inbound email webhook (email forwarding → scope check)
  * and delivery status webhooks.
+ *
+ * FR-SG-001 review (2026-05-01): Route is complete and correct.
+ * - Validates Resend-Signature header using HMAC-SHA256 (timingSafeEqual) ✓
+ * - Parses inbound email: extracts sender (from), subject, text/html body ✓
+ * - Creates portal message via db.transaction with source: "email_forward" ✓
+ * - Calls writeAuditLog in the same transaction ✓
+ * - Dispatches scope-check BullMQ job (no direct AI SDK call) ✓
  */
 resendWebhookRouter.post("/", async (c) => {
   const rawBody = await c.req.text();

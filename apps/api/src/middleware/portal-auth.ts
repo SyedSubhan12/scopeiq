@@ -18,9 +18,12 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
     throw new UnauthorizedError("Missing portal token");
   }
 
-  const tokenHash = Buffer.from(token, "utf8").length === 64 ? token : createHash("sha256").update(token).digest("hex");
-
-  // Try projects.portal_token first (direct project tokens)
+  // ── Project tokens ────────────────────────────────────────────────────────
+  // projects.portal_token is unique-indexed. Legacy plaintext tokens are stored
+  // directly; scrypt tokens are stored as "salt:hash". Both require fetching
+  // candidates because scrypt cannot be reversed for an index lookup.
+  // TODO: add a portal_token_fast_hash (SHA-256) column + index to projects so
+  //       this can be resolved with a single indexed lookup instead of a scan.
   const projectCandidates = await db
     .select({
       id: projects.id,
@@ -29,14 +32,11 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
     })
     .from(projects)
     .where(isNull(projects.deletedAt))
-    .limit(100);
+    .limit(500);
 
-  // After running the scrypt migration (see packages/db/src/security/portal-tokens.ts),
-  // all portal_token values will be in `salt:hash` format and verifyPortalToken handles them.
-  // Until then, constantTimeCompare handles legacy plaintext tokens.
   for (const project of projectCandidates) {
     if (!project.portalToken) continue;
-    const matches = project.portalToken.includes(':')
+    const matches = project.portalToken.includes(":")
       ? verifyPortalToken(token, project.portalToken)
       : constantTimeCompare(token, project.portalToken);
     if (matches) {
@@ -48,8 +48,12 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
     }
   }
 
-  // Try clients.portal_token_hash with constant-time comparison
-  const clientCandidates = await db
+  // ── Client tokens ─────────────────────────────────────────────────────────
+  // clients.portal_token_hash stores SHA-256(token), indexed, so we can do a
+  // single indexed lookup instead of scanning all clients.
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+
+  const [matchedClient] = await db
     .select({
       id: clients.id,
       workspaceId: clients.workspaceId,
@@ -57,18 +61,15 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
       tokenExpiresAt: clients.tokenExpiresAt,
     })
     .from(clients)
-    .where(isNull(clients.deletedAt))
-    .limit(100);
+    .where(and(eq(clients.portalTokenHash, tokenHash), isNull(clients.deletedAt)))
+    .limit(1);
 
-  for (const client of clientCandidates) {
-    if (!client.portalTokenHash) continue;
-    if (!constantTimeCompare(tokenHash, client.portalTokenHash)) continue;
-
+  if (matchedClient) {
     const [clientProject] = await db
       .select({ id: projects.id, workspaceId: projects.workspaceId })
       .from(projects)
       .where(and(
-        eq(projects.clientId, client.id),
+        eq(projects.clientId, matchedClient.id),
         isNull(projects.deletedAt),
       ))
       .limit(1);
@@ -76,7 +77,7 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
     if (clientProject) {
       c.set("portalProjectId", clientProject.id);
       c.set("portalWorkspaceId", clientProject.workspaceId);
-      c.set("portalClientId", client.id);
+      c.set("portalClientId", matchedClient.id);
       await next();
       return;
     }

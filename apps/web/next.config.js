@@ -8,6 +8,9 @@ const fs = require('fs')
 // eliminates the ENOENT. Fixed upstream in Next.js 14.2+.
 fs.mkdirSync(path.join(__dirname, '.next', 'static', 'development'), { recursive: true })
 
+// Vercel Analytics: enable in Vercel Dashboard → Project Settings → Analytics.
+// The NEXT_PUBLIC_VERCEL_ANALYTICS_ID env var is injected automatically by Vercel.
+// Locally it remains undefined; the @vercel/analytics SDK is a no-op in that case.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Only transpile packages that are actually imported in browser code.

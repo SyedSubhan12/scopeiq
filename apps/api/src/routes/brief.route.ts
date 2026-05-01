@@ -96,6 +96,17 @@ briefRouter.patch("/:id/override", zValidator("json", overrideBriefSchema), asyn
   const userId = c.get("userId");
   const briefId = c.req.param("id");
   const body = c.req.valid("json");
-  const brief = await briefService.overrideBrief(workspaceId, briefId, userId, body);
+
+  // FR-BB-002: Reason is mandatory when overriding a clarification_needed brief.
+  // We check the current brief status to determine if this is an override of a hold.
+  const currentBrief = await briefService.getBrief(workspaceId, briefId);
+  if (currentBrief.status === "clarification_needed" && !body.reason?.trim()) {
+    return c.json({ error: "Override reason is required" }, 422);
+  }
+
+  const brief = await briefService.overrideBrief(workspaceId, briefId, userId, {
+    ...body,
+    ...(body.reason ? { overrideReason: body.reason } : {}),
+  });
   return c.json({ data: brief });
 });

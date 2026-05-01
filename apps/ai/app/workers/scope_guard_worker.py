@@ -1,7 +1,7 @@
 import asyncio
-import json
 import time
 import structlog
+import asyncpg
 from bullmq import Worker
 
 from app.config import settings
@@ -144,8 +144,9 @@ async def process_scope_check(job, token):
             # Also respect workspace-level scopeGuardThreshold — flags are only
             # created when confidence meets or exceeds the workspace admin's setting.
             effective_min = max(CONFIDENCE_MIN, scope_guard_threshold)
+            sla_ok = duration_ms <= SLA_LATENCY_MS
+
             if result.is_deviation and result.confidence > effective_min:
-                flag_id = str(uuid4())
                 tuned_severity = severity_for_confidence(
                     result.confidence,
                     fallback=result.suggested_severity,
@@ -153,40 +154,6 @@ async def process_scope_check(job, token):
                 # v2 rule: confidence 0.61-0.74 → severity capped at LOW
                 if result.confidence <= CONFIDENCE_LOW_CAP:
                     tuned_severity = "low"
-                sla_ok = duration_ms <= SLA_LATENCY_MS
-                # Use Pydantic attribute access (not .get()) — result is a ScopeAnalysisResult model
-                await conn.execute(
-                    """
-                    INSERT INTO scope_flags (
-                        id, workspace_id, project_id, title, description,
-                        severity, status, source, metadata
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
-                    """,
-                    flag_id,
-                    workspace_id,
-                    project_id,
-                    "AI Detection: Possible Scope Deviation",
-                    result.reasoning,
-                    tuned_severity,
-                    "pending",
-                    "ai_audit",
-                    json.dumps({
-                        "confidence": result.confidence,
-                        "ai_severity": result.suggested_severity,
-                        "matched_clause_id": result.matched_clause_id,
-                        "original_request": input_text,
-                        "detection_latency_ms": duration_ms,
-                        "sla_ok": sla_ok,
-                    }),
-                )
-                logger.info(
-                    "scope_flag_created",
-                    flag_id=flag_id,
-                    confidence=result.confidence,
-                    severity=tuned_severity,
-                    detection_latency_ms=duration_ms,
-                    sla_ok=sla_ok,
-                )
             elif result.is_deviation:
                 # v2: confidence did not exceed threshold — log but do not create flag
                 logger.info(
@@ -196,6 +163,45 @@ async def process_scope_check(job, token):
                     effective_min=effective_min,
                     scope_guard_threshold=scope_guard_threshold,
                 )
+                tuned_severity = None
+            else:
+                tuned_severity = None
+
+            # Post results back to the API callback — the API owns all DB writes,
+            # including the atomic scope_flag + system message insert (FR-SG-002).
+            # The worker must NOT write directly to scope_flags or messages tables.
+            job_id = job_data.get("job_id")
+            callback_payload = {
+                "jobId": job_id,
+                "messageId": message_id,
+                "projectId": project_id,
+                "isDeviation": result.is_deviation,
+                "confidence": result.confidence,
+                "reasoning": result.reasoning,
+                "suggestedSeverity": tuned_severity,
+                "suggestedResponse": result.suggested_response if hasattr(result, "suggested_response") else None,
+                "matchedClauseId": result.matched_clause_id if hasattr(result, "matched_clause_id") else None,
+                "matchingClauses": [
+                    {
+                        "clauseId": mc.id if hasattr(mc, "id") else str(mc),
+                        "clauseText": mc.original_text if hasattr(mc, "original_text") else "",
+                        "relevance": mc.relevance if hasattr(mc, "relevance") else 0,
+                    }
+                    for mc in (result.matching_clauses if hasattr(result, "matching_clauses") else [])
+                ],
+                "durationMs": duration_ms,
+                "slaMet": sla_ok,
+            }
+            await post_callback("/api/ai-callback/scope-checked", callback_payload)
+            logger.info(
+                "scope_check_callback_posted",
+                project_id=project_id,
+                is_deviation=result.is_deviation,
+                confidence=result.confidence,
+                severity=tuned_severity,
+                detection_latency_ms=duration_ms,
+                sla_ok=sla_ok,
+            )
 
             return {
                 "is_deviation": result.is_deviation,

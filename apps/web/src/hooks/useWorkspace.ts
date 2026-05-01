@@ -4,13 +4,14 @@ import { fetchWithAuth } from "@/lib/api";
 export interface WorkspaceRecord {
   id: string;
   name: string;
-  plan: "free" | "solo" | "studio" | "agency";
+  plan: "solo" | "studio" | "agency";
   brandColor?: string | null;
   secondaryColor?: string | null;
   logoUrl?: string | null;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   reminderSettings?: unknown;
+  settingsJson?: Record<string, unknown> | null;
 }
 
 export function getWorkspaceQueryOptions() {

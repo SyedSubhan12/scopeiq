@@ -6,8 +6,13 @@ import {
   FileText, Video, Link2, Figma, ImageIcon, FileArchive,
   FileSpreadsheet, Presentation,
 } from "lucide-react";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 import { AnnotationCanvas } from "./AnnotationCanvas";
 import type { FeedbackItem } from "@/hooks/useFeedback";
+
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 interface DeliverableViewerProps {
   fileUrl: string;
@@ -15,7 +20,7 @@ interface DeliverableViewerProps {
   externalUrl?: string | null;
   pins: FeedbackItem[];
   onPinClick: (pin: FeedbackItem) => void;
-  onPlacePin: (x: number, y: number) => void;
+  onPlacePin: (x: number, y: number, page?: number) => void;
   placingPin: boolean;
 }
 
@@ -85,6 +90,8 @@ export function DeliverableViewer({
   placingPin,
 }: DeliverableViewerProps) {
   const [zoom, setZoom] = useState(1);
+  const [numPages, setNumPages] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const isImage = fileType?.startsWith("image/");
   const isPdf = fileType === "application/pdf";
@@ -182,7 +189,7 @@ export function DeliverableViewer({
               <AnnotationCanvas
                 pins={pins}
                 onPinClick={onPinClick}
-                onPlacePin={onPlacePin}
+                onPlacePin={(x, y) => onPlacePin(x, y)}
                 placingPin={placingPin}
               />
             </div>
@@ -191,15 +198,57 @@ export function DeliverableViewer({
 
         {/* === PDF === */}
         {isPdf && hasFile && (
-          <div
-            className="h-full origin-top overflow-auto transition-transform"
-            style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
-          >
-            <iframe
-              src={`${fileUrl}#toolbar=1`}
-              className="h-[800px] w-full border-0"
-              title="PDF Viewer"
-            />
+          <div className="flex flex-col h-full">
+            {/* Page navigation */}
+            {numPages > 1 && (
+              <div className="flex items-center justify-center gap-3 border-b border-[rgb(var(--border-default))] bg-white px-4 py-2 text-sm">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  disabled={currentPage <= 1}
+                  className="rounded px-2 py-1 disabled:opacity-40 hover:bg-[rgb(var(--surface-subtle))]"
+                >
+                  ← Prev
+                </button>
+                <span className="text-[rgb(var(--text-muted))]">
+                  Page {currentPage} of {numPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, numPages))}
+                  disabled={currentPage >= numPages}
+                  className="rounded px-2 py-1 disabled:opacity-40 hover:bg-[rgb(var(--surface-subtle))]"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+            <div
+              className="relative flex flex-1 items-start justify-center overflow-auto p-4"
+              style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+            >
+              <div className="relative inline-block">
+                <Document
+                  file={fileUrl}
+                  onLoadSuccess={({ numPages: n }) => { setNumPages(n); setCurrentPage(1); }}
+                  loading={<div className="flex h-64 items-center justify-center text-sm text-[rgb(var(--text-muted))]">Loading PDF…</div>}
+                  error={<div className="flex h-64 items-center justify-center text-sm text-red-500">Failed to load PDF.</div>}
+                >
+                  <Page
+                    pageNumber={currentPage}
+                    renderAnnotationLayer
+                    renderTextLayer
+                    className="shadow-sm"
+                  />
+                </Document>
+                <AnnotationCanvas
+                  pins={pins.filter(
+                    (p) => p.annotationJson?.pageNumber === currentPage || p.annotationJson?.pageNumber == null
+                  )}
+                  onPinClick={onPinClick}
+                  onPlacePin={(x, y) => onPlacePin(x, y, currentPage)}
+                  placingPin={placingPin}
+                />
+              </div>
+            </div>
           </div>
         )}
 

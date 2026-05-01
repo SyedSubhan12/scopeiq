@@ -144,7 +144,7 @@ function DeliverableReviewContent({ deliverableId }: { deliverableId: string }) 
     }
   };
 
-  const handlePlacePin = async (x: number, y: number) => {
+  const handlePlacePin = async (x: number, y: number, page?: number) => {
     const pinNumber = pins.length + 1;
     try {
       await createFeedback.mutateAsync({
@@ -153,6 +153,7 @@ function DeliverableReviewContent({ deliverableId }: { deliverableId: string }) 
           xPos: x,
           yPos: y,
           pinNumber,
+          pageNumber: page ?? null,
         },
       });
       setPlacingPin(false);
