@@ -8,7 +8,7 @@ import { updateWorkspaceSchema, updateAiPolicySchema } from "./workspace.schemas
 import { getUploadUrl, validateMimeType } from "../lib/storage.js";
 import { stripUndefined } from "../lib/strip-undefined.js";
 import { z } from "zod";
-import { db, workspaces, eq } from "@novabots/db";
+import { db, workspaces, eq, projects, and, desc, isNotNull } from "@novabots/db";
 
 const onboardingStepSchema = z.object({
   step: z.enum([
@@ -185,4 +185,61 @@ workspaceRouter.get("/me/domain/status", async (c) => {
   const workspaceId = c.get("workspaceId");
   const status = await domainService.getDomainStatus(workspaceId);
   return c.json({ data: status });
+});
+
+// ---------------------------------------------------------------------------
+// GET /v1/workspaces/by-slug/:slug  (FR-AP-001 — public, no auth required)
+// Resolves a workspace slug to the portal token of its most recent active
+// project. Used by the Next.js subdomain middleware to redirect
+// {slug}.scopeiq.com to the correct portal route.
+// ---------------------------------------------------------------------------
+
+// We mount the public router separately so it does NOT inherit the
+// authMiddleware that was applied to workspaceRouter via `use("*", ...)`.
+export const workspacePublicRouter = new Hono();
+
+workspacePublicRouter.get("/by-slug/:slug", async (c) => {
+  const { slug } = c.req.param();
+
+  // 1. Resolve workspace by slug
+  const [workspace] = await db
+    .select({ id: workspaces.id, name: workspaces.name, slug: workspaces.slug })
+    .from(workspaces)
+    .where(eq(workspaces.slug, slug))
+    .limit(1);
+
+  if (!workspace) {
+    return c.json({ error: { code: "NOT_FOUND", message: "Workspace not found" } }, 404);
+  }
+
+  // 2. Find the most recent active project that has a portal token
+  const [project] = await db
+    .select({
+      id: projects.id,
+      portalToken: projects.portalToken,
+      status: projects.status,
+    })
+    .from(projects)
+    .where(
+      and(
+        eq(projects.workspaceId, workspace.id),
+        isNotNull(projects.portalToken),
+      )
+    )
+    .orderBy(desc(projects.createdAt))
+    .limit(1);
+
+  if (!project?.portalToken) {
+    return c.json({
+      error: { code: "NOT_FOUND", message: "No active portal found for this workspace" },
+    }, 404);
+  }
+
+  return c.json({
+    data: {
+      workspaceSlug: workspace.slug,
+      workspaceName: workspace.name,
+      portalToken: project.portalToken,
+    },
+  });
 });

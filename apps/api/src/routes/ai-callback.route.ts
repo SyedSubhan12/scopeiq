@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { aiRateLimitMiddleware } from "../middleware/ai-rate-limiter.js";
-import { recordScopeFlagDuration } from "../lib/axiom.js";
 import {
   db,
   writeAuditLog,
@@ -26,6 +25,8 @@ import { dispatchScopeFlagAlertJob } from "../jobs/scope-flag-alert.job.js";
 import { dispatchClarificationEmail } from "../services/clarification-email.service.js";
 import { computeSlaDeadline } from "../services/scope-flag.service.js";
 import { logProjectEvent } from "../repositories/project-intelligence.repository.js";
+import { recordScopeFlagDuration } from "../lib/axiom.js";
+import { sendPagerDutyAlert } from "../lib/pagerduty.js";
 
 // ---------------------------------------------------------------------------
 // Middleware — shared-secret validation
@@ -263,7 +264,7 @@ aiCallbackRouter.post(
           confidence: payload.confidence,
           title: "AI Detection: Possible Scope Deviation",
           description: payload.reasoning,
-          severity: (payload.suggestedSeverity as "low" | "medium" | "high") ?? "medium",
+          severity: (payload.suggestedSeverity as any) ?? "medium",
           status: "pending",
           suggestedResponse: payload.suggestedResponse ?? null,
           aiReasoning: payload.reasoning,
@@ -283,52 +284,6 @@ aiCallbackRouter.post(
         .returning();
 
       flagId = flag?.id ?? null;
-    }
-
-    // FR-SG-002: bilateral scope flag notification — insert a "system" message
-    // visible to the client portal so both sides see the flag simultaneously.
-    let systemMessageId: string | null = null;
-    if (flagId && payload.isDeviation && payload.confidence > 0.60) {
-      // Resolve threadId from the triggering message so the system bubble
-      // appears in the same conversation thread the client is reading.
-      let originThreadId: string | null = null;
-      if (payload.messageId) {
-        const [originMsg] = await trx
-          .select({ threadId: messages.threadId })
-          .from(messages)
-          .where(eq(messages.id, payload.messageId))
-          .limit(1);
-        originThreadId = originMsg?.threadId ?? null;
-      }
-
-      const [systemMsg] = await trx
-        .insert(messages)
-        .values({
-          workspaceId: project.workspaceId,
-          projectId: payload.projectId,
-          authorId: null,
-          authorName: null,
-          source: "system",
-          status: "checked",
-          body: "This request appears to fall outside our current agreement. Your team has been notified and will follow up with options.",
-          threadId: originThreadId,
-          authorType: "system",
-          scopeCheckStatus: "skipped",
-        })
-        .returning({ id: messages.id });
-
-      systemMessageId = systemMsg?.id ?? null;
-
-      // Patch the scope flag's evidence jsonb to record system_message_id,
-      // so the dismissal handler can locate and update this message later.
-      if (systemMessageId) {
-        await trx
-          .update(scopeFlags)
-          .set({
-            evidence: sql`${scopeFlags.evidence} || ${JSON.stringify({ system_message_id: systemMessageId })}::jsonb`,
-          })
-          .where(eq(scopeFlags.id, flagId));
-      }
     }
 
     // Update message status
@@ -354,7 +309,6 @@ aiCallbackRouter.post(
         confidence: payload.confidence,
         flagId,
         messageId: payload.messageId,
-        systemMessageId,
         durationMs: payload.durationMs,
         slaMet: payload.slaMet,
         jobId: payload.jobId,
@@ -368,15 +322,18 @@ aiCallbackRouter.post(
     };
   });
 
-  // Fire Axiom SLA metric — best-effort, never throws.
-  // durationMs is the wall-clock ms of the AI analysis computed in scope_guard_worker.py.
-  // slaMet is sent explicitly by the worker (duration_ms <= 5000); fall back to the
-  // same 5 000 ms threshold if the field is absent for any reason.
+  // Record SLA metric and fire PagerDuty alert if duration exceeds 7s (FR-SG-004)
   if (payload.durationMs != null) {
-    recordScopeFlagDuration(
-      payload.durationMs,
-      payload.slaMet ?? payload.durationMs <= 5000,
-    );
+    recordScopeFlagDuration(payload.durationMs, payload.slaMet ?? payload.durationMs <= 5000);
+  }
+
+  if (payload.durationMs != null && payload.durationMs > 7000) {
+    void sendPagerDutyAlert({
+      summary: `Scope flag exceeded 7s SLA (${payload.durationMs}ms)`,
+      severity: "warning",
+      source: "scopeiq-scope-guard",
+      dedupKey: `scope-flag-sla-${payload.projectId}`,
+    });
   }
 
   // Dispatch 2-hour delayed email alert for new scope flags (outside transaction)

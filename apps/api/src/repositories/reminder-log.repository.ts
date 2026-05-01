@@ -2,6 +2,39 @@ import { db, reminderLogs, projects, deliverables, eq, and, isNull, desc } from 
 import type { NewReminderLog, ReminderStep } from "@novabots/db";
 
 export const reminderLogRepository = {
+  /**
+   * List all reminder logs for a project, ordered by sentAt desc, limit 50.
+   * Workspace isolation is enforced via a join on the projects table.
+   */
+  async listByProject(workspaceId: string, projectId: string) {
+    const rows = await db
+      .select({
+        id: reminderLogs.id,
+        projectId: reminderLogs.projectId,
+        deliverableId: reminderLogs.deliverableId,
+        sequenceStep: reminderLogs.sequenceStep,
+        step: reminderLogs.step,
+        recipientEmail: reminderLogs.recipientEmail,
+        sentAt: reminderLogs.sentAt,
+        deliveryStatus: reminderLogs.deliveryStatus,
+        openedAt: reminderLogs.openedAt,
+      })
+      .from(reminderLogs)
+      .innerJoin(
+        projects,
+        and(
+          eq(reminderLogs.projectId, projects.id),
+          eq(projects.workspaceId, workspaceId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .where(eq(reminderLogs.projectId, projectId))
+      .orderBy(desc(reminderLogs.sentAt))
+      .limit(50);
+
+    return rows;
+  },
+
   async listByDeliverable(workspaceId: string, deliverableId: string) {
     const rows = await db
       .select({

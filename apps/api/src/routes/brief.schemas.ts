@@ -14,6 +14,8 @@ export const overrideBriefSchema = z.object({
     .optional(),
   scopeScore: z.number().int().min(0).max(100).optional(),
   scoringResultJson: z.record(z.unknown()).optional(),
+  /** Required when overriding a brief in clarification_needed status (FR-BB-002) */
+  reason: z.string().min(1).max(2000).optional(),
 });
 
 export const reviewBriefSchema = z.object({

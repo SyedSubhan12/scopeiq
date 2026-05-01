@@ -1,38 +1,73 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, FileText, ArrowRight, X, Check } from "lucide-react";
-import { Button } from "@novabots/ui";
+import { Button, Skeleton } from "@novabots/ui";
 import { useRevisionLimitModal } from "@/stores/revision-limit-modal.store";
 import { fetchWithAuth } from "@/lib/api";
 
-const DEFAULT_ADDON_PRICE = 500;
+interface AddonQuote {
+  price: number;
+  label: string;
+  description: string;
+}
+
+const DEFAULT_FALLBACK_QUOTE: AddonQuote = {
+  price: 500,
+  label: "Additional Revision Round",
+  description: "Unlock additional revision round(s) for this deliverable.",
+};
 
 export function RevisionLimitModal() {
   const { isOpen, data, closeModal } = useRevisionLimitModal();
   const [acknowledged, setAcknowledged] = useState(false);
+  const [liveQuote, setLiveQuote] = useState<AddonQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !data?.deliverableId) {
+      setLiveQuote(null);
+      return;
+    }
+
+    let cancelled = false;
+    setQuoteLoading(true);
+    setLiveQuote(null);
+
+    void (async () => {
+      try {
+        const result = await fetchWithAuth(
+          `/v1/deliverables/${data.deliverableId}/addon-quote`,
+        ) as AddonQuote;
+        if (!cancelled) {
+          setLiveQuote(result);
+        }
+      } catch {
+        // Silent fallback — do not surface error UI
+        if (!cancelled) {
+          setLiveQuote(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setQuoteLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, data?.deliverableId]);
 
   if (!data) return null;
 
-  const quote = data.addonQuote ?? {
-    price: DEFAULT_ADDON_PRICE,
-    label: "Additional Revision Round",
+  const quote = liveQuote ?? data.addonQuote ?? {
+    ...DEFAULT_FALLBACK_QUOTE,
     description: `Unlock ${Math.min(3, data.maxRevisions)} additional revision round(s) for this deliverable.`,
   };
 
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleRequestQuote = async () => {
-    if (!data || !acknowledged) return;
-    setSubmitting(true);
-    try {
-      await fetchWithAuth(`/v1/deliverables/${data.deliverableId}/revision-limit-acknowledged`, { method: "POST" });
-    } catch {
-      // best-effort — audit log failure doesn't block the user
-    } finally {
-      setSubmitting(false);
-    }
+  const handleRequestQuote = () => {
     closeModal();
   };
 
@@ -92,18 +127,31 @@ export function RevisionLimitModal() {
                     Pre-generated Quote
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-[rgb(var(--text-primary))]">{quote.label}</p>
-                    <p className="mt-0.5 text-xs text-[rgb(var(--text-muted))]">{quote.description}</p>
+                {quoteLoading ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-64" />
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <Skeleton className="ml-auto h-6 w-20" />
+                      <Skeleton className="ml-auto h-3 w-12" />
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-[rgb(var(--text-primary))]">
-                      ${quote.price.toLocaleString()}
-                    </p>
-                    <p className="text-[10px] text-[rgb(var(--text-muted))]">estimated</p>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-[rgb(var(--text-primary))]">{quote.label}</p>
+                      <p className="mt-0.5 text-xs text-[rgb(var(--text-muted))]">{quote.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-[rgb(var(--text-primary))]">
+                        ${quote.price.toLocaleString()}
+                      </p>
+                      <p className="text-[10px] text-[rgb(var(--text-muted))]">estimated</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Acknowledgment checkbox */}
@@ -138,8 +186,8 @@ export function RevisionLimitModal() {
               </Button>
               <Button
                 size="sm"
-                onClick={() => { void handleRequestQuote(); }}
-                disabled={!acknowledged || submitting}
+                onClick={handleRequestQuote}
+                disabled={!acknowledged}
                 className="gap-1.5"
               >
                 Request Additional Rounds

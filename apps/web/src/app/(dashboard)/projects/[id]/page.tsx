@@ -30,6 +30,7 @@ const tabs = [
   { key: "change-orders", label: "Change Orders" },
   { key: "health", label: "Health" },
   { key: "log", label: "Activity Log" },
+  { key: "reminders", label: "Reminders" },
 ];
 
 function HealthTab({ projectId }: { projectId: string }) {
@@ -369,21 +370,16 @@ function PortalLinkBadge({ portalToken }: { portalToken?: string }) {
 import { ScopeGuardTab } from "@/components/scope/ScopeGuardTab";
 import { ChangeOrdersTab } from "@/components/scope/ChangeOrdersTab";
 import { ActivityLogTab } from "@/components/shared/ActivityLogTab";
-import { useRealtimeDeliverables } from "@/hooks/useRealtimeDeliverables";
-import { ScopeMeter } from "@/components/shared/ScopeMeter";
+import { ReminderSequenceCard } from "@/components/approval/ReminderSequenceCard";
+import { ReminderLogTimeline } from "@/components/approval/ReminderLogTimeline";
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
   const { data, isLoading } = useProject(id);
-  const { data: deliverablesData } = useDeliverables(id);
   const activeTab = useUIStore((s) => s.activeTab);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
-
-  useRealtimeDeliverables(id);
-
-  const deliverables = deliverablesData?.data ?? [];
 
   if (isLoading) {
     return (
@@ -408,24 +404,15 @@ export default function ProjectDetailPage() {
     <div>
       {/* Header */}
       <div className="mb-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex flex-1 flex-wrap items-center gap-3">
-            <button
-              onClick={() => router.push("/projects")}
-              className="rounded-md p-1 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface-subtle))]"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">{project.name}</h1>
-            <Badge status={project.status}>{project.status}</Badge>
-          </div>
-          {/* Composite scope meter — visible when there are deliverables */}
-          {deliverables.length > 0 && (
-            <ScopeMeter
-              deliverables={deliverables}
-              className="shrink-0"
-            />
-          )}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => router.push("/projects")}
+            className="rounded-md p-1 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface-subtle))]"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h1 className="text-2xl font-bold text-[rgb(var(--text-primary))]">{project.name}</h1>
+          <Badge status={project.status}>{project.status}</Badge>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[rgb(var(--text-muted))] sm:ml-9 sm:mt-2 sm:gap-4">
           {project.description && (
@@ -478,7 +465,16 @@ export default function ProjectDetailPage() {
         {activeTab === "change-orders" && <ChangeOrdersTab projectId={id} />}
         {activeTab === "health" && <HealthTab projectId={id} />}
         {activeTab === "log" && (
-          <ActivityLogTab workspaceId={project.workspaceId} />
+          <>
+            <ActivityLogTab workspaceId={project.workspaceId} />
+            <ReminderLogTimeline projectId={id} />
+          </>
+        )}
+        {activeTab === "reminders" && (
+          <ReminderSequenceCard
+            projectId={id}
+            remindersPaused={Boolean(project.remindersPaused)}
+          />
         )}
       </div>
     </div>

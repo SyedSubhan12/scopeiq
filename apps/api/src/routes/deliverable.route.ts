@@ -5,6 +5,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { deliverableService } from "../services/deliverable.service.js";
 import { feedbackService } from "../services/feedback.service.js";
 import { deliverableRevisionRepository } from "../repositories/deliverable-revision.repository.js";
+import { rateCardRepository } from "../repositories/rate-card.repository.js";
 import {
   listDeliverablesQuerySchema,
   createDeliverableSchema,
@@ -19,7 +20,6 @@ import {
 type CreateDeliverableInput = z.output<typeof createDeliverableSchema>;
 type UploadUrlInput = z.output<typeof uploadUrlSchema>;
 import { submitFeedbackSchema, feedbackResponseSchema } from "./feedback.schemas.js";
-import { db, writeAuditLog, deliverables, eq, and } from "@novabots/db";
 
 export const deliverableRouter = new Hono();
 
@@ -182,39 +182,55 @@ deliverableRouter.patch(
   },
 );
 
-deliverableRouter.post(
-  "/:id/revision-limit-acknowledged",
-  async (c) => {
-    const workspaceId = c.get("workspaceId");
-    const userId = c.get("userId");
-    const id = c.req.param("id");
+// GET /:id/addon-quote — returns a price quote for an additional revision round (FR-AP-003)
+deliverableRouter.get("/:id/addon-quote", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const id = c.req.param("id");
 
-    const [deliverable] = await db
-      .select({ id: deliverables.id, revisionRound: deliverables.revisionRound, maxRevisions: deliverables.maxRevisions })
-      .from(deliverables)
-      .where(and(eq(deliverables.id, id), eq(deliverables.workspaceId, workspaceId)))
-      .limit(1);
+  const deliverable = await deliverableService.getById(workspaceId, id);
 
-    if (!deliverable) {
-      return c.json({ error: "Deliverable not found" }, 404);
-    }
+  // Fetch workspace rate card items to derive a daily rate
+  const rateCardItems = await rateCardRepository.list(workspaceId);
 
-    await db.transaction(async (trx) => {
-      await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
-        workspaceId,
-        actorId: userId,
-        actorType: "user",
-        entityType: "deliverable",
-        entityId: id,
-        action: "update",
-        metadata: {
-          action: "revision_limit_acknowledged",
-          currentRound: deliverable.revisionRound,
-          maxRevisions: deliverable.maxRevisions,
-        },
-      });
-    });
+  const DEFAULT_RESPONSE = {
+    price: 500,
+    label: "Additional Revision Round",
+    description: "Unlock additional revision round(s) for this deliverable.",
+  };
 
-    return c.json({ ok: true });
-  },
-);
+  if (rateCardItems.length === 0) {
+    return c.json({ data: DEFAULT_RESPONSE });
+  }
+
+  // Use the highest daily_rate equivalent from rate card items (unit = "day")
+  // Fall back to hourly items converted to a daily rate (8 hours)
+  const dayItems = rateCardItems.filter((item) => item.unit === "day");
+  const hourItems = rateCardItems.filter((item) => item.unit === "hour");
+
+  let dailyRateCents: number | null = null;
+
+  if (dayItems.length > 0) {
+    // Take the first day-rate item
+    dailyRateCents = dayItems[0]!.rateInCents;
+  } else if (hourItems.length > 0) {
+    // Convert hourly to daily (8 hours)
+    dailyRateCents = hourItems[0]!.rateInCents * 8;
+  }
+
+  if (dailyRateCents === null) {
+    return c.json({ data: DEFAULT_RESPONSE });
+  }
+
+  // Half-day estimate per extra revision round; round to nearest $50, minimum $250
+  const rawDollars = (dailyRateCents / 100) * 0.5;
+  const roundedToFifty = Math.round(rawDollars / 50) * 50;
+  const price = Math.max(250, roundedToFifty);
+
+  return c.json({
+    data: {
+      price,
+      label: "Additional Revision Round",
+      description: `Unlock additional revision round(s) for this deliverable. Estimated at half a day of work based on your rate card.`,
+    },
+  });
+});

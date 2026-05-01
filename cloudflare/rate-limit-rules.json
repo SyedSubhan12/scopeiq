@@ -1,0 +1,28 @@
+{
+  "description": "ScopeIQ Cloudflare Edge Rate Limit Rules",
+  "rules": [
+    {
+      "name": "Portal endpoint rate limit",
+      "expression": "(http.request.uri.path contains \"/portal/\") or (http.request.uri.path contains \"/v1/portal\")",
+      "action": "block",
+      "ratelimit": {
+        "characteristics": ["ip.src"],
+        "period": 3600,
+        "requests_per_period": 10,
+        "mitigation_timeout": 3600
+      }
+    },
+    {
+      "name": "API general rate limit",
+      "expression": "http.request.uri.path starts_with \"/v1/\"",
+      "action": "block",
+      "ratelimit": {
+        "characteristics": ["ip.src"],
+        "period": 60,
+        "requests_per_period": 100,
+        "mitigation_timeout": 60
+      }
+    }
+  ],
+  "instructions": "Apply these rules in Cloudflare Dashboard > Security > WAF > Rate Limiting Rules for your zone."
+}

@@ -1,6 +1,7 @@
 import type { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { AppError, type ApiErrorResponse } from "@novabots/types";
+import { captureException } from "../lib/sentry.js";
 
 export const errorHandler: ErrorHandler = async (err, c) => {
     console.error(err);
@@ -25,6 +26,9 @@ export const errorHandler: ErrorHandler = async (err, c) => {
         };
         return c.json(errorResponse, err.statusCode as Parameters<typeof c.json>[1]);
     }
+
+    // Capture unhandled errors in Sentry (skips HTTP exceptions and known AppErrors)
+    captureException(err, { path: c.req.path, method: c.req.method });
 
     // Handle generic errors
     const errorResponse: ApiErrorResponse = {
