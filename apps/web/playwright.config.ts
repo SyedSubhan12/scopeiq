@@ -1,45 +1,41 @@
-import { defineConfig, devices } from "@playwright/test";
-
-/**
- * Read environment variables with defaults for local development.
- */
-const BASE_URL = process.env.WEB_URL ?? "http://localhost:3000";
-const API_URL = process.env.API_URL ?? "http://localhost:4000";
-const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://scopeiq:scopeiq_dev@localhost:5433/scopeiq";
-
-const localWebServer = {
-  command: "cd ../api && pnpm dev",
-  url: `${API_URL}/health`,
-  timeout: 30_000,
-  reuseExistingServer: true,
-};
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: "./tests/e2e",
-  fullyParallel: false, // DB tests share state; run serially
+  testDir: './e2e',
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 1,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  timeout: 60_000, // 60s global timeout
-  expect: {
-    timeout: 10_000, // SLA-matched expectation timeout
-  },
-
+  workers: process.env.CI ? 1 : undefined,
+  reporter: [['html', { open: 'never' }], ['list']],
   use: {
-    baseURL: BASE_URL,
-    trace: "on-first-retry",
-    video: "retain-on-failure",
-    screenshot: "only-on-failure",
-    viewport: { width: 1280, height: 720 },
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    trace: 'on-first-retry',
   },
-
   projects: [
+    // Auth setup project runs first
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: 'setup',
+      testMatch: /global-setup\.ts/,
+    },
+    // Authenticated tests
+    {
+      name: 'chromium-auth',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+      testIgnore: /portal\.spec\.ts|unauthenticated/,
+    },
+    // Mobile viewport (375px) for portal tests — no auth needed
+    {
+      name: 'mobile-portal',
+      use: {
+        ...devices['iPhone 12'],
+      },
+      testMatch: /portal\.spec\.ts/,
     },
   ],
-
-  ...(!process.env.CI ? { webServer: localWebServer } : {}),
 });

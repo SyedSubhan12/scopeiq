@@ -15,6 +15,7 @@ import {
   messages,
   projects,
   clients,
+  workspaces,
   eq,
   and,
   isNull,
@@ -25,8 +26,6 @@ import { dispatchScopeFlagAlertJob } from "../jobs/scope-flag-alert.job.js";
 import { dispatchClarificationEmail } from "../services/clarification-email.service.js";
 import { computeSlaDeadline } from "../services/scope-flag.service.js";
 import { logProjectEvent } from "../repositories/project-intelligence.repository.js";
-import { recordScopeFlagDuration } from "../lib/axiom.js";
-import { sendPagerDutyAlert } from "../lib/pagerduty.js";
 
 // ---------------------------------------------------------------------------
 // Middleware — shared-secret validation
@@ -322,26 +321,45 @@ aiCallbackRouter.post(
     };
   });
 
-  // Record SLA metric and fire PagerDuty alert if duration exceeds 7s (FR-SG-004)
-  if (payload.durationMs != null) {
-    recordScopeFlagDuration(payload.durationMs, payload.slaMet ?? payload.durationMs <= 5000);
-  }
-
-  if (payload.durationMs != null && payload.durationMs > 7000) {
-    void sendPagerDutyAlert({
-      summary: `Scope flag exceeded 7s SLA (${payload.durationMs}ms)`,
-      severity: "warning",
-      source: "scopeiq-scope-guard",
-      dedupKey: `scope-flag-sla-${payload.projectId}`,
-    });
-  }
-
   // Dispatch 2-hour delayed email alert for new scope flags (outside transaction)
   if (result.flagId) {
     await dispatchScopeFlagAlertJob(result.flagId, project.workspaceId, payload.projectId)
       .catch((err) => {
         console.error(`[ScopeFlagAlert] Failed to dispatch alert job: ${err.message}`);
       });
+
+    // Fire-and-forget Slack scope flag notification
+    void (async () => {
+      try {
+        const [ws] = await db
+          .select({ settingsJson: workspaces.settingsJson })
+          .from(workspaces)
+          .where(eq(workspaces.id, project.workspaceId))
+          .limit(1);
+        const settings = (ws?.settingsJson ?? {}) as Record<string, unknown>;
+        const accessToken = settings["slackAccessToken"] as string | undefined;
+        const channelId = settings["slackChannelId"] as string | undefined;
+        if (accessToken && channelId) {
+          // Look up project name for the notification
+          const [projectRecord] = await db
+            .select({ name: projects.name })
+            .from(projects)
+            .where(and(eq(projects.id, payload.projectId), isNull(projects.deletedAt)))
+            .limit(1);
+          const { sendSlackScopeFlag } = await import("../lib/slack.js");
+          await sendSlackScopeFlag({
+            accessToken,
+            channelId,
+            projectName: projectRecord?.name ?? "Unknown project",
+            messageText: payload.reasoning,
+            confidence: payload.confidence,
+            flagId: result.flagId!, // non-null: we are inside `if (result.flagId)` block
+          });
+        }
+      } catch (err) {
+        console.error("[Slack] Failed to send scope flag notification:", err);
+      }
+    })();
 
     logProjectEvent({
       workspaceId: project.workspaceId,
