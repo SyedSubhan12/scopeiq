@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import { timingSafeEqual } from "node:crypto";
 import { aiRateLimitMiddleware } from "../middleware/ai-rate-limiter.js";
 import {
   db,
@@ -26,6 +27,7 @@ import { dispatchScopeFlagAlertJob } from "../jobs/scope-flag-alert.job.js";
 import { dispatchClarificationEmail } from "../services/clarification-email.service.js";
 import { computeSlaDeadline } from "../services/scope-flag.service.js";
 import { logProjectEvent } from "../repositories/project-intelligence.repository.js";
+import { takeRateService } from "../services/take-rate.service.js";
 
 // ---------------------------------------------------------------------------
 // Middleware — shared-secret validation
@@ -35,7 +37,13 @@ const AI_CALLBACK_SECRET = process.env.AI_CALLBACK_SECRET;
 
 const aiSecretMiddleware = async (c: Parameters<Parameters<Hono["use"]>[1]>[0], next: () => Promise<void>) => {
   const secret = c.req.header("X-AI-Secret");
-  if (!AI_CALLBACK_SECRET || !secret || secret !== AI_CALLBACK_SECRET) {
+  if (!AI_CALLBACK_SECRET || !secret) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  // Constant-time compare to prevent prefix-extension timing oracle (FIND-006).
+  const a = Buffer.from(secret);
+  const b = Buffer.from(AI_CALLBACK_SECRET);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return c.json({ error: "Unauthorized" }, 401);
   }
   await next();
@@ -150,27 +158,41 @@ export const aiCallbackRouter = new Hono();
 
 aiCallbackRouter.use("*", aiSecretMiddleware);
 
+// Body-size guard — placed after aiSecretMiddleware so unauthenticated
+// requests are rejected before we inspect headers.
+aiCallbackRouter.use("*", async (c, next) => {
+  const len = Number(c.req.header("content-length") ?? 0);
+  if (len > 5 * 1024 * 1024) {
+    return c.json({ error: "Body too large" }, 413);
+  }
+  await next();
+});
+
 // POST /api/ai-callback/sow-parsed
 aiCallbackRouter.post("/sow-parsed", zValidator("json", sowParsedSchema), async (c) => {
   const payload = c.req.valid("json");
 
-  // Fetch workspaceId for audit log
-  const [existingSow] = await db
-    .select({ workspaceId: statementsOfWork.workspaceId, parsedAt: statementsOfWork.parsedAt })
-    .from(statementsOfWork)
-    .where(eq(statementsOfWork.id, payload.sowId))
-    .limit(1);
-
-  if (!existingSow) {
-    return c.json({ error: "SOW not found", sowId: payload.sowId }, 404);
-  }
-
-  // Idempotency: check if SOW already parsed
-  if (existingSow.parsedAt) {
-    return c.json({ status: "already_processed", sowId: payload.sowId }, 200);
-  }
-
   const result = await db.transaction(async (trx) => {
+    // Lock the SOW row and check for prior parse atomically
+    const updated = await trx
+      .update(statementsOfWork)
+      .set({ status: "parsed" as SowStatus, parsedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(statementsOfWork.id, payload.sowId), isNull(statementsOfWork.parsedAt)))
+      .returning({ workspaceId: statementsOfWork.workspaceId });
+
+    if (updated.length === 0) {
+      // Either SOW doesn't exist or was already parsed — distinguish
+      const [exists] = await trx
+        .select({ workspaceId: statementsOfWork.workspaceId })
+        .from(statementsOfWork)
+        .where(eq(statementsOfWork.id, payload.sowId))
+        .limit(1);
+      if (!exists) return { notFound: true as const };
+      return { alreadyProcessed: true as const, sowId: payload.sowId };
+    }
+
+    const workspaceId = updated[0]!.workspaceId;
+
     // Delete auto-parsed placeholders
     await trx
       .delete(sowClauses)
@@ -189,15 +211,9 @@ aiCallbackRouter.post("/sow-parsed", zValidator("json", sowParsedSchema), async 
       );
     }
 
-    // Mark SOW as parsed and transition status: draft → parsed
-    await trx
-      .update(statementsOfWork)
-      .set({ status: "parsed" as SowStatus, parsedAt: new Date(), updatedAt: new Date() })
-      .where(eq(statementsOfWork.id, payload.sowId));
-
     // Audit log
     await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
-      workspaceId: existingSow.workspaceId,
+      workspaceId,
       actorId: null,
       actorType: "system",
       entityType: "statement_of_work",
@@ -208,6 +224,13 @@ aiCallbackRouter.post("/sow-parsed", zValidator("json", sowParsedSchema), async 
 
     return { clauseCount: payload.clauses.length };
   });
+
+  if ("notFound" in result) {
+    return c.json({ error: "SOW not found", sowId: payload.sowId }, 404);
+  }
+  if ("alreadyProcessed" in result) {
+    return c.json({ status: "already_processed", sowId: payload.sowId }, 200);
+  }
 
   return c.json({ ok: true, ...result }, 200);
 });
@@ -222,44 +245,83 @@ aiCallbackRouter.post(
   async (c) => {
   const payload = c.req.valid("json");
 
-  // Idempotency: check if message already processed
-  if (payload.messageId) {
-    const [msg] = await db
-      .select({ status: messages.status })
-      .from(messages)
-      .where(eq(messages.id, payload.messageId))
-      .limit(1);
-
-    if (msg && msg.status !== "pending_check") {
-      return c.json({ status: "already_processed", messageId: payload.messageId }, 200);
-    }
-  }
-
-  // Fetch project to get workspaceId and sowId
-  const [project] = await db
-    .select({ workspaceId: projects.workspaceId, sowId: projects.sowId })
+  // Fetch project and workspace name for bilateral notification
+  const [projectData] = await db
+    .select({ 
+      workspaceId: projects.workspaceId, 
+      sowId: projects.sowId,
+      workspaceName: workspaces.name
+    })
     .from(projects)
+    .innerJoin(workspaces, eq(projects.workspaceId, workspaces.id))
     .where(and(eq(projects.id, payload.projectId), isNull(projects.deletedAt)))
     .limit(1);
 
-  if (!project) {
+  if (!projectData) {
     return c.json({ error: "Project not found", projectId: payload.projectId }, 404);
   }
 
-  const slaDeadline = await computeSlaDeadline(project.workspaceId);
+  const slaDeadline = await computeSlaDeadline(projectData.workspaceId);
 
   const result = await db.transaction(async (trx) => {
-    let flagId: string | null = null;
+    // Idempotency: atomically claim the message for processing.
+    if (payload.messageId) {
+      const newStatus = (payload.isDeviation && payload.confidence > 0.60) ? "flagged" : "checked";
+      const claimed = await trx
+        .update(messages)
+        .set({ status: newStatus })
+        .where(
+          and(
+            eq(messages.id, payload.messageId),
+            eq(messages.projectId, payload.projectId),
+            eq(messages.status, "pending_check"),
+          ),
+        )
+        .returning({ id: messages.id });
 
-    // If deviation detected, create a scope flag
+      if (claimed.length === 0) {
+        // Scope the existence check to projectId — prevents cross-workspace data
+        // smearing where a message in workspace A's project could be linked to
+        // workspace B's project via a crafted callback (FIND-018).
+        const [exists] = await trx
+          .select({ id: messages.id })
+          .from(messages)
+          .where(and(eq(messages.id, payload.messageId), eq(messages.projectId, payload.projectId)))
+          .limit(1);
+        if (!exists) return { notFound: true as const };
+        return { alreadyProcessed: true as const, messageId: payload.messageId };
+      }
+    }
+
+    let flagId: string | null = null;
+    let systemMessageId: string | null = null;
+
+    // Rule 8: Bilateral flag notification must be atomic.
     if (payload.isDeviation && payload.confidence > 0.60) {
+      // 1. Create client portal system message
+      const [systemMsg] = await trx
+        .insert(messages)
+        .values({
+          workspaceId: projectData.workspaceId,
+          projectId: payload.projectId,
+          authorType: "system",
+          source: "portal",
+          status: "checked",
+          body: `This request appears to fall outside our current agreement. ${projectData.workspaceName} has been notified and will follow up with options.`,
+          scopeCheckStatus: "flagged",
+        })
+        .returning({ id: messages.id });
+      
+      systemMessageId = systemMsg?.id ?? null;
+
+      // 2. Create agency scope flag record
       const [flag] = await trx
         .insert(scopeFlags)
         .values({
-          workspaceId: project.workspaceId,
+          workspaceId: projectData.workspaceId,
           projectId: payload.projectId,
           sowClauseId: payload.matchedClauseId ?? null,
-          messageText: payload.reasoning, // The reasoning serves as the message text reference
+          messageText: payload.reasoning,
           confidence: payload.confidence,
           title: "AI Detection: Possible Scope Deviation",
           description: payload.reasoning,
@@ -276,6 +338,7 @@ aiCallbackRouter.post(
             confidence: payload.confidence,
             matched_clause_id: payload.matchedClauseId,
             message_id: payload.messageId,
+            system_message_id: systemMessageId, // Link for "dismiss" logic in Rule 8
           },
           slaDeadline,
           slaBreached: false,
@@ -285,18 +348,9 @@ aiCallbackRouter.post(
       flagId = flag?.id ?? null;
     }
 
-    // Update message status
-    if (payload.messageId) {
-      const newStatus = (payload.isDeviation && payload.confidence > 0.60) ? "flagged" : "checked";
-      await trx
-        .update(messages)
-        .set({ status: newStatus })
-        .where(eq(messages.id, payload.messageId));
-    }
-
     // Audit log
     await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
-      workspaceId: project.workspaceId,
+      workspaceId: projectData.workspaceId,
       actorId: null,
       actorType: "system",
       entityType: payload.isDeviation ? "scope_flag" : "message",
@@ -307,6 +361,7 @@ aiCallbackRouter.post(
         isDeviation: payload.isDeviation,
         confidence: payload.confidence,
         flagId,
+        systemMessageId,
         messageId: payload.messageId,
         durationMs: payload.durationMs,
         slaMet: payload.slaMet,
@@ -321,9 +376,16 @@ aiCallbackRouter.post(
     };
   });
 
+  if ("notFound" in result) {
+    return c.json({ error: "Message not found", messageId: payload.messageId }, 404);
+  }
+  if ("alreadyProcessed" in result) {
+    return c.json({ status: "already_processed", messageId: payload.messageId }, 200);
+  }
+
   // Dispatch 2-hour delayed email alert for new scope flags (outside transaction)
   if (result.flagId) {
-    await dispatchScopeFlagAlertJob(result.flagId, project.workspaceId, payload.projectId)
+    await dispatchScopeFlagAlertJob(result.flagId, projectData.workspaceId, payload.projectId)
       .catch((err) => {
         console.error(`[ScopeFlagAlert] Failed to dispatch alert job: ${err.message}`);
       });
@@ -334,7 +396,7 @@ aiCallbackRouter.post(
         const [ws] = await db
           .select({ settingsJson: workspaces.settingsJson })
           .from(workspaces)
-          .where(eq(workspaces.id, project.workspaceId))
+          .where(eq(workspaces.id, projectData.workspaceId))
           .limit(1);
         const settings = (ws?.settingsJson ?? {}) as Record<string, unknown>;
         const accessToken = settings["slackAccessToken"] as string | undefined;
@@ -362,7 +424,7 @@ aiCallbackRouter.post(
     })();
 
     logProjectEvent({
-      workspaceId: project.workspaceId,
+      workspaceId: projectData.workspaceId,
       projectId: payload.projectId,
       eventType: "scope_flag_created",
       entityType: "scope_flag",
@@ -379,75 +441,64 @@ aiCallbackRouter.post(
 aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderGeneratedSchema), async (c) => {
   const payload = c.req.valid("json");
 
-  // Idempotency: check if change order already exists for this scope flag
-  const [existingCO] = await db
-    .select({ id: changeOrders.id })
-    .from(changeOrders)
-    .where(eq(changeOrders.scopeFlagId, payload.scopeFlagId))
-    .limit(1);
-
-  // Also check if the specific change order ID already exists (by our UUID)
-  const [existingById] = await db
-    .select({ id: changeOrders.id })
-    .from(changeOrders)
-    .where(eq(changeOrders.id, payload.changeOrderId))
-    .limit(1);
-
-  if (existingCO || existingById) {
-    return c.json({ status: "already_processed", changeOrderId: existingById?.id ?? existingCO?.id }, 200);
-  }
-
-  // Verify scope flag exists and get workspace/project
-  const [flag] = await db
-    .select({ workspaceId: scopeFlags.workspaceId, projectId: scopeFlags.projectId })
-    .from(scopeFlags)
-    .where(eq(scopeFlags.id, payload.scopeFlagId))
-    .limit(1);
-
-  if (!flag) {
-    return c.json({ error: "Scope flag not found", scopeFlagId: payload.scopeFlagId }, 404);
-  }
-
   const result = await db.transaction(async (trx) => {
+    // Verify scope flag exists and get workspace/project — inside the transaction
+    // so the flag lookup and the INSERT are atomic (no TOCTOU window).
+    const [flag] = await trx
+      .select({ workspaceId: scopeFlags.workspaceId, projectId: scopeFlags.projectId })
+      .from(scopeFlags)
+      .where(eq(scopeFlags.id, payload.scopeFlagId))
+      .limit(1);
+
+    if (!flag) return { notFound: true as const };
+
     // Build pricing object: prefer worker-supplied pricingJson, fall back to totalAmountCents
     const pricingValue = payload.pricingJson
       ? {
-          subtotal_cents: payload.pricingJson.subtotalCents ?? payload.totalAmountCents,
-          tax_cents: payload.pricingJson.taxCents ?? 0,
-          total_cents: payload.pricingJson.totalCents ?? payload.totalAmountCents,
+          amount: payload.pricingJson.subtotalCents ? payload.pricingJson.subtotalCents / 100 : payload.totalAmountCents / 100,
           currency: payload.pricingJson.currency ?? "USD",
           line_item_count: payload.pricingJson.lineItemCount ?? payload.lineItems.length,
         }
       : payload.totalAmountCents > 0
-        ? { total_cents: payload.totalAmountCents, currency: "USD" }
+        ? { amount: payload.totalAmountCents / 100, currency: "USD" }
         : null;
 
-    // Insert change order — scopeItemsJson is persisted here so that
-    // changeOrderService.acceptWithFullTransaction() can read it and insert
-    // new SOW clauses when the client accepts the change order.
-    await trx.insert(changeOrders).values({
-      id: payload.changeOrderId,
-      workspaceId: flag.workspaceId,
-      projectId: flag.projectId,
-      scopeFlagId: payload.scopeFlagId,
-      title: payload.title,
-      workDescription: payload.description ?? null,
-      estimatedHours: payload.estimatedHours ?? null,
-      pricing: pricingValue,
-      currency: "USD",
-      status: "draft",
-      lineItemsJson: payload.lineItems.map(item => ({
-        rate_card_item_id: item.rateCardItemId,
-        rate_card_name: item.rateCardName,
-        quantity: item.quantity,
-        unit: item.unit,
-        rate_in_cents: item.rateInCents,
-        subtotal_cents: item.subtotalCents,
-      })),
-      // scopeItemsJson stores the AI-generated SOW clause objects so that
-      // acceptWithFullTransaction can append them to the project SOW on acceptance.
-      scopeItemsJson: payload.scopeItemsJson.length > 0 ? payload.scopeItemsJson : [],
-    });
+    // FIND-009/014: atomic idempotent INSERT. Bare onConflictDoNothing catches
+    // BOTH the PK conflict (worker re-dispatch with same changeOrderId) AND the
+    // partial unique index `change_orders_one_open_per_flag` (worker retry that
+    // mints a fresh changeOrderId for a flag that already has an open CO).
+    // Either case is treated as already-processed — no second PaymentIntent is
+    // ever created.
+    const [inserted] = await trx
+      .insert(changeOrders)
+      .values({
+        id: payload.changeOrderId,
+        workspaceId: flag.workspaceId,
+        projectId: flag.projectId,
+        scopeFlagId: payload.scopeFlagId,
+        title: payload.title,
+        workDescription: payload.description ?? null,
+        estimatedHours: payload.estimatedHours ?? null,
+        pricing: pricingValue,
+        currency: "USD",
+        status: "draft",
+        lineItemsJson: payload.lineItems.map(item => ({
+          rate_card_item_id: item.rateCardItemId,
+          rate_card_name: item.rateCardName,
+          quantity: item.quantity,
+          unit: item.unit,
+          rate_in_cents: item.rateInCents,
+          subtotal_cents: item.subtotalCents,
+        })),
+        scopeItemsJson: payload.scopeItemsJson.length > 0 ? payload.scopeItemsJson : [],
+      })
+      .onConflictDoNothing()
+      .returning({ id: changeOrders.id });
+
+    if (!inserted) {
+      // Row already exists — idempotent success, no side-effects.
+      return { alreadyProcessed: true as const, changeOrderId: payload.changeOrderId };
+    }
 
     // Update scope flag status
     await trx
@@ -455,7 +506,15 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
       .set({ status: "change_order_sent", updatedAt: new Date() })
       .where(eq(scopeFlags.id, payload.scopeFlagId));
 
-    // Audit log — must be in the same transaction as the INSERT
+    // Look up Stripe customer id for the post-commit PaymentIntent call.
+    const [ws] = await trx
+      .select({ stripeCustomerId: workspaces.stripeCustomerId })
+      .from(workspaces)
+      .where(eq(workspaces.id, flag.workspaceId))
+      .limit(1);
+
+    // Audit log for CO creation. PaymentIntent metadata is logged in a
+    // separate audit row after the Stripe call commits (see post-tx block).
     await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
       workspaceId: flag.workspaceId,
       actorId: null,
@@ -473,12 +532,76 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
       },
     });
 
-    return { changeOrderId: payload.changeOrderId, title: payload.title, totalAmountCents: payload.totalAmountCents };
+    return {
+      changeOrderId: payload.changeOrderId,
+      title: payload.title,
+      totalAmountCents: payload.totalAmountCents,
+      workspaceId: flag.workspaceId,
+      projectId: flag.projectId,
+      stripeCustomerId: ws?.stripeCustomerId ?? null,
+      pricingAmount: pricingValue?.amount ?? null,
+    };
   });
 
+  if ("notFound" in result) {
+    return c.json({ error: "Scope flag not found", scopeFlagId: payload.scopeFlagId }, 404);
+  }
+  if ("alreadyProcessed" in result) {
+    return c.json({ status: "already_processed", changeOrderId: result.changeOrderId }, 200);
+  }
+
+  // FIND-002: Stripe PaymentIntent created OUTSIDE the DB transaction with an
+  // idempotency key. A reconciliation worker should sweep change_orders rows
+  // older than 60s with NULL stripe_payment_intent_id. If this call throws
+  // here, the CO row exists in 'draft' with no intent — safe to retry.
+  if (result.pricingAmount !== null && result.pricingAmount > 0) {
+    try {
+      const amountCents = Math.round(result.pricingAmount * 100);
+      const intentMeta = await takeRateService.createPaymentIntent({
+        workspaceId: result.workspaceId,
+        changeOrderId: result.changeOrderId,
+        amountCents,
+        currency: "usd",
+        customerId: result.stripeCustomerId,
+      });
+
+      await db.transaction(async (trx) => {
+        await trx
+          .update(changeOrders)
+          .set({
+            stripePaymentIntentId: intentMeta.paymentIntentId,
+            takeRatePct: String(intentMeta.takeRatePct),
+            takeRateAmountCents: intentMeta.takeRateAmountCents,
+          })
+          .where(eq(changeOrders.id, result.changeOrderId));
+
+        await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
+          workspaceId: result.workspaceId,
+          actorId: null,
+          actorType: "system",
+          entityType: "change_order",
+          entityId: result.changeOrderId,
+          action: "update",
+          metadata: {
+            action: "ai_change_order_payment_intent_created",
+            paymentIntentId: intentMeta.paymentIntentId,
+            takeRatePct: intentMeta.takeRatePct,
+            takeRateAmountCents: intentMeta.takeRateAmountCents,
+            scopeFlagId: payload.scopeFlagId,
+          },
+        });
+      });
+    } catch (err) {
+      console.error(
+        `[AICallback] PaymentIntent creation failed for CO ${result.changeOrderId} — reconciliation worker will retry:`,
+        (err as Error).message,
+      );
+    }
+  }
+
   logProjectEvent({
-    workspaceId: flag.workspaceId,
-    projectId: flag.projectId,
+    workspaceId: result.workspaceId,
+    projectId: result.projectId,
     eventType: "change_order_generated",
     entityType: "change_order",
     entityId: result.changeOrderId,
@@ -486,28 +609,12 @@ aiCallbackRouter.post("/change-order-generated", zValidator("json", changeOrderG
     metadata: { changeOrderId: result.changeOrderId, totalAmountCents: result.totalAmountCents, scopeFlagId: payload.scopeFlagId },
   }).catch(() => undefined);
 
-  return c.json({ status: "ok", ...result }, 200);
+  return c.json({ status: "ok", changeOrderId: result.changeOrderId, title: result.title, totalAmountCents: result.totalAmountCents }, 200);
 });
 
 // POST /api/ai-callback/brief-scored
 aiCallbackRouter.post("/brief-scored", zValidator("json", briefScoredSchema), async (c) => {
   const payload = c.req.valid("json");
-
-  // Fetch workspaceId for audit log
-  const [existingBrief] = await db
-    .select({ workspaceId: briefs.workspaceId, scoredAt: briefs.scoredAt })
-    .from(briefs)
-    .where(eq(briefs.id, payload.briefId))
-    .limit(1);
-
-  if (!existingBrief) {
-    return c.json({ error: "Brief not found", briefId: payload.briefId }, 404);
-  }
-
-  // Idempotency: check if brief already scored
-  if (existingBrief.scoredAt) {
-    return c.json({ status: "already_processed", briefId: payload.briefId }, 200);
-  }
 
   const scoringResult = {
     score: payload.score,
@@ -516,8 +623,10 @@ aiCallbackRouter.post("/brief-scored", zValidator("json", briefScoredSchema), as
   };
 
   const result = await db.transaction(async (trx) => {
-    // Update brief
-    await trx
+    // Atomic idempotent UPDATE: only succeeds when scoredAt IS NULL (FIND-014).
+    // Returns workspaceId and projectId so the rest of the handler doesn't need
+    // a second SELECT outside the transaction.
+    const updated = await trx
       .update(briefs)
       .set({
         scopeScore: payload.score,
@@ -525,7 +634,21 @@ aiCallbackRouter.post("/brief-scored", zValidator("json", briefScoredSchema), as
         scoredAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(briefs.id, payload.briefId));
+      .where(and(eq(briefs.id, payload.briefId), isNull(briefs.scoredAt)))
+      .returning({ workspaceId: briefs.workspaceId, projectId: briefs.projectId });
+
+    if (updated.length === 0) {
+      // Either brief doesn't exist OR was already scored — distinguish
+      const [exists] = await trx
+        .select({ id: briefs.id })
+        .from(briefs)
+        .where(eq(briefs.id, payload.briefId))
+        .limit(1);
+      if (!exists) return { notFound: true as const };
+      return { alreadyProcessed: true as const, briefId: payload.briefId };
+    }
+
+    const { workspaceId, projectId } = updated[0]!;
 
     // Update latest brief version
     const [latestVersion] = await trx
@@ -548,14 +671,7 @@ aiCallbackRouter.post("/brief-scored", zValidator("json", briefScoredSchema), as
     }
 
     // Update project status based on brief scoring result
-    // First, get the project_id from the brief
-    const [briefProject] = await trx
-      .select({ projectId: briefs.projectId })
-      .from(briefs)
-      .where(eq(briefs.id, payload.briefId))
-      .limit(1);
-
-    if (briefProject) {
+    if (projectId) {
       const newProjectStatus = payload.status === "scored" ? "brief_scored" : "awaiting_brief";
       await trx
         .update(projects)
@@ -563,12 +679,12 @@ aiCallbackRouter.post("/brief-scored", zValidator("json", briefScoredSchema), as
           status: newProjectStatus,
           updatedAt: new Date(),
         })
-        .where(and(eq(projects.id, briefProject.projectId), isNull(projects.deletedAt)));
+        .where(and(eq(projects.id, projectId), isNull(projects.deletedAt)));
     }
 
     // Audit log
     await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
-      workspaceId: existingBrief.workspaceId,
+      workspaceId,
       actorId: null,
       actorType: "system",
       entityType: "brief",
@@ -580,15 +696,22 @@ aiCallbackRouter.post("/brief-scored", zValidator("json", briefScoredSchema), as
         status: payload.status,
         flagCount: payload.flagCount,
         jobId: payload.jobId,
-        projectStatusUpdated: briefProject ? true : false,
+        projectStatusUpdated: projectId ? true : false,
       },
     });
 
-    return { briefId: payload.briefId, score: payload.score, briefStatus: payload.status, projectId: briefProject?.projectId ?? null };
+    return { briefId: payload.briefId, score: payload.score, briefStatus: payload.status, projectId: projectId ?? null, workspaceId };
   });
 
+  if ("notFound" in result) {
+    return c.json({ error: "Brief not found", briefId: payload.briefId }, 404);
+  }
+  if ("alreadyProcessed" in result) {
+    return c.json({ status: "already_processed", briefId: payload.briefId }, 200);
+  }
+
   logProjectEvent({
-    workspaceId: existingBrief.workspaceId,
+    workspaceId: result.workspaceId,
     projectId: result.projectId ?? payload.briefId,
     eventType: "brief_scored",
     entityType: "brief",
@@ -647,28 +770,12 @@ aiCallbackRouter.post("/brief-scored", zValidator("json", briefScoredSchema), as
     }
   }
 
-  return c.json({ status: "ok", ...result }, 200);
+  return c.json({ status: "ok", briefId: result.briefId, score: result.score, briefStatus: result.briefStatus, projectId: result.projectId }, 200);
 });
 
 // POST /api/ai-callback/feedback-summarized
 aiCallbackRouter.post("/feedback-summarized", zValidator("json", feedbackSummarizedSchema), async (c) => {
   const payload = c.req.valid("json");
-
-  // Fetch workspaceId for audit log
-  const [existingDeliverable] = await db
-    .select({ workspaceId: deliverables.workspaceId, aiFeedbackSummary: deliverables.aiFeedbackSummary })
-    .from(deliverables)
-    .where(eq(deliverables.id, payload.deliverableId))
-    .limit(1);
-
-  if (!existingDeliverable) {
-    return c.json({ error: "Deliverable not found", deliverableId: payload.deliverableId }, 404);
-  }
-
-  // Idempotency: check if deliverable already has AI summary
-  if (existingDeliverable.aiFeedbackSummary) {
-    return c.json({ status: "already_processed", deliverableId: payload.deliverableId }, 200);
-  }
 
   const summary = {
     tasks: payload.tasks,
@@ -677,18 +784,33 @@ aiCallbackRouter.post("/feedback-summarized", zValidator("json", feedbackSummari
   };
 
   const result = await db.transaction(async (trx) => {
-    // Update deliverable
-    await trx
+    // Atomic idempotent UPDATE: only succeeds when aiFeedbackSummary IS NULL (FIND-014).
+    // Eliminates the racy pre-transaction SELECT that previously checked this field.
+    const updated = await trx
       .update(deliverables)
       .set({
         aiFeedbackSummary: summary,
         updatedAt: new Date(),
       })
-      .where(eq(deliverables.id, payload.deliverableId));
+      .where(and(eq(deliverables.id, payload.deliverableId), isNull(deliverables.aiFeedbackSummary)))
+      .returning({ workspaceId: deliverables.workspaceId });
+
+    if (updated.length === 0) {
+      // Either deliverable doesn't exist OR summary already set — distinguish
+      const [exists] = await trx
+        .select({ id: deliverables.id })
+        .from(deliverables)
+        .where(eq(deliverables.id, payload.deliverableId))
+        .limit(1);
+      if (!exists) return { notFound: true as const };
+      return { alreadyProcessed: true as const, deliverableId: payload.deliverableId };
+    }
+
+    const workspaceId = updated[0]!.workspaceId;
 
     // Audit log
     await writeAuditLog(trx as Parameters<typeof writeAuditLog>[0], {
-      workspaceId: existingDeliverable.workspaceId,
+      workspaceId,
       actorId: null,
       actorType: "system",
       entityType: "deliverable",
@@ -703,6 +825,13 @@ aiCallbackRouter.post("/feedback-summarized", zValidator("json", feedbackSummari
 
     return { deliverableId: payload.deliverableId, taskCount: payload.taskCount };
   });
+
+  if ("notFound" in result) {
+    return c.json({ error: "Deliverable not found", deliverableId: payload.deliverableId }, 404);
+  }
+  if ("alreadyProcessed" in result) {
+    return c.json({ status: "already_processed", deliverableId: payload.deliverableId }, 200);
+  }
 
   return c.json({ status: "ok", ...result }, 200);
 });

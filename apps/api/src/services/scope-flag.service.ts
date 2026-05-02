@@ -81,7 +81,7 @@ export const scopeFlagService = {
             // bilateral system message so the client sees "Confirmed in scope" instead
             // of the original flag notification.
             if (update.status === "dismissed") {
-                const [flagRecord] = await db
+                const [flagRecord] = await trx
                     .select({ evidence: scopeFlags.evidence })
                     .from(scopeFlags)
                     .where(and(eq(scopeFlags.id, id), eq(scopeFlags.workspaceId, workspaceId)))
@@ -93,7 +93,7 @@ export const scopeFlagService = {
                     await trx
                         .update(messages)
                         .set({
-                            body: "Your request has been reviewed and confirmed within the scope of our current agreement.",
+                            body: "Confirmed in scope",
                             scopeCheckStatus: "checked",
                         })
                         .where(eq(messages.id, systemMessageId));

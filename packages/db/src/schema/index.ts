@@ -27,4 +27,6 @@ export * from "./invitations.schema";
 export * from "./brief-embeds.schema";
 export * from "./marketplace-installs.schema";
 export * from "./project-intelligence.schema";
+export * from "./stripe-processed-events.schema";
+export * from "./notification-outbox.schema";
 export * from "./relations";

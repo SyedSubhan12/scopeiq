@@ -1,10 +1,10 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    GEMINI_API_KEY: str
+    ANTHROPIC_API_KEY: str
     DATABASE_URL: str
     REDIS_URL: str
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
     API_BASE_URL: str = "http://localhost:4000"
     AI_CALLBACK_SECRET: str = ""
     # Object storage (MinIO / S3-compatible) — only required for PDF extraction fallback

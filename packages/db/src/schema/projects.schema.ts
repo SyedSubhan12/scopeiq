@@ -30,6 +30,10 @@ export const projects = pgTable(
     startDate: date("start_date"),
     endDate: date("end_date"),
     portalToken: varchar("portal_token", { length: 64 }).unique(),
+    // FIND-005: SHA-256 of the plaintext token for O(1) indexed lookup. The
+    // existing `portalToken` column may hold scrypt(salt:hash) or legacy
+    // plaintext; both are slow or impossible to look up in an index.
+    portalTokenLookupHash: varchar("portal_token_lookup_hash", { length: 64 }),
     portalEnabled: varchar("portal_enabled", { length: 5 }).default("false"),
     /** Flexible project-level settings (e.g. remindersPaused: boolean) */
     settingsJson: jsonb("settings_json").default({}),
@@ -41,6 +45,9 @@ export const projects = pgTable(
     workspaceStatusIdx: index("idx_projects_workspace_status").on(table.workspaceId, table.status),
     clientIdx: index("idx_projects_client").on(table.clientId),
     portalTokenIdx: uniqueIndex("idx_projects_portal_token").on(table.portalToken),
+    portalTokenLookupIdx: uniqueIndex("idx_projects_portal_token_lookup_hash").on(
+      table.portalTokenLookupHash,
+    ),
   }),
 );
 

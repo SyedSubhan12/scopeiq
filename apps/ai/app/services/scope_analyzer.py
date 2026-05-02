@@ -1,69 +1,75 @@
 import asyncio
 import structlog
 import time
+import json
+from anthropic import AsyncAnthropic, APIError, RateLimitError
 
-from google.genai import types
-
-from app.gemini_client import get_gemini_client
+from app.anthropic_client import get_anthropic_client
 from app.config import settings
 from app.schemas.scope_schemas import ScopeAnalysisInput, ScopeAnalysisResult
 from app.prompts.scope_guard_prompt import SCOPE_GUARD_SYSTEM_PROMPT
 
 logger = structlog.get_logger()
 
-SCOPE_ANALYSIS_TOOL = types.Tool(
-    function_declarations=[
-        types.FunctionDeclaration(
-            name="analyze_scope",
-            description="Analyze a project request against SOW clauses for deviations",
-            parameters=types.Schema(
-                type="OBJECT",
-                properties={
-                    "is_deviation": types.Schema(type="BOOLEAN"),
-                    "confidence": types.Schema(
-                        type="NUMBER",
-                        description="Confidence score from 0.0 to 1.0",
-                    ),
-                    "reasoning": types.Schema(type="STRING"),
-                    "matched_clause_id": types.Schema(type="STRING"),
-                    "suggested_severity": types.Schema(
-                        type="STRING",
-                        enum=["low", "medium", "high"],
-                    ),
-                },
-                required=["is_deviation", "confidence", "reasoning", "suggested_severity"],
-            ),
-        )
-    ]
-)
+SCOPE_ANALYSIS_TOOL = {
+    "name": "analyze_scope",
+    "description": "Analyze a project request against SOW clauses for deviations",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "is_deviation": {
+                "type": "boolean",
+                "description": "True if the request falls outside the defined scope clauses"
+            },
+            "confidence": {
+                "type": "number",
+                "description": "Confidence score from 0.0 to 1.0"
+            },
+            "reasoning": {
+                "type": "string",
+                "description": "Detailed reasoning for the scope determination, citing specific clauses"
+            },
+            "matched_clause_id": {
+                "type": "string",
+                "description": "The ID of the most relevant SOW clause that was matched or violated"
+            },
+            "suggested_severity": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+                "description": "Severity of the deviation"
+            },
+            "suggested_response": {
+                "type": "string",
+                "description": "A professional, non-confrontational suggested response for the agency"
+            }
+        },
+        "required": ["is_deviation", "confidence", "reasoning", "suggested_severity", "suggested_response"]
+    }
+}
 
-SCOPE_ANALYSIS_CONFIG = types.GenerateContentConfig(
-    system_instruction=SCOPE_GUARD_SYSTEM_PROMPT,
-    tools=[SCOPE_ANALYSIS_TOOL],
-    tool_config=types.ToolConfig(
-        function_calling_config=types.FunctionCallingConfig(
-            mode="ANY",
-            allowed_function_names=["analyze_scope"],
-        )
-    ),
-)
-
-
-async def _call_gemini_with_retry(prompt: str, max_retries: int = 3) -> types.GenerateContentResponse:
-    client = get_gemini_client()
-    last_exc: Exception | None = None
+async def _call_claude_with_retry(system_prompt: str, user_prompt: str, max_retries: int = 3) -> dict:
+    client = get_anthropic_client()
+    last_exc = None
+    
     for attempt in range(max_retries):
         try:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: client.models.generate_content(
-                    model=settings.GEMINI_MODEL,
-                    contents=prompt,
-                    config=SCOPE_ANALYSIS_CONFIG,
-                ),
+            response = await client.messages.create(
+                model=settings.ANTHROPIC_MODEL,
+                max_tokens=2048,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                tools=[SCOPE_ANALYSIS_TOOL],
+                tool_choice={"type": "tool", "name": "analyze_scope"}
             )
-            return response
-        except Exception as exc:
+            
+            # Find the tool use part
+            for content_block in response.content:
+                if content_block.type == "tool_use":
+                    return content_block.input
+            
+            raise ValueError("Claude failed to provide tool_use output")
+            
+        except (RateLimitError, APIError) as exc:
             last_exc = exc
             if attempt < max_retries - 1:
                 wait = 2 ** attempt
@@ -74,43 +80,54 @@ async def _call_gemini_with_retry(prompt: str, max_retries: int = 3) -> types.Ge
                     error=str(exc),
                 )
                 await asyncio.sleep(wait)
-    raise last_exc  # type: ignore[misc]
+        except Exception as exc:
+            logger.error("claude_invocation_error", error=str(exc))
+            raise
 
+    raise last_exc or ValueError("Claude invocation failed")
 
 class ScopeAnalyzerService:
     async def analyze(self, input_data: ScopeAnalysisInput) -> ScopeAnalysisResult:
-        """Analyze a text request against SOW clauses using Gemini function calling."""
-        prompt = self._build_prompt(input_data)
+        """Analyze a text request against SOW clauses using Claude tool_use."""
+        user_prompt = self._build_prompt(input_data)
         start_ms = int(time.monotonic() * 1000)
 
         logger.info(
             "analyzing_scope",
             project_id=input_data.project_id,
             clause_count=len(input_data.clauses),
+            model=settings.ANTHROPIC_MODEL
         )
 
         try:
-            response = await _call_gemini_with_retry(prompt)
-            func_call = response.candidates[0].content.parts[0].function_call
-            args = dict(func_call.args)
+            # v3.0 mandate: Claude API called with tool_use output schema
+            args = await _call_claude_with_retry(
+                system_prompt=SCOPE_GUARD_SYSTEM_PROMPT,
+                user_prompt=user_prompt
+            )
 
             is_deviation: bool = bool(args.get("is_deviation", False))
             confidence: float = float(args.get("confidence", 0.0))
             reasoning: str = str(args.get("reasoning", ""))
             suggested_severity: str = str(args.get("suggested_severity", "medium"))
-            # matched_clause_id may be absent or null — handle both
+            suggested_response: str = str(args.get("suggested_response", ""))
+            
+            # matched_clause_id handle
             matched_clause_id_raw = args.get("matched_clause_id")
             matched_clause_id: str | None = (
                 str(matched_clause_id_raw) if matched_clause_id_raw else None
             )
 
             duration_ms = int(time.monotonic() * 1000) - start_ms
+            
+            # Rule 3 check: Verify return object matches expected schema
             result = ScopeAnalysisResult(
                 is_deviation=is_deviation,
                 confidence=confidence,
                 reasoning=reasoning,
                 matched_clause_id=matched_clause_id,
                 suggested_severity=suggested_severity,
+                suggested_response=suggested_response
             )
 
             logger.info(
@@ -118,7 +135,7 @@ class ScopeAnalyzerService:
                 project_id=input_data.project_id,
                 is_deviation=result.is_deviation,
                 confidence=result.confidence,
-                model=settings.GEMINI_MODEL,
+                model=settings.ANTHROPIC_MODEL,
                 duration_ms=duration_ms,
                 success=True,
             )
@@ -130,16 +147,15 @@ class ScopeAnalyzerService:
                 "scope_analysis_failed",
                 project_id=input_data.project_id,
                 error=str(exc),
-                model=settings.GEMINI_MODEL,
+                model=settings.ANTHROPIC_MODEL,
                 duration_ms=duration_ms,
                 success=False,
             )
-            return ScopeAnalysisResult(
-                is_deviation=False,
-                confidence=0.0,
-                reasoning="Unable to perform semantic analysis — internal error",
-                suggested_severity="low",
-            )
+            # Fail closed: re-raise so BullMQ retries with backoff.
+            # Synthesizing a default verdict would silently mask AI outages and
+            # let real out-of-scope work pass without a scope flag (Rule 8 trust
+            # violation). Per FIND-003.
+            raise
 
     def _build_prompt(self, input_data: ScopeAnalysisInput) -> str:
         lines = [

@@ -6,7 +6,15 @@ export async function GET(request: NextRequest) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
     const requestUrl = new URL(request.url);
-    const appOrigin = process.env.NEXT_PUBLIC_APP_URL ?? requestUrl.origin;
+    // FIND-010: never derive redirect origin from the request URL — Host header
+    // is attacker-controlled. In production the env var is mandatory; in dev
+    // we fall back to the request origin to avoid blocking local development.
+    const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL;
+    if (!configuredOrigin && process.env.NODE_ENV === "production") {
+        console.error("[auth/callback] NEXT_PUBLIC_APP_URL is required in production");
+        return new NextResponse("Misconfigured", { status: 500 });
+    }
+    const appOrigin = configuredOrigin ?? requestUrl.origin;
     const code = requestUrl.searchParams.get("code");
     const error = requestUrl.searchParams.get("error");
     const errorDescription = requestUrl.searchParams.get("error_description");
@@ -29,7 +37,12 @@ export async function GET(request: NextRequest) {
                     },
                     setAll(cookiesToSet) {
                         cookiesToSet.forEach(({ name, value, options }) => {
-                            response.cookies.set(name, value, options);
+                            response.cookies.set(name, value, {
+                                ...options,
+                                httpOnly: true,
+                                secure: process.env.NODE_ENV === "production",
+                                sameSite: "lax",
+                            });
                         });
                     },
                 },

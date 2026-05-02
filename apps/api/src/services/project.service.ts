@@ -1,5 +1,5 @@
 import { projectRepository } from "../repositories/project.repository.js";
-import { writeAuditLog, db, generatePortalToken, statementsOfWork, sowClauses, clients, workspaces, eq, and, isNull } from "@novabots/db";
+import { writeAuditLog, db, generatePortalToken, hashPortalToken, statementsOfWork, sowClauses, clients, workspaces, eq, and, isNull } from "@novabots/db";
 import { NotFoundError } from "@novabots/types";
 import { stripUndefined } from "../lib/strip-undefined.js";
 import { briefService } from "./brief.service.js";
@@ -85,23 +85,32 @@ export const projectService = {
       endDate?: string;
     };
 
-    const project = await projectRepository.create({
-      workspaceId,
-      clientId,
-      name,
-      description: description ?? null,
-      budget: budget ?? null,
-      startDate: startDate ?? null,
-      endDate: endDate ?? null,
-      portalToken: getProjectPortalToken(),
-    });
+    const portalTokenRaw = getProjectPortalToken();
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "project",
-      entityId: project.id,
-      action: "create",
+    const project = await db.transaction(async (trx) => {
+      const p = await projectRepository.create({
+        workspaceId,
+        clientId,
+        name,
+        description: description ?? null,
+        budget: budget ?? null,
+        startDate: startDate ?? null,
+        endDate: endDate ?? null,
+        portalToken: portalTokenRaw,
+        // FIND-005: index-friendly fast lookup hash. Stored alongside the raw
+        // token (also indexed) so the auth middleware can resolve in O(1).
+        portalTokenLookupHash: hashPortalToken(portalTokenRaw),
+      }, trx as never);
+
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "project",
+        entityId: p.id,
+        action: "create",
+      });
+
+      return p;
     });
 
     // Send portal invitation email to client (fire and forget — does not block project creation)
@@ -121,35 +130,43 @@ export const projectService = {
     actorId: string,
     data: Record<string, unknown>,
   ) {
-    const project = await projectRepository.update(workspaceId, projectId, stripUndefined(data));
-    if (!project) {
-      throw new NotFoundError("Project", projectId);
-    }
+    const project = await db.transaction(async (trx) => {
+      const p = await projectRepository.update(workspaceId, projectId, stripUndefined(data), trx as never);
+      if (!p) {
+        throw new NotFoundError("Project", projectId);
+      }
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "project",
-      entityId: projectId,
-      action: "update",
-      metadata: { fields: Object.keys(data) },
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "project",
+        entityId: projectId,
+        action: "update",
+        metadata: { fields: Object.keys(data) },
+      });
+
+      return p;
     });
 
     return project;
   },
 
   async deleteProject(workspaceId: string, projectId: string, actorId: string) {
-    const project = await projectRepository.softDelete(workspaceId, projectId);
-    if (!project) {
-      throw new NotFoundError("Project", projectId);
-    }
+    const project = await db.transaction(async (trx) => {
+      const p = await projectRepository.softDelete(workspaceId, projectId, trx as never);
+      if (!p) {
+        throw new NotFoundError("Project", projectId);
+      }
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "project",
-      entityId: projectId,
-      action: "delete",
+      await writeAuditLog(trx as never, {
+        workspaceId,
+        actorId,
+        entityType: "project",
+        entityId: projectId,
+        action: "delete",
+      });
+
+      return p;
     });
 
     return project;
@@ -162,15 +179,24 @@ export const projectService = {
     const [sow] = await db
       .select()
       .from(statementsOfWork)
-      .where(and(eq(statementsOfWork.id, project.sowId), isNull(statementsOfWork.deletedAt)))
+      .where(and(eq(statementsOfWork.id, project.sowId), eq(statementsOfWork.workspaceId, workspaceId), isNull(statementsOfWork.deletedAt)))
       .limit(1);
 
     if (!sow) return null;
 
     const clauses = await db
-      .select()
+      .select({
+        id: sowClauses.id,
+        clauseType: sowClauses.clauseType,
+        originalText: sowClauses.originalText,
+        summary: sowClauses.summary,
+      })
       .from(sowClauses)
-      .where(eq(sowClauses.sowId, sow.id));
+      .innerJoin(statementsOfWork, eq(sowClauses.sowId, statementsOfWork.id))
+      .where(and(
+        eq(sowClauses.sowId, sow.id),
+        eq(statementsOfWork.workspaceId, workspaceId)
+      ));
 
     return {
       ...sow,

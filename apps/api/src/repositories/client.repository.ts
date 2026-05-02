@@ -1,6 +1,10 @@
 import { db, clients, eq, and, isNull, desc, gt } from "@novabots/db";
 import type { NewClient } from "@novabots/db";
 
+// Minimal driver type — accepts both `db` and the trx argument from
+// `db.transaction(trx => ...)` without leaking deep generics into callers.
+type Driver = typeof db;
+
 export const clientRepository = {
   async list(
     workspaceId: string,
@@ -49,13 +53,18 @@ export const clientRepository = {
     return client ?? null;
   },
 
-  async create(data: NewClient) {
-    const [client] = await db.insert(clients).values(data).returning();
+  async create(data: NewClient, tx: Driver = db) {
+    const [client] = await tx.insert(clients).values(data).returning();
     return client!;
   },
 
-  async update(workspaceId: string, clientId: string, data: Partial<NewClient>) {
-    const [updated] = await db
+  async update(
+    workspaceId: string,
+    clientId: string,
+    data: Partial<NewClient>,
+    tx: Driver = db,
+  ) {
+    const [updated] = await tx
       .update(clients)
       .set({ ...data, updatedAt: new Date() })
       .where(
@@ -69,8 +78,8 @@ export const clientRepository = {
     return updated ?? null;
   },
 
-  async delete(workspaceId: string, clientId: string) {
-    const [deleted] = await db
+  async delete(workspaceId: string, clientId: string, tx: Driver = db) {
+    const [deleted] = await tx
       .update(clients)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(

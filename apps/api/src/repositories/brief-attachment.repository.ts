@@ -2,11 +2,28 @@ import { db, briefAttachments, eq, and, isNull, asc } from "@novabots/db";
 import type { NewBriefAttachment } from "@novabots/db";
 
 export const briefAttachmentRepository = {
-  async listByBriefId(briefId: string) {
+  async listByBriefId(workspaceId: string, briefId: string) {
     return db
-      .select()
+      .select({
+        id: briefAttachments.id,
+        briefId: briefAttachments.briefId,
+        workspaceId: briefAttachments.workspaceId,
+        fieldKey: briefAttachments.fieldKey,
+        originalName: briefAttachments.originalName,
+        fileUrl: briefAttachments.fileUrl,
+        fileKey: briefAttachments.objectKey,
+        mimeType: briefAttachments.mimeType,
+        sizeBytes: briefAttachments.sizeBytes,
+        createdAt: briefAttachments.createdAt,
+      })
       .from(briefAttachments)
-      .where(and(eq(briefAttachments.briefId, briefId), isNull(briefAttachments.deletedAt)))
+      .where(
+        and(
+          eq(briefAttachments.briefId, briefId),
+          eq(briefAttachments.workspaceId, workspaceId),
+          isNull(briefAttachments.deletedAt)
+        )
+      )
       .orderBy(asc(briefAttachments.createdAt));
   },
 

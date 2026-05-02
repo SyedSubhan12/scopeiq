@@ -87,7 +87,7 @@ export const userRoleEnum = pgEnum("user_role_enum", [
 
 export const userTypeEnum = pgEnum("user_type_enum", ["agency", "client"]);
 
-export const planEnum = pgEnum("plan_enum", ["solo", "studio", "agency"]);
+export const planEnum = pgEnum("plan_enum", ["free", "solo", "studio", "agency"]);
 
 export const auditActionEnum = pgEnum("audit_action_enum", [
   "create",

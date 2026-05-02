@@ -1,6 +1,8 @@
 import { db, projects, clients, eq, and, isNull, desc, gt } from "@novabots/db";
 import type { NewProject } from "@novabots/db";
 
+type Driver = typeof db;
+
 export const projectRepository = {
   async list(
     workspaceId: string,
@@ -71,13 +73,18 @@ export const projectRepository = {
     return project ?? null;
   },
 
-  async create(data: NewProject) {
-    const [project] = await db.insert(projects).values(data).returning();
+  async create(data: NewProject, tx: Driver = db) {
+    const [project] = await tx.insert(projects).values(data).returning();
     return project!;
   },
 
-  async update(workspaceId: string, projectId: string, data: Partial<NewProject>) {
-    const [updated] = await db
+  async update(
+    workspaceId: string,
+    projectId: string,
+    data: Partial<NewProject>,
+    tx: Driver = db,
+  ) {
+    const [updated] = await tx
       .update(projects)
       .set({ ...data, updatedAt: new Date() })
       .where(
@@ -91,8 +98,8 @@ export const projectRepository = {
     return updated ?? null;
   },
 
-  async softDelete(workspaceId: string, projectId: string) {
-    const [deleted] = await db
+  async softDelete(workspaceId: string, projectId: string, tx: Driver = db) {
+    const [deleted] = await tx
       .update(projects)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(

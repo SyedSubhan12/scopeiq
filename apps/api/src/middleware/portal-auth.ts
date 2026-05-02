@@ -19,29 +19,30 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
   }
 
   // ── Project tokens ────────────────────────────────────────────────────────
-  // projects.portal_token is unique-indexed. Legacy plaintext tokens are stored
-  // directly; scrypt tokens are stored as "salt:hash". Both require fetching
-  // candidates because scrypt cannot be reversed for an index lookup.
-  // TODO: add a portal_token_fast_hash (SHA-256) column + index to projects so
-  //       this can be resolved with a single indexed lookup instead of a scan.
-  const projectCandidates = await db
+  // FIND-005: O(1) indexed lookup via portal_token_lookup_hash (SHA-256). The
+  // previous implementation scanned up to 500 candidate rows and ran scrypt
+  // against each — both a CPU-DoS surface and silently broken past 500 rows.
+  // The scrypt verifyPortalToken still runs for tokens that have one stored,
+  // protecting against rainbow tables on a leaked DB.
+  const lookupHash = createHash("sha256").update(token).digest("hex");
+
+  const [matchedProject] = await db
     .select({
       id: projects.id,
       workspaceId: projects.workspaceId,
       portalToken: projects.portalToken,
     })
     .from(projects)
-    .where(isNull(projects.deletedAt))
-    .limit(500);
+    .where(and(eq(projects.portalTokenLookupHash, lookupHash), isNull(projects.deletedAt)))
+    .limit(1);
 
-  for (const project of projectCandidates) {
-    if (!project.portalToken) continue;
-    const matches = project.portalToken.includes(":")
-      ? verifyPortalToken(token, project.portalToken)
-      : constantTimeCompare(token, project.portalToken);
+  if (matchedProject?.portalToken) {
+    const matches = matchedProject.portalToken.includes(":")
+      ? verifyPortalToken(token, matchedProject.portalToken)
+      : constantTimeCompare(token, matchedProject.portalToken);
     if (matches) {
-      c.set("portalProjectId", project.id);
-      c.set("portalWorkspaceId", project.workspaceId);
+      c.set("portalProjectId", matchedProject.id);
+      c.set("portalWorkspaceId", matchedProject.workspaceId);
       c.set("portalClientId", null);
       await next();
       return;
@@ -65,15 +66,26 @@ export const portalAuthMiddleware = createMiddleware(async (c, next) => {
     .limit(1);
 
   if (matchedClient) {
-    const [clientProject] = await db
+    // FIND-001: Reject expired tokens before doing any further work.
+    if (matchedClient.tokenExpiresAt && matchedClient.tokenExpiresAt.getTime() < Date.now()) {
+      throw new UnauthorizedError("Invalid or expired token");
+    }
+
+    // FIND-005: Use limit(2) so we can detect the ambiguous multi-project case.
+    const clientProjects = await db
       .select({ id: projects.id, workspaceId: projects.workspaceId })
       .from(projects)
       .where(and(
         eq(projects.clientId, matchedClient.id),
         isNull(projects.deletedAt),
       ))
-      .limit(1);
+      .limit(2);
 
+    if (clientProjects.length > 1) {
+      throw new UnauthorizedError("Client token is ambiguous — multiple active projects");
+    }
+
+    const clientProject = clientProjects[0];
     if (clientProject) {
       c.set("portalProjectId", clientProject.id);
       c.set("portalWorkspaceId", clientProject.workspaceId);

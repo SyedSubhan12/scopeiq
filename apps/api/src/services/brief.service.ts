@@ -176,7 +176,7 @@ async function getEditableBriefContext(data: {
     throw new NotFoundError("Brief", brief.id);
   }
 
-  const existingFields = await briefRepository.getFieldsByBriefId(brief.id);
+  const existingFields = await briefRepository.getFieldsByBriefId(workspaceId, brief.id);
   const templateVersion = brief.templateVersionId
     ? await briefTemplateRepository.getVersionByBriefVersionId(workspaceId, brief.templateVersionId)
     : null;
@@ -221,12 +221,13 @@ async function getSubmittedBriefContext(
 }
 
 async function syncAttachmentFieldValue(
+  workspaceId: string,
   briefId: string,
   field: BriefFieldConfig,
 ) {
   const attachments = await briefAttachmentRepository.listByBriefAndField(briefId, field.key);
   const nextValue = attachments.map((attachment) => attachment.originalName).join(", ") || null;
-  const existingFields = await briefRepository.getFieldsByBriefId(briefId);
+  const existingFields = await briefRepository.getFieldsByBriefId(workspaceId, briefId);
   const existingField = existingFields.find((entry) => entry.fieldKey === field.key);
 
   const fieldPayload = {
@@ -250,8 +251,8 @@ async function syncAttachmentFieldValue(
   ]);
 }
 
-async function listBriefAttachments(briefId: string): Promise<BriefAttachmentSummary[]> {
-  const attachments = await briefAttachmentRepository.listByBriefId(briefId);
+async function listBriefAttachments(workspaceId: string, briefId: string): Promise<BriefAttachmentSummary[]> {
+  const attachments = await briefAttachmentRepository.listByBriefId(workspaceId, briefId);
   return attachments.map((attachment) => ({
     id: attachment.id,
     fieldKey: attachment.fieldKey,
@@ -271,7 +272,7 @@ async function createBriefVersionSnapshot(data: {
   attachments?: BriefAttachmentSummary[] | undefined;
   reviewNote?: string | null | undefined;
 }) {
-  const attachments = data.attachments ?? (await listBriefAttachments(data.brief.id));
+  const attachments = data.attachments ?? (await listBriefAttachments(data.workspaceId, data.brief.id));
   const nextVersionNumber = await briefRepository.getNextVersionNumber(
     data.workspaceId,
     data.brief.id,
@@ -321,8 +322,8 @@ export const briefService = {
       throw new NotFoundError("Brief", briefId);
     }
 
-    const fields = await briefRepository.getFieldsByBriefId(briefId);
-    const attachments = await listBriefAttachments(briefId);
+    const fields = await briefRepository.getFieldsByBriefId(workspaceId, briefId);
+    const attachments = await listBriefAttachments(workspaceId, briefId);
     const storedVersions = await briefRepository.listVersions(workspaceId, briefId);
     const currentClarificationRequest = await briefClarificationRepository.getOpenForBrief(
       workspaceId,
@@ -587,8 +588,8 @@ export const briefService = {
       throw new NotFoundError("Brief", briefId);
     }
 
-    const fields = await briefRepository.getFieldsByBriefId(briefId);
-    const attachments = await listBriefAttachments(briefId);
+    const fields = await briefRepository.getFieldsByBriefId(workspaceId, briefId);
+    const attachments = await listBriefAttachments(workspaceId, briefId);
     const storedVersions = await briefRepository.listVersions(workspaceId, briefId);
 
     if (storedVersions.length === 0) {
@@ -699,7 +700,7 @@ export const briefService = {
     // Dispatch scoring job
     await dispatchScoreBriefJob(brief.id);
 
-    const createdFields = await briefRepository.getFieldsByBriefId(brief.id);
+    const createdFields = await briefRepository.getFieldsByBriefId(workspaceId, brief.id);
     await createBriefVersionSnapshot({
       workspaceId,
       brief,
@@ -735,7 +736,7 @@ export const briefService = {
       projectId,
       briefId,
     );
-    const attachments = await briefAttachmentRepository.listByBriefId(briefId);
+    const attachments = await briefAttachmentRepository.listByBriefId(workspaceId, briefId);
     const attachmentMap = new Map<string, BriefAttachmentSummary[]>();
     for (const attachment of attachments) {
       const existing = attachmentMap.get(attachment.fieldKey) ?? [];
@@ -808,12 +809,12 @@ export const briefService = {
     if (!submittedBrief) {
       throw new NotFoundError("Brief", briefId);
     }
-    const updatedFields = await briefRepository.getFieldsByBriefId(briefId);
+    const updatedFields = await briefRepository.getFieldsByBriefId(workspaceId, briefId);
     await createBriefVersionSnapshot({
       workspaceId,
       brief: submittedBrief,
       fields: updatedFields,
-      attachments: await listBriefAttachments(briefId),
+      attachments: await listBriefAttachments(workspaceId, briefId),
     });
 
     await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
@@ -856,7 +857,7 @@ export const briefService = {
       throw new ValidationError("This clarification request is no longer active");
     }
 
-    const attachments = await briefAttachmentRepository.listByBriefId(briefId);
+    const attachments = await briefAttachmentRepository.listByBriefId(workspaceId, briefId);
     const attachmentMap = new Map<string, BriefAttachmentSummary[]>();
     for (const attachment of attachments) {
       const existing = attachmentMap.get(attachment.fieldKey) ?? [];
@@ -875,7 +876,7 @@ export const briefService = {
 
     for (const [index, field] of fieldConfigs.entries()) {
       if (field.type === "file_upload") {
-        await syncAttachmentFieldValue(briefId, field);
+        await syncAttachmentFieldValue(workspaceId, briefId, field);
         continue;
       }
 
@@ -913,12 +914,12 @@ export const briefService = {
     }
 
     await briefClarificationRepository.resolveOpenByBriefId(workspaceId, briefId);
-    const updatedFields = await briefRepository.getFieldsByBriefId(briefId);
+    const updatedFields = await briefRepository.getFieldsByBriefId(workspaceId, briefId);
     await createBriefVersionSnapshot({
       workspaceId,
       brief: updatedBrief,
       fields: updatedFields,
-      attachments: await listBriefAttachments(briefId),
+      attachments: await listBriefAttachments(workspaceId, briefId),
     });
 
     await dispatchScoreBriefJob(briefId);
@@ -959,7 +960,7 @@ export const briefService = {
 
     for (const [index, field] of fieldConfigs.entries()) {
       if (field.type === "file_upload") {
-        await syncAttachmentFieldValue(briefId, field);
+        await syncAttachmentFieldValue(workspaceId, briefId, field);
         continue;
       }
 
@@ -1062,7 +1063,7 @@ export const briefService = {
       },
     });
 
-    await syncAttachmentFieldValue(briefId, field);
+    await syncAttachmentFieldValue(workspaceId, briefId, field);
 
     return attachment;
   },
@@ -1102,7 +1103,7 @@ export const briefService = {
 
     const field = fieldConfigs.find((entry) => entry.key === deleted.fieldKey);
     if (field) {
-      await syncAttachmentFieldValue(briefId, field);
+      await syncAttachmentFieldValue(workspaceId, briefId, field);
     }
 
     return deleted;

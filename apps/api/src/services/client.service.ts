@@ -33,23 +33,25 @@ export const clientService = {
       notes?: string;
     };
 
-    const client = await clientRepository.create({
-      workspaceId,
-      name,
-      contactName: contactName ?? null,
-      contactEmail: contactEmail ?? null,
-      notes: notes ?? null,
-    });
+    return db.transaction(async (trx) => {
+        const client = await clientRepository.create({
+            workspaceId,
+            name,
+            contactName: contactName ?? null,
+            contactEmail: contactEmail ?? null,
+            notes: notes ?? null,
+        }, trx as never);
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "client",
-      entityId: client.id,
-      action: "create",
-    });
+        await writeAuditLog(trx as never, {
+            workspaceId,
+            actorId,
+            entityType: "client",
+            entityId: client.id,
+            action: "create",
+        });
 
-    return client;
+        return client;
+    });
   },
 
   async updateClient(
@@ -58,37 +60,41 @@ export const clientService = {
     actorId: string,
     data: Record<string, unknown>,
   ) {
-    const client = await clientRepository.update(workspaceId, clientId, stripUndefined(data));
-    if (!client) {
-      throw new NotFoundError("Client", clientId);
-    }
+    return db.transaction(async (trx) => {
+        const client = await clientRepository.update(workspaceId, clientId, stripUndefined(data), trx as never);
+        if (!client) {
+            throw new NotFoundError("Client", clientId);
+        }
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "client",
-      entityId: clientId,
-      action: "update",
-      metadata: { fields: Object.keys(data) },
+        await writeAuditLog(trx as never, {
+            workspaceId,
+            actorId,
+            entityType: "client",
+            entityId: clientId,
+            action: "update",
+            metadata: { fields: Object.keys(data) },
+        });
+
+        return client;
     });
-
-    return client;
   },
 
   async deleteClient(workspaceId: string, clientId: string, actorId: string) {
-    const client = await clientRepository.delete(workspaceId, clientId);
-    if (!client) {
-      throw new NotFoundError("Client", clientId);
-    }
+    return db.transaction(async (trx) => {
+        const client = await clientRepository.delete(workspaceId, clientId, trx as never);
+        if (!client) {
+            throw new NotFoundError("Client", clientId);
+        }
 
-    await writeAuditLog(db as Parameters<typeof writeAuditLog>[0], {
-      workspaceId,
-      actorId,
-      entityType: "client",
-      entityId: clientId,
-      action: "delete",
+        await writeAuditLog(trx as never, {
+            workspaceId,
+            actorId,
+            entityType: "client",
+            entityId: clientId,
+            action: "delete",
+        });
+
+        return client;
     });
-
-    return client;
   },
 };

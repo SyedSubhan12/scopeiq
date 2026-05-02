@@ -1,37 +1,60 @@
 import { Hono } from "hono";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { Webhook, WebhookVerificationError } from "svix";
+import sanitizeHtml from "sanitize-html";
 import { db, messages, projects, eq, and, isNull, writeAuditLog } from "@novabots/db";
 import { dispatchCheckScopeJob } from "../jobs/check-scope.job.js";
 import { ValidationError } from "@novabots/types";
 
 const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET;
+let webhookVerifier: Webhook | null = null;
+function getVerifier(): Webhook | null {
+  if (webhookVerifier) return webhookVerifier;
+  if (!RESEND_WEBHOOK_SECRET) return null;
+  webhookVerifier = new Webhook(RESEND_WEBHOOK_SECRET);
+  return webhookVerifier;
+}
+
+/** Allowlist used to strip unsafe HTML from inbound email bodies (FIND-010 XSS). */
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: ["p", "br", "strong", "em", "u", "a", "ul", "ol", "li", "blockquote", "code", "pre"],
+  allowedAttributes: { a: ["href", "title"] },
+  allowedSchemes: ["http", "https", "mailto"],
+};
 
 export const resendWebhookRouter = new Hono();
 
 /**
- * Validate Resend webhook signature using HMAC-SHA256.
- * In production, rejects all requests when the secret is not configured.
+ * Validate Resend webhook using Svix-format signing (Resend's actual scheme).
+ * Fail-closed in every environment — no dev bypass.
  */
-function verifyResendSignature(payload: string, signature: string | undefined): boolean {
-  if (!RESEND_WEBHOOK_SECRET) {
-    if (process.env.NODE_ENV === "production") {
-      console.error("[ResendWebhook] RESEND_WEBHOOK_SECRET not set in production — rejecting all requests");
-      return false;
-    }
-    console.warn("[ResendWebhook] RESEND_WEBHOOK_SECRET not set — allowing in development");
-    return true;
+function verifyResendWebhook(
+  payload: string,
+  headers: {
+    svixId: string | undefined;
+    svixTimestamp: string | undefined;
+    svixSignature: string | undefined;
+  },
+): boolean {
+  const verifier = getVerifier();
+  if (!verifier) {
+    console.error("[ResendWebhook] RESEND_WEBHOOK_SECRET not set — rejecting request");
+    return false;
   }
-  if (!signature) return false;
-
-  const expectedSignature = createHmac("sha256", RESEND_WEBHOOK_SECRET)
-    .update(payload)
-    .digest("hex");
-
-  const sigBuf = Buffer.from(signature, "utf8");
-  const expectedBuf = Buffer.from(expectedSignature, "utf8");
-
-  if (sigBuf.length !== expectedBuf.length) return false;
-  return timingSafeEqual(sigBuf, expectedBuf);
+  if (!headers.svixId || !headers.svixTimestamp || !headers.svixSignature) {
+    return false;
+  }
+  try {
+    verifier.verify(payload, {
+      "svix-id": headers.svixId,
+      "svix-timestamp": headers.svixTimestamp,
+      "svix-signature": headers.svixSignature,
+    });
+    return true;
+  } catch (err) {
+    if (err instanceof WebhookVerificationError) return false;
+    console.warn("[ResendWebhook] Unexpected verification error:", err);
+    return false;
+  }
 }
 
 /**
@@ -40,18 +63,25 @@ function verifyResendSignature(payload: string, signature: string | undefined): 
  * Handles Resend inbound email webhook (email forwarding → scope check)
  * and delivery status webhooks.
  *
- * FR-SG-001 review (2026-05-01): Route is complete and correct.
- * - Validates Resend-Signature header using HMAC-SHA256 (timingSafeEqual) ✓
- * - Parses inbound email: extracts sender (from), subject, text/html body ✓
- * - Creates portal message via db.transaction with source: "email_forward" ✓
- * - Calls writeAuditLog in the same transaction ✓
- * - Dispatches scope-check BullMQ job (no direct AI SDK call) ✓
+ * Security fixes (2026-05-02):
+ * - FIND-010: projectId derived from `To:` address only — never from data.project_id
+ * - FIND-010 XSS: HTML body sanitized with strict allowlist before persisting
+ * - FIND-016: 10 MB Content-Length cap to prevent oversized body attacks
+ * - Defensive DKIM/SPF status logging (warn only, no reject)
  */
 resendWebhookRouter.post("/", async (c) => {
-  const rawBody = await c.req.text();
-  const signature = c.req.header("Resend-Signature");
+  // FIND-016: Reject oversized payloads before reading the body.
+  const len = Number(c.req.header("content-length") ?? 0);
+  if (len > 10 * 1024 * 1024) return c.json({ error: "Body too large" }, 413);
 
-  if (!verifyResendSignature(rawBody, signature)) {
+  const rawBody = await c.req.text();
+  const ok = verifyResendWebhook(rawBody, {
+    svixId: c.req.header("svix-id"),
+    svixTimestamp: c.req.header("svix-timestamp"),
+    svixSignature: c.req.header("svix-signature"),
+  });
+
+  if (!ok) {
     return c.json({ error: "Invalid signature" }, 401);
   }
 
@@ -69,29 +99,45 @@ resendWebhookRouter.post("/", async (c) => {
     const data = body.data as Record<string, string> | undefined;
     if (!data) return c.json({ error: "Missing data" }, 400);
 
-    const { to, from, subject, html, text, project_id } = data;
+    const { to, from, subject, html, text } = data;
+    // NOTE: data.project_id is intentionally NOT read — it is attacker-controlled
+    // (FIND-010 IDOR). Project identity is derived solely from the To: address.
 
-    if (!project_id) {
-      return c.json({ error: "Missing project_id in email headers" }, 400);
+    // FIND-010: Derive projectId from the validated inbound To: address.
+    // Resend inbound addresses follow the convention: project-<uuid>@<inbound-domain>
+    const localPart = (to ?? "").split("@")[0]?.toLowerCase() ?? "";
+    const match = /^project-([0-9a-f-]{36})$/.exec(localPart);
+    if (!match) {
+      return c.json({ error: "Unrecognized inbound address" }, 400);
+    }
+    const projectId = match[1]!;
+
+    // Defensive DKIM/SPF logging — do NOT reject; Resend may omit these fields.
+    const spfStatus = (data as Record<string, string>)["spf_status"];
+    const dkimStatus = (data as Record<string, string>)["dkim_status"];
+    if (spfStatus && spfStatus !== "pass") {
+      console.warn("[ResendWebhook] SPF check did not pass", { spfStatus, to, from });
+    }
+    if (dkimStatus && dkimStatus !== "pass") {
+      console.warn("[ResendWebhook] DKIM check did not pass", { dkimStatus, to, from });
     }
 
     const [project] = await db
       .select({ id: projects.id, workspaceId: projects.workspaceId })
       .from(projects)
-      .where(and(eq(projects.id, project_id), isNull(projects.deletedAt)))
+      .where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
       .limit(1);
 
     if (!project) {
       return c.json({ error: "Project not found" }, 404);
     }
 
-    const messageBody = html ?? text ?? subject ?? "";
+    // FIND-010 XSS: Sanitize HTML with a strict allowlist before persisting.
+    const cleanHtml = html
+      ? sanitizeHtml(html, SANITIZE_OPTIONS)
+      : null;
+    const messageBody = cleanHtml ?? text ?? subject ?? "";
 
-    // FLAW-007 (Rule 6 / SECURITY): The original code inserted into `messages`
-    // without calling writeAuditLog(), violating the non-negotiable rule that
-    // every mutation must write an audit log row in the same transaction.
-    // Fixed: both the insert and writeAuditLog are now executed inside a single
-    // db.transaction() so they are atomically committed or rolled back together.
     const messageRecord = await db.transaction(async (tx) => {
       const [inserted] = await tx
         .insert(messages)

@@ -121,11 +121,25 @@ async def process_scope_check(job, token):
                 logger.error(
                     "scope_check_timeout",
                     project_id=project_id,
-                    model=settings.GEMINI_MODEL,
+                    model=settings.ANTHROPIC_MODEL,
                     duration_ms=duration_ms,
                     success=False,
                 )
-                return {"status": "error", "reason": "AI analysis timed out"}
+                # Re-raise so BullMQ retries the job with backoff (FIND-003).
+                # The message stays in pending_check until a verdict arrives.
+                raise
+            except Exception as exc:
+                duration_ms = int(time.monotonic() * 1000) - start_ms
+                logger.error(
+                    "scope_check_failed",
+                    project_id=project_id,
+                    model=settings.ANTHROPIC_MODEL,
+                    duration_ms=duration_ms,
+                    error=str(exc),
+                    success=False,
+                )
+                # Re-raise — BullMQ retry policy handles backoff (FIND-003).
+                raise
 
             duration_ms = int(time.monotonic() * 1000) - start_ms
             logger.info(
@@ -133,7 +147,7 @@ async def process_scope_check(job, token):
                 project_id=project_id,
                 is_deviation=result.is_deviation,
                 confidence=result.confidence,
-                model=settings.GEMINI_MODEL,
+                model=settings.ANTHROPIC_MODEL,
                 duration_ms=duration_ms,
                 success=True,
             )
@@ -215,7 +229,7 @@ async def process_scope_check(job, token):
             "scope_check_failed",
             project_id=project_id,
             error=str(exc),
-            model=settings.GEMINI_MODEL,
+            model=settings.ANTHROPIC_MODEL,
             duration_ms=duration_ms,
             success=False,
         )

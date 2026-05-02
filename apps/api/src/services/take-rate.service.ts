@@ -87,7 +87,11 @@ export const takeRateService = {
       params.customer = opts.customerId;
     }
 
-    const intent = await stripe.paymentIntents.create(params);
+    // FIND-002: idempotencyKey ties retries to one PaymentIntent.
+    // Stripe enforces idempotency for 24h on this key.
+    const intent = await stripe.paymentIntents.create(params, {
+      idempotencyKey: `co_intent_${opts.changeOrderId}`,
+    });
 
     return {
       paymentIntentId: intent.id,
