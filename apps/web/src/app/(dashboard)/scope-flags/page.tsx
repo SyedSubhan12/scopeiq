@@ -27,23 +27,15 @@ import { getScopeFlagsQueryOptions, useScopeFlags } from "@/hooks/useScopeFlags"
 // Types
 // ---------------------------------------------------------------------------
 
-interface ScopeFlag {
-  id: string;
-  status: string;
-  severity: string;
+import type { ScopeFlag as HookScopeFlag } from "@/hooks/useScopeFlags";
+
+type ScopeFlag = HookScopeFlag & {
   flagType?: string;
-  reason?: string;
-  title?: string;
-  snippet?: string;
-  projectId?: string;
+  snippet?: string | null;
   project?: { name: string } | null;
   client?: { name: string } | null;
-  confidence?: number;
-  createdAt: string;
-  updatedAt?: string;
-  suggestedResponse?: string;
-  sowContext?: string;
-}
+  sowContext?: string | null;
+};
 
 // ---------------------------------------------------------------------------
 // Priority scoring
@@ -155,7 +147,7 @@ function FlagCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const isPending =
-    flag.status === "pending" || flag.status === "pending_review";
+    flag.status === "pending" || (flag.status as string) === "pending_review";
   const message = flag.reason ?? flag.title ?? "Scope signal detected";
   const excerpt = message.length > 120 ? message.slice(0, 120) + "…" : message;
   const projectName = flag.project?.name ?? "Unknown project";
@@ -360,7 +352,7 @@ export default function ScopeFlagsPage() {
   }, [sorted]);
 
   const pendingCount = flags.filter(
-    (f) => f.status === "pending" || f.status === "pending_review",
+    (f) => f.status === "pending" || (f.status as string) === "pending_review",
   ).length;
 
   const containerRef = useRowReveal(".reveal-row");

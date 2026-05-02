@@ -6,7 +6,7 @@ import { Check, Zap, Loader2 } from "lucide-react";
 import { Button, Card, useToast } from "@novabots/ui";
 import { cn } from "@novabots/ui";
 import { useWorkspaceStore } from "@/stores/workspace.store";
-import { fetchWithAuth } from "@/lib/api";
+import { apiClient } from "@/lib/api";
 import { MultiWorkspacePlanCard } from "@/components/billing/MultiWorkspacePlanCard";
 import { useEffect } from "react";
 
@@ -116,12 +116,12 @@ export default function BillingPage() {
     try {
       const successUrl = `${window.location.origin}/settings/billing?upgraded=true`;
       const cancelUrl = window.location.href;
-      const res = await fetchWithAuth.post<{ data: { url: string } }>("/v1/billing/checkout", {
+      const res = await apiClient.post<{ data: { url: string } }>("/v1/billing/checkout", {
         planTier,
         successUrl,
         cancelUrl,
       });
-      window.location.href = res.data.data.url;
+      window.location.href = res.data.url;
     } catch {
       toast("error", "Failed to start checkout. Please try again.");
       setUpgrading(null);
@@ -130,10 +130,10 @@ export default function BillingPage() {
 
   const handleManageSubscription = async () => {
     try {
-      const res = await fetchWithAuth.post<{ data: { url: string } }>("/v1/billing/portal", {
+      const res = await apiClient.post<{ data: { url: string } }>("/v1/billing/portal", {
         returnUrl: window.location.href,
       });
-      window.location.href = res.data.data.url;
+      window.location.href = res.data.url;
     } catch {
       toast("error", "Failed to open billing portal.");
     }

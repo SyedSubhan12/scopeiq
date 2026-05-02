@@ -267,7 +267,7 @@ export function SOWReviewPanel({ data, onAcceptAll, onEditClause }: SOWReviewPan
             <ClauseRow
               key={clause.id}
               clause={clause}
-              onEdit={onEditClause}
+              {...(onEditClause ? { onEdit: onEditClause } : {})}
               onAccept={acceptClause}
               isAccepted={acceptedIds.has(clause.id)}
             />

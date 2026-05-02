@@ -5,7 +5,6 @@ import asyncpg
 from bullmq import Worker
 
 from app.config import settings
-from app.gemini_client import get_gemini_client  # noqa: F401 — imported to confirm singleton pattern
 from app.schemas.scope_schemas import ScopeAnalysisInput, ScopeClauseInput
 from app.services.scope_analyzer import ScopeAnalyzerService
 from app.services.callback_service import post_callback

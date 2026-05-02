@@ -179,7 +179,7 @@ function SidebarPanel({
   pathname: string;
   expanded: boolean;
   workspaceName: string;
-  plan: "solo" | "studio" | "agency";
+  plan: "free" | "solo" | "studio" | "agency";
   mainItems: NavDef[];
   insightItems: NavDef[];
   supportItems: NavDef[];
