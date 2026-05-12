@@ -21,9 +21,12 @@ type CreateDeliverableInput = z.output<typeof createDeliverableSchema>;
 type UploadUrlInput = z.output<typeof uploadUrlSchema>;
 import { submitFeedbackSchema, feedbackResponseSchema } from "./feedback.schemas.js";
 
+import { gateMiddleware } from "../middleware/gate.js";
+
 export const deliverableRouter = new Hono();
 
 deliverableRouter.use("*", authMiddleware);
+deliverableRouter.use("*", gateMiddleware("approval_portal"));
 
 deliverableRouter.get(
   "/",

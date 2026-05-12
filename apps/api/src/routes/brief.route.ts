@@ -12,9 +12,12 @@ import {
   createClarificationRequestSchema,
 } from "./brief.schemas.js";
 
+import { gateMiddleware } from "../middleware/gate.js";
+
 export const briefRouter = new Hono();
 
 briefRouter.use("*", authMiddleware);
+briefRouter.use("*", gateMiddleware("brief_builder"));
 
 // ---------------------------------------------------------------------------
 // POST /coach-hint — no auth required; called from textarea debounce hook

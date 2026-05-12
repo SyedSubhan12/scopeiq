@@ -10,9 +10,12 @@ import {
   updateBriefTemplateSchema,
 } from "./brief-template.schemas.js";
 
+import { gateMiddleware } from "../middleware/gate.js";
+
 export const briefTemplateRouter = new Hono();
 
 briefTemplateRouter.use("*", authMiddleware);
+briefTemplateRouter.use("*", gateMiddleware("brief_builder"));
 
 // Validate UUID in path parameters
 const uuidParamSchema = z.object({ id: z.string().uuid() });
