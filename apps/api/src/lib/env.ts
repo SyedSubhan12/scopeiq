@@ -17,6 +17,10 @@ const envSchema = z.object({
     AI_CALLBACK_SECRET: z.string().min(1),
     STRIPE_SECRET_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
+    // Cloudflare for SaaS — custom domain provisioning (optional in local dev)
+    CLOUDFLARE_API_TOKEN: z.string().optional(),
+    CLOUDFLARE_ZONE_ID: z.string().optional(),
+    CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

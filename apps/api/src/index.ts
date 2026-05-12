@@ -50,6 +50,8 @@ import { intelligenceRouter } from "./routes/intelligence.route.js";
 import { briefEmbedRouter } from "./routes/brief-embed.route.js";
 import { oembedRouter } from "./routes/oembed.route.js";
 import { publicBriefEmbedRouter } from "./routes/public-brief-embed.route.js";
+import { customDomainRouter } from "./routes/custom-domain.route.js";
+import { brandingRouter } from "./routes/branding.route.js";
 import { ensureBucketExists } from "./lib/storage.js";
 import { portalRateLimiter } from "./middleware/portal-rate-limiter.js";
 import { securityHeadersMiddleware } from "./middleware/security-headers.js";
@@ -91,6 +93,8 @@ v1.route("/sow", sowRouter);
 v1.route("/intelligence", intelligenceRouter);
 v1.route("/brief-embeds", briefEmbedRouter);
 v1.route("/oembed", oembedRouter);
+v1.route("/custom-domain", customDomainRouter);
+v1.route("/branding", brandingRouter);
 
 app.route("/v1", v1);
 
