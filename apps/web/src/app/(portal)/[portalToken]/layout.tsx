@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { generatePortalTheme } from "@/lib/portal-theme";
+import { generatePortalTheme, hexToRgb, lightenHex, darkenHex } from "@/lib/portal-theme";
 import { getPortalProject } from "@/lib/portal-auth";
 
 interface PortalTokenLayoutProps {
@@ -20,9 +20,25 @@ async function fetchWorkspaceBranding(token: string) {
 
 function generatePortalCSSVars(brandColor: string): string {
   const theme = generatePortalTheme(brandColor);
-  return Object.entries(theme)
-    .map(([key, value]) => `${key}: ${value};`)
-    .join("\n      ");
+
+  // Spec-mandated vars: --brand-primary, --brand-bg, --brand-fg
+  // --brand-primary mirrors --portal-primary (RGB tuple for rgba() composition)
+  // --brand-bg  is a very light tint of the brand color (suitable for backgrounds)
+  // --brand-fg  is a dark shade ensuring AA contrast on --brand-bg
+  const brandPrimary = hexToRgb(brandColor);
+  const brandBg = hexToRgb(lightenHex(brandColor, 220));
+  const brandFg = hexToRgb(darkenHex(brandColor, 60));
+
+  const specVars: Record<string, string> = {
+    "--brand-primary": brandPrimary,
+    "--brand-bg": brandBg,
+    "--brand-fg": brandFg,
+  };
+
+  return [
+    ...Object.entries(theme).map(([k, v]) => `${k}: ${v};`),
+    ...Object.entries(specVars).map(([k, v]) => `${k}: ${v};`),
+  ].join("\n      ");
 }
 
 /**

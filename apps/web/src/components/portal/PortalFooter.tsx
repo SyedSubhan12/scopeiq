@@ -24,8 +24,10 @@ export function PortalFooter({
           Bill what you built.
         </p>
         <p className="text-xs text-[rgb(var(--text-muted))]">
-          &copy; {new Date().getFullYear()} {workspaceName || "ScopeIQ"}. 
-          Powered by <span className="font-semibold" style={{ color: brandColor }}>ScopeIQ</span>
+          &copy; {new Date().getFullYear()} {workspaceName || "ScopeIQ"}.
+          <span data-scopeiq-brand>
+            {" "}Powered by <span className="font-semibold" style={{ color: brandColor }}>ScopeIQ</span>
+          </span>
         </p>
       </div>
     </footer>
