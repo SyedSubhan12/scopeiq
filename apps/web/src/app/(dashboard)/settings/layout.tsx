@@ -8,6 +8,7 @@ import { Building, Users, CreditCard, Bell, Palette, Plug } from "lucide-react";
 const NAV = [
     { href: "/settings", label: "General", icon: Building },
     { href: "/settings/workspace", label: "Workspace", icon: Palette },
+    { href: "/settings/branding", label: "Branding", icon: Palette },
     { href: "/settings/team", label: "Team", icon: Users },
     { href: "/settings/rate-card", label: "Rate Card", icon: CreditCard },
     { href: "/settings/reminders", label: "Reminders", icon: Bell },
