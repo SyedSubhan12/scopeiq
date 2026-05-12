@@ -1,0 +1,5 @@
+- [Wave 0 triage outcome](project_wave0_triage.md) — 9 commits landed, 2 stashes for user review; clean tree gate met for Wave 1
+- [Branch divergence](project_branch_state.md) — work lives on cursor/add-lottie-f5a82; diverged 11 commits from origin/main
+- [Tenant isolation pattern](feedback_tenant_isolation.md) — every repo query takes workspaceId; cross-project access also requires projectId
+- [Gate middleware](project_gate_middleware.md) — gateMiddleware(name) gates Gates 2/3; Gate 1 always-on for launch
+- [Graphify cache is tracked](feedback_graphify_tracked.md) — cache JSONs live in git; rebuild after code changes
