@@ -46,32 +46,31 @@ export async function scheduleHourlyReminders(): Promise<void> {
 const REMINDER_STEP_ORDER = ["gentle_nudge", "deadline_warning", "silence_approval"] as const;
 type ReminderStepLabel = (typeof REMINDER_STEP_ORDER)[number];
 
+import { workspaceRepository } from "../repositories/workspace.repository.js";
+
 /**
  * Process the reminder job — hourly sweep that checks all in-review deliverables.
- *
- * For each deliverable that has not yet received a client response, determine which
- * reminder step is next and enqueue it on the reminders queue if it has not already
- * been dispatched. This is a safety-net alongside the per-step delayed BullMQ jobs
- * scheduled by scheduleReminderSequence: if a delayed job was lost (Redis restart,
- * deploy, etc.) this sweep will recover it within one hour.
  */
 export async function processReminders(): Promise<{ action: string; processed: number; skipped: number }> {
+  const workspaces = await workspaceRepository.listAll(); // Fetch all active workspaces
   const inReviewSince = new Date(Date.now() - 48 * 60 * 60 * 1000); // older than 48 h
-  const deliverables = await deliverableRepository.findInReviewSince(inReviewSince);
 
   let processed = 0;
   let skipped = 0;
 
-  for (const deliverable of deliverables) {
-    // Skip if the client has already responded
-    const events = await approvalEventRepository.listByDeliverable(
-      deliverable.workspaceId,
-      deliverable.id,
-    );
-    if (events.length > 0) {
-      skipped++;
-      continue;
-    }
+  for (const workspace of workspaces) {
+    const deliverables = await deliverableRepository.findInReviewSince(workspace.id, inReviewSince);
+
+    for (const deliverable of deliverables) {
+      // Skip if the client has already responded
+      const events = await approvalEventRepository.listByDeliverable(
+        deliverable.workspaceId,
+        deliverable.id,
+      );
+      if (events.length > 0) {
+        skipped++;
+        continue;
+      }
 
     // Determine which steps have already been sent
     const logs = await reminderLogRepository.listByDeliverable(
@@ -110,6 +109,7 @@ export async function processReminders(): Promise<{ action: string; processed: n
     });
 
     processed++;
+    }
   }
 
   return { action: "sweep_complete", processed, skipped };

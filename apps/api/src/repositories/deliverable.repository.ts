@@ -126,14 +126,16 @@ export const deliverableRepository = {
     return deleted ?? null;
   },
 
-  async findInReviewSince(since: Date) {
+  async findInReviewSince(workspaceId: string, since: Date) {
     return db
       .select()
       .from(deliverables)
       .where(
         and(
+          eq(deliverables.workspaceId, workspaceId),
           eq(deliverables.status, "in_review"),
           isNull(deliverables.deletedAt),
+          lt(deliverables.updatedAt, since)
         ),
       )
       .orderBy(desc(deliverables.updatedAt));

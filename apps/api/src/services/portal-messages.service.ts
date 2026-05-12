@@ -1,6 +1,6 @@
 import { db, writeAuditLog, projects, eq, and, isNull } from "@novabots/db";
 import type { MessageAttachment } from "@novabots/db";
-import { NotFoundError, ForbiddenError } from "@novabots/types";
+import { NotFoundError } from "@novabots/types";
 import {
   messageRepository,
   type ListMessagesOptions,
@@ -102,24 +102,26 @@ export const portalMessagesService = {
   async markRead(
     id: string,
     workspaceId: string,
+    projectId: string,
     actorId: string,
   ): Promise<MessageRow> {
-    const existing = await messageRepository.findById(id, workspaceId);
+    // findById scopes by workspaceId AND projectId — a client of project A cannot
+    // find (and therefore cannot mark read) a message that belongs to project B,
+    // even within the same workspace.
+    const existing = await messageRepository.findById(id, workspaceId, projectId);
     if (!existing) {
+      // Return a generic 404 regardless of whether the message exists in another
+      // project — do not leak cross-project existence information.
       throw new NotFoundError("Message", id);
     }
 
-    if (existing.workspaceId !== workspaceId) {
-      throw new ForbiddenError("Message does not belong to this workspace");
-    }
-
-    // Already read — return as-is
+    // Already read — return as-is (idempotent)
     if (existing.readAt != null) {
       return existing;
     }
 
     const updated = await db.transaction(async (trx) => {
-      const row = await messageRepository.markRead(id, workspaceId);
+      const row = await messageRepository.markRead(id, workspaceId, projectId);
       if (!row) {
         return existing;
       }

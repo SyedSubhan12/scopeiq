@@ -92,12 +92,13 @@ export const scopeFlagRepository = {
      * Return all flags that are open, have a past slaDeadline, and have not yet been marked breached.
      * Used by the SLA sweep job.
      */
-    async listBreachable(now: Date) {
+    async listBreachable(workspaceId: string, now: Date) {
         return db
             .select()
             .from(scopeFlags)
             .where(
                 and(
+                    eq(scopeFlags.workspaceId, workspaceId),
                     eq(scopeFlags.status, "pending"),
                     eq(scopeFlags.slaBreached, false),
                     lt(scopeFlags.slaDeadline, now),

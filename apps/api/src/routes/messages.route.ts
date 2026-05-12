@@ -26,6 +26,10 @@ const sendMessageSchema = z.object({
   authorName: z.string().min(1).max(255).optional(),
 });
 
+const markReadQuerySchema = z.object({
+  projectId: z.string().uuid(),
+});
+
 export const messagesRouter = new Hono();
 
 messagesRouter.use("*", authMiddleware);
@@ -132,20 +136,27 @@ messagesRouter.post(
 );
 
 /**
- * POST /v1/messages/:id/read
+ * POST /v1/messages/:id/read?projectId=...
  * Agency marks a client message as read.
+ * projectId is required to scope the lookup — prevents marking messages in
+ * projects the caller doesn't own within the same workspace.
  */
-messagesRouter.post("/:id/read", async (c) => {
-  const id = c.req.param("id");
-  const workspaceId = c.get("workspaceId");
-  const userId = c.get("userId");
+messagesRouter.post(
+  "/:id/read",
+  zValidator("query", markReadQuerySchema),
+  async (c) => {
+    const id = c.req.param("id");
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const { projectId } = c.req.valid("query");
 
-  const record = await portalMessagesService.markRead(id, workspaceId, userId);
+    const record = await portalMessagesService.markRead(id, workspaceId, projectId, userId);
 
-  return c.json({
-    data: {
-      id: record.id,
-      read_at: record.readAt?.toISOString() ?? null,
-    },
-  });
-});
+    return c.json({
+      data: {
+        id: record.id,
+        read_at: record.readAt?.toISOString() ?? null,
+      },
+    });
+  },
+);

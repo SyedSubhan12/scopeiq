@@ -35,27 +35,32 @@ export async function scheduleSlaBreachSweep(): Promise<void> {
     );
 }
 
+import { workspaceRepository } from "../repositories/workspace.repository.js";
+
 /**
  * Core sweep logic: find all open flags past their SLA deadline and mark them breached.
- * Returns a summary for logging.
  */
 export async function processSlaBreachSweep(): Promise<{ breached: number; skipped: number }> {
+    const workspaces = await workspaceRepository.listAll();
     const now = new Date();
-    const flags = await scopeFlagRepository.listBreachable(now);
 
     let breached = 0;
     let skipped = 0;
 
-    for (const flag of flags) {
-        try {
-            await scopeFlagService.markBreached(flag.id, flag.workspaceId);
-            breached++;
-        } catch (err) {
-            console.error(
-                `[SlaBreachSweep] Failed to mark flag ${flag.id} as breached:`,
-                err instanceof Error ? err.message : String(err),
-            );
-            skipped++;
+    for (const workspace of workspaces) {
+        const flags = await scopeFlagRepository.listBreachable(workspace.id, now);
+
+        for (const flag of flags) {
+            try {
+                await scopeFlagService.markBreached(flag.id, workspace.id);
+                breached++;
+            } catch (err) {
+                console.error(
+                    `[SlaBreachSweep] Failed to mark flag ${flag.id} as breached:`,
+                    err instanceof Error ? err.message : String(err),
+                );
+                skipped++;
+            }
         }
     }
 

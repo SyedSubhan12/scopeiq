@@ -90,7 +90,11 @@ export const messageRepository = {
     return rows as MessageRow[];
   },
 
-  async findById(id: string, workspaceId: string): Promise<MessageRow | null> {
+  async findById(
+    id: string,
+    workspaceId: string,
+    projectId: string,
+  ): Promise<MessageRow | null> {
     const [row] = await db
       .select({
         id: messages.id,
@@ -107,7 +111,13 @@ export const messageRepository = {
         createdAt: messages.createdAt,
       })
       .from(messages)
-      .where(and(eq(messages.id, id), eq(messages.workspaceId, workspaceId)))
+      .where(
+        and(
+          eq(messages.id, id),
+          eq(messages.workspaceId, workspaceId),
+          eq(messages.projectId, projectId),
+        ),
+      )
       .limit(1);
 
     return (row as MessageRow) ?? null;
@@ -151,7 +161,11 @@ export const messageRepository = {
     return row as MessageRow;
   },
 
-  async markRead(id: string, workspaceId: string): Promise<MessageRow | null> {
+  async markRead(
+    id: string,
+    workspaceId: string,
+    projectId: string,
+  ): Promise<MessageRow | null> {
     const [row] = await db
       .update(messages)
       .set({ readAt: new Date() })
@@ -159,6 +173,7 @@ export const messageRepository = {
         and(
           eq(messages.id, id),
           eq(messages.workspaceId, workspaceId),
+          eq(messages.projectId, projectId),
           isNull(messages.readAt),
         ),
       )

@@ -93,11 +93,20 @@ export const briefRepository = {
     return updated ?? null;
   },
 
-  async getFieldsByBriefId(briefId: string) {
+  async getFieldsByBriefId(workspaceId: string, briefId: string) {
     return db
-      .select()
+      .select({
+        id: briefFields.id,
+        briefId: briefFields.briefId,
+        fieldKey: briefFields.fieldKey,
+        fieldLabel: briefFields.fieldLabel,
+        fieldType: briefFields.fieldType,
+        value: briefFields.value,
+        sortOrder: briefFields.sortOrder,
+      })
       .from(briefFields)
-      .where(eq(briefFields.briefId, briefId))
+      .innerJoin(briefs, eq(briefFields.briefId, briefs.id))
+      .where(and(eq(briefFields.briefId, briefId), eq(briefs.workspaceId, workspaceId)))
       .orderBy(briefFields.sortOrder);
   },
 

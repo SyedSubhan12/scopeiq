@@ -131,25 +131,35 @@ portalMessagesRouter.post(
   },
 );
 
+const messageIdParamSchema = z.object({ id: z.string().uuid() });
+
 /**
  * POST /portal/messages/:id/read
  * Client marks an agency message as read.
+ * projectId comes from the portal auth context — a client can only mark messages
+ * that belong to their own project as read.
  */
-portalMessagesRouter.post("/:id/read", async (c) => {
-  const id = c.req.param("id");
-  const workspaceId = c.get("portalWorkspaceId");
-  const clientId = c.get("portalClientId");
+portalMessagesRouter.post(
+  "/:id/read",
+  zValidator("param", messageIdParamSchema),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const workspaceId = c.get("portalWorkspaceId");
+    const projectId = c.get("portalProjectId");
+    const clientId = c.get("portalClientId");
 
-  const record = await portalMessagesService.markRead(
-    id,
-    workspaceId,
-    clientId ?? "portal-client",
-  );
+    const record = await portalMessagesService.markRead(
+      id,
+      workspaceId,
+      projectId,
+      clientId ?? "portal-client",
+    );
 
-  return c.json({
-    data: {
-      id: record.id,
-      read_at: record.readAt?.toISOString() ?? null,
-    },
-  });
-});
+    return c.json({
+      data: {
+        id: record.id,
+        read_at: record.readAt?.toISOString() ?? null,
+      },
+    });
+  },
+);

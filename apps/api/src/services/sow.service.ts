@@ -236,9 +236,20 @@ export const sowService = {
       });
 
       const clauses = await trx
-        .select()
+        .select({
+            id: sowClauses.id,
+            sowId: sowClauses.sowId,
+            clauseType: sowClauses.clauseType,
+            originalText: sowClauses.originalText,
+            summary: sowClauses.summary,
+            sortOrder: sowClauses.sortOrder,
+        })
         .from(sowClauses)
-        .where(eq(sowClauses.sowId, sowId))
+        .innerJoin(statementsOfWork, eq(sowClauses.sowId, statementsOfWork.id))
+        .where(and(
+            eq(sowClauses.sowId, sowId),
+            eq(statementsOfWork.workspaceId, workspaceId)
+        ))
         .orderBy(sowClauses.sortOrder);
 
       return { ...sow, clauses, parsedAt: new Date() };
@@ -264,9 +275,19 @@ export const sowService = {
     }
 
     const clauses = await db
-      .select()
+      .select({
+        id: sowClauses.id,
+        clauseType: sowClauses.clauseType,
+        originalText: sowClauses.originalText,
+        summary: sowClauses.summary,
+        sortOrder: sowClauses.sortOrder,
+      })
       .from(sowClauses)
-      .where(eq(sowClauses.sowId, sow.id))
+      .innerJoin(statementsOfWork, eq(sowClauses.sowId, statementsOfWork.id))
+      .where(and(
+        eq(sowClauses.sowId, sow.id),
+        eq(statementsOfWork.workspaceId, workspaceId)
+      ))
       .orderBy(sowClauses.sortOrder);
 
     return { ...sow, clauses };
@@ -307,9 +328,19 @@ export const sowService = {
     if (!sow) return null;
 
     const clauses = await db
-      .select()
+      .select({
+        id: sowClauses.id,
+        clauseType: sowClauses.clauseType,
+        originalText: sowClauses.originalText,
+        summary: sowClauses.summary,
+        sortOrder: sowClauses.sortOrder,
+      })
       .from(sowClauses)
-      .where(eq(sowClauses.sowId, sow.id))
+      .innerJoin(statementsOfWork, eq(sowClauses.sowId, statementsOfWork.id))
+      .where(and(
+        eq(sowClauses.sowId, sow.id),
+        eq(statementsOfWork.workspaceId, workspaceId)
+      ))
       .orderBy(sowClauses.sortOrder);
 
     return { ...sow, clauses };

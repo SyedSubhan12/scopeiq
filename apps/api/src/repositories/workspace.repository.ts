@@ -38,6 +38,13 @@ export const workspaceRepository = {
     return workspace ?? null;
   },
 
+  async listAll() {
+    return db
+      .select()
+      .from(workspaces)
+      .where(isNull(workspaces.deletedAt));
+  },
+
   async updateAiPolicy(
     workspaceId: string,
     data: Partial<
