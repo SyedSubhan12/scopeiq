@@ -100,6 +100,7 @@ export function WelcomeEmail({
 
           {/* Footer */}
           <Section style={footer}>
+            <Text style={footerSlogan}>Bill what you built.</Text>
             <Text style={footerText}>
               <Link href={`${baseUrl}/dashboard`} style={footerLink}>
                 View in ScopeIQ
@@ -253,6 +254,14 @@ const divider: React.CSSProperties = {
 
 const footer: React.CSSProperties = {
   padding: "16px 40px 32px",
+};
+
+const footerSlogan: React.CSSProperties = {
+  fontSize: "14px",
+  fontWeight: "700",
+  color: "#0F6E56",
+  textAlign: "center",
+  margin: "0 0 12px",
 };
 
 const footerText: React.CSSProperties = {

@@ -85,37 +85,51 @@
     --shadow-card-hover: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
     --shadow-dropdown: 0 8px 24px rgba(0,0,0,.12);
 
-    /* Status colors — ClickUp palette (hex, consumed by StatusPill) */
-    --status-draft: #94a3b8;
-    --status-in-review: #f59e0b;
-    --status-approved: #10b981;
-    --status-flagged: #ef4444;
-    --status-completed: #6366f1;
+    /* PRD v3.0 Design System Tokens (Semantic Aliases) */
+    --primary-teal:       var(--raw-teal-600);   /* #0F6E56 */
+    --primary-teal-mid:   var(--raw-teal-500);   /* #1D9E75 */
+    --primary-teal-light: var(--raw-teal-50);    /* #E1F5EE */
+    --status-red:         var(--raw-red-600);    /* #DC2626 */
+    --status-amber:       var(--raw-amber-600);  /* #D97706 */
+    --status-green:       var(--raw-green-600);  /* #059669 */
+    --status-blue:        var(--raw-blue-600);   /* #2563EB */
+    --text-primary:       var(--raw-slate-900);  /* #0D1B2A */
+    --text-secondary:     var(--raw-slate-600);  /* #4B5563 */
+    --text-muted:         var(--raw-slate-400);  /* #9CA3AF */
+    --surface-white:      var(--raw-white);      /* #FFFFFF */
+    --surface-subtle:     var(--raw-slate-50);   /* #F8FAFC */
+
+    /* Legacy Status Mappings (for compatibility with existing code) */
+    --status-draft: var(--text-muted);
+    --status-in-review: var(--status-amber);
+    --status-approved: var(--status-green);
+    --status-flagged: var(--status-red);
+    --status-completed: var(--status-blue);
 
     /* Scope severity */
-    --severity-high: #ef4444;
-    --severity-medium: #f59e0b;
-    --severity-low: #3b82f6;
+    --severity-high: var(--status-red);
+    --severity-medium: var(--status-amber);
+    --severity-low: var(--status-blue);
 
     /* Color tokens */
     --radius: 0.625rem;
-    --background: rgb(var(--surface-subtle));
-    --foreground: rgb(var(--text-primary));
-    --card: rgb(255 255 255);
-    --card-foreground: rgb(var(--text-primary));
-    --popover: rgb(255 255 255);
-    --popover-foreground: rgb(var(--text-primary));
-    --secondary: rgb(var(--surface-subtle));
-    --secondary-foreground: rgb(var(--text-primary));
-    --muted: rgb(var(--surface-subtle));
-    --muted-foreground: rgb(var(--text-muted));
-    --accent: rgb(var(--primary-light));
-    --accent-foreground: rgb(var(--primary-dark));
-    --destructive: rgb(var(--status-red));
-    --border: rgb(var(--border-subtle));
-    --input: rgb(var(--border-default));
-    --ring: rgb(var(--primary));
-    --sidebar: rgb(255 255 255);
+    --background: var(--surface-subtle);
+    --foreground: var(--text-primary);
+    --card: var(--surface-white);
+    --card-foreground: var(--text-primary);
+    --popover: var(--surface-white);
+    --popover-foreground: var(--text-primary);
+    --secondary: var(--surface-subtle);
+    --secondary-foreground: var(--text-primary);
+    --muted: var(--surface-subtle);
+    --muted-foreground: var(--text-muted);
+    --accent: var(--primary-teal-light);
+    --accent-foreground: var(--primary-teal);
+    --destructive: var(--status-red);
+    --border: var(--raw-slate-200);
+    --input: var(--raw-slate-200);
+    --ring: var(--primary-teal);
+    --sidebar: var(--surface-white);
     --sidebar-foreground: rgb(var(--text-primary));
     --sidebar-primary: rgb(var(--primary-dark));
     --sidebar-primary-foreground: rgb(255 255 255);

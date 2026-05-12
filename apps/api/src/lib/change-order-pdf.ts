@@ -143,7 +143,15 @@ export async function generateSignedCoPdf(
     { size: 9, color: rgb(0.4, 0.4, 0.4) },
   );
 
-  // ── Footer with doc hash placeholder ─────────────────────────────────────
+  // ── Footer with slogan ──────────────────────────────────────────────────
+  page.drawText("Bill what you built.", {
+    x: width / 2 - 45,
+    y: 50,
+    size: 11,
+    font: boldFont,
+    color: rgb(0.058, 0.431, 0.337), // --primary-teal (#0F6E56)
+  });
+
   page.drawText(`Document generated: ${new Date().toISOString()}`, {
     x: margin,
     y: 30,

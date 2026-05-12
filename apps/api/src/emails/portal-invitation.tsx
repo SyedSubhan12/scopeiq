@@ -50,8 +50,11 @@ export function PortalInvitationEmail({
             </Button>
           </Section>
           <Hr style={{ borderColor: "#e5e7eb", margin: "24px 0" }} />
-          <Text style={{ fontSize: "12px", color: "#9ca3af", margin: "0" }}>
-            This link is unique to you. Do not share it. Powered by ScopeIQ.
+          <Text style={{ fontSize: "14px", fontWeight: "700", color: "#0F6E56", textAlign: "center", margin: "0 0 12px" }}>
+            Bill what you built.
+          </Text>
+          <Text style={{ fontSize: "12px", color: "#9ca3af", textAlign: "center", margin: "0" }}>
+            This link is unique to you. Do not share it. Powered by <span style={{ fontWeight: "600", color: "#0F6E56" }}>ScopeIQ</span>
           </Text>
         </Container>
       </Body>

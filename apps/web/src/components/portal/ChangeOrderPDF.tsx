@@ -392,7 +392,10 @@ export function ChangeOrderPDF({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-[rgb(var(--border-subtle))] px-10 py-4 text-center">
+        <div className="border-t border-[rgb(var(--border-subtle))] px-10 py-6 text-center">
+          <p className="text-sm font-bold mb-1" style={{ color: brandColor }}>
+            Bill what you built.
+          </p>
           <p className="text-xs text-[rgb(var(--text-muted))]">
             Powered by{" "}
             <span className="font-semibold" style={{ color: brandColor }}>
