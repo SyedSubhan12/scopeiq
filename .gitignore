@@ -37,6 +37,10 @@ tmp/
 # coverage
 coverage/
 
+# playwright artifacts
+playwright-report/
+test-results/
+
 # types
 *.tsbuildinfo
 
