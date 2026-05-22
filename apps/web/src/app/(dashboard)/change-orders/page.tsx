@@ -7,19 +7,21 @@ import { Card, Badge, Button, Skeleton, Dialog, Input, Textarea, useToast } from
 import { fetchWithAuth } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { useAssetsReady } from "@/hooks/useAssetsReady";
-import { getChangeOrdersQueryOptions, useChangeOrders } from "@/hooks/change-orders";
+import { getChangeOrdersQueryOptions, useChangeOrders, type ChangeOrder } from "@/hooks/change-orders";
 import { queryClient } from "@/lib/query-client";
 
-const STATUS_FILTERS = ["all", "pending", "sent", "accepted", "declined"];
+const STATUS_FILTERS = ["all", "draft", "sent", "accepted", "declined"];
 
-const STATUS_CONFIG: Record<string, { icon: React.ElementType; color: string; badge: string }> = {
-  pending: { icon: Clock, color: "text-amber-500", badge: "pending" },
+type BadgeStatus = "approved" | "in_review" | "pending" | "flagged" | "draft" | "active" | "paused" | "completed" | "archived";
+
+const STATUS_CONFIG: Record<string, { icon: React.ElementType; color: string; badge: BadgeStatus }> = {
+  draft: { icon: Clock, color: "text-amber-500", badge: "pending" },
   sent: { icon: Send, color: "text-blue-500", badge: "active" },
   accepted: { icon: CheckCircle2, color: "text-emerald-500", badge: "active" },
   declined: { icon: XCircle, color: "text-red-500", badge: "flagged" },
 };
 
-function COCard({ co, onSend }: { co: any; onSend: (id: string) => void }) {
+function COCard({ co, onSend }: { co: ChangeOrder; onSend: (id: string) => void }) {
   const cfg = STATUS_CONFIG[co.status] ?? STATUS_CONFIG['pending']!;
   const StatusIcon = cfg!.icon;
 
@@ -30,7 +32,7 @@ function COCard({ co, onSend }: { co: any; onSend: (id: string) => void }) {
           <div className="flex items-center gap-2">
             <StatusIcon className={`h-4 w-4 shrink-0 ${cfg!.color}`} />
             <p className="truncate text-sm font-semibold text-[rgb(var(--text-primary))]">{co.title}</p>
-            <Badge status={cfg!.badge as any} className="text-[10px] shrink-0">
+            <Badge status={cfg!.badge} className="text-[10px] shrink-0">
               {co.status}
             </Badge>
           </div>
@@ -56,7 +58,7 @@ function COCard({ co, onSend }: { co: any; onSend: (id: string) => void }) {
             </span>
           </div>
         </div>
-        {co.status === "pending" && (
+        {co.status === "draft" && (
           <Button size="sm" onClick={() => onSend(co.id)} className="shrink-0">
             <Send className="mr-1.5 h-3.5 w-3.5" />
             Send to client
@@ -78,10 +80,10 @@ export default function ChangeOrdersPage() {
   const { data, isLoading, refetch } = useChangeOrders();
   const { toast } = useToast();
 
-  const cos: any[] = data?.data ?? [];
+  const cos: ChangeOrder[] = data?.data ?? [];
   const filtered = statusFilter === "all" ? cos : cos.filter((c) => c.status === statusFilter);
 
-  const pendingCount = cos.filter((c) => c.status === "pending").length;
+  const pendingCount = cos.filter((c) => c.status === "draft").length;
   const totalValue = cos
     .filter((c) => c.status === "accepted")
     .reduce((s, c) => s + (Number(c.amount) || 0), 0);
@@ -161,7 +163,7 @@ export default function ChangeOrdersPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map((co: any) => (
+          {filtered.map((co) => (
             <COCard key={co.id} co={co} onSend={(id) => void handleSend(id)} />
           ))}
         </div>

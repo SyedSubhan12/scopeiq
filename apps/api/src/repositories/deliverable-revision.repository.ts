@@ -1,4 +1,4 @@
-import { db, deliverableRevisions, eq, and, desc } from "@novabots/db";
+import { db, deliverableRevisions, deliverables, eq, and, desc } from "@novabots/db";
 import type { NewDeliverableRevision } from "@novabots/db";
 
 export const deliverableRevisionRepository = {
@@ -11,19 +11,47 @@ export const deliverableRevisionRepository = {
         return revision!;
     },
 
-    async listByDeliverable(deliverableId: string) {
+    async listByDeliverable(workspaceId: string, deliverableId: string) {
         return db
-            .select()
+            .select({
+                id: deliverableRevisions.id,
+                deliverableId: deliverableRevisions.deliverableId,
+                versionNumber: deliverableRevisions.versionNumber,
+                fileUrl: deliverableRevisions.fileUrl,
+                notes: deliverableRevisions.notes,
+                createdAt: deliverableRevisions.createdAt,
+                createdBy: deliverableRevisions.createdBy,
+            })
             .from(deliverableRevisions)
-            .where(eq(deliverableRevisions.deliverableId, deliverableId))
+            .innerJoin(deliverables, eq(deliverableRevisions.deliverableId, deliverables.id))
+            .where(
+                and(
+                    eq(deliverableRevisions.deliverableId, deliverableId),
+                    eq(deliverables.workspaceId, workspaceId),
+                ),
+            )
             .orderBy(desc(deliverableRevisions.versionNumber));
     },
 
-    async getLatestVersion(deliverableId: string) {
+    async getLatestVersion(workspaceId: string, deliverableId: string) {
         const [revision] = await db
-            .select()
+            .select({
+                id: deliverableRevisions.id,
+                deliverableId: deliverableRevisions.deliverableId,
+                versionNumber: deliverableRevisions.versionNumber,
+                fileUrl: deliverableRevisions.fileUrl,
+                notes: deliverableRevisions.notes,
+                createdAt: deliverableRevisions.createdAt,
+                createdBy: deliverableRevisions.createdBy,
+            })
             .from(deliverableRevisions)
-            .where(eq(deliverableRevisions.deliverableId, deliverableId))
+            .innerJoin(deliverables, eq(deliverableRevisions.deliverableId, deliverables.id))
+            .where(
+                and(
+                    eq(deliverableRevisions.deliverableId, deliverableId),
+                    eq(deliverables.workspaceId, workspaceId),
+                ),
+            )
             .orderBy(desc(deliverableRevisions.versionNumber))
             .limit(1);
         return revision ?? null;

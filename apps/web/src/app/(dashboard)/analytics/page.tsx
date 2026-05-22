@@ -12,11 +12,13 @@ import { queryClient } from "@/lib/query-client";
 import { getScopeFlagsQueryOptions } from "@/hooks/useScopeFlags";
 import { useWorkspaceStore } from "@/stores/workspace.store";
 import { useProjects } from "@/hooks/useProjects";
-import { useScopeFlags } from "@/hooks/useScopeFlags";
+import type { Project } from "@novabots/db";
+import { useScopeFlags, type ScopeFlag } from "@/hooks/useScopeFlags";
 import { useWorkspaceTimeline } from "@/hooks/useProjectHealth";
-import { useChangeOrders } from "@/hooks/change-orders";
+import { useChangeOrders, type ChangeOrder } from "@/hooks/change-orders";
 
 type Range = "7d" | "30d" | "90d" | "all";
+type BadgeStatus = "approved" | "in_review" | "pending" | "flagged" | "draft" | "active" | "paused" | "completed" | "archived";
 
 const RANGE_LABELS: { value: Range; label: string }[] = [
   { value: "7d", label: "Last 7 days" },
@@ -62,9 +64,9 @@ export default function AnalyticsPage() {
   const { data: timelineData, isLoading: loadingTimeline } = useWorkspaceTimeline();
   const { data: cosData } = useChangeOrders();
 
-  const projects: any[] = projectsData?.data ?? [];
-  const flags: any[] = flagsData?.data ?? [];
-  const cos: any[] = cosData?.data ?? [];
+  const projects: Project[] = projectsData?.data ?? [];
+  const flags: ScopeFlag[] = flagsData?.data ?? [];
+  const cos: ChangeOrder[] = cosData?.data ?? [];
   const weeks = timelineData?.data?.weeks ?? [];
 
   // Project status breakdown
@@ -79,7 +81,7 @@ export default function AnalyticsPage() {
   // Top projects by pending flags
   const flagsByProject = flags.reduce(
     (acc, f) => {
-      if (f.status === "pending_review" || f.status === "pending") {
+      if (f.status === "pending" || f.status === "confirmed") {
         acc[f.projectId] = (acc[f.projectId] ?? 0) + 1;
       }
       return acc;
@@ -223,7 +225,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge status="flagged">{p.flagCount} flag{p.flagCount !== 1 ? "s" : ""}</Badge>
-                    <Badge status={p.status as any}>{p.status}</Badge>
+                    <Badge status={p.status as BadgeStatus}>{p.status}</Badge>
                   </div>
                 </div>
               ))}
@@ -243,11 +245,11 @@ export default function AnalyticsPage() {
             <p className="py-6 text-center text-sm text-[rgb(var(--text-muted))]">No activity data yet</p>
           ) : (
             <div className="space-y-2">
-              {["projects", "briefs", "deliverables", "flags"].map((metric) => (
+              {(["projects", "briefs", "deliverables", "flags"] as const).map((metric) => (
                 <div key={metric} className="flex items-center gap-3">
                   <span className="w-20 shrink-0 text-xs capitalize text-[rgb(var(--text-muted))] sm:w-24">{metric}</span>
                   <Bar
-                    value={filteredWeeks.reduce((s, w) => s + (w as any)[metric], 0)}
+                    value={filteredWeeks.reduce((s, w) => s + w[metric], 0)}
                     max={maxWeekVal * filteredWeeks.length || 1}
                     color={
                       metric === "projects" ? "bg-primary" :

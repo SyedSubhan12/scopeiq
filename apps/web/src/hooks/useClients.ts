@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
+import type { Client } from "@novabots/db";
 
 type ClientsOptions = { cursor?: string; limit?: number };
 
@@ -11,12 +12,12 @@ export function getClientsQueryOptions(options?: ClientsOptions) {
 
   return {
     queryKey: ["clients", options],
-    queryFn: () => fetchWithAuth(`/v1/clients${qs ? `?${qs}` : ""}`) as Promise<{ data: any[] }>,
+    queryFn: () => fetchWithAuth(`/v1/clients${qs ? `?${qs}` : ""}`) as Promise<{ data: Client[] }>,
   };
 }
 
 export function useClients(options?: ClientsOptions) {
-  return useQuery<{ data: any[] }>(getClientsQueryOptions(options));
+  return useQuery<{ data: Client[] }>(getClientsQueryOptions(options));
 }
 
 export function useCreateClient() {

@@ -1,6 +1,7 @@
 import {
   db,
   projectIntelligence,
+  writeAuditLog,
   eq,
   and,
   desc,
@@ -26,15 +27,26 @@ export async function logProjectEvent(params: {
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   try {
-    await db.insert(projectIntelligence).values({
-      workspaceId: params.workspaceId,
-      projectId: params.projectId,
-      clientId: params.clientId ?? null,
-      eventType: params.eventType,
-      entityType: params.entityType,
-      entityId: params.entityId,
-      summary: params.summary,
-      metadataJson: params.metadata ?? null,
+    await db.transaction(async (trx) => {
+      const [row] = await trx.insert(projectIntelligence).values({
+        workspaceId: params.workspaceId,
+        projectId: params.projectId,
+        clientId: params.clientId ?? null,
+        eventType: params.eventType,
+        entityType: params.entityType,
+        entityId: params.entityId,
+        summary: params.summary,
+        metadataJson: params.metadata ?? null,
+      }).returning();
+      await writeAuditLog(trx, {
+        workspaceId: params.workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "project_intelligence",
+        entityId: row!.id,
+        action: "create",
+        metadata: { eventType: params.eventType, entityType: params.entityType, entityId: params.entityId },
+      });
     });
   } catch (err) {
     console.error("[ProjectIntelligence] Failed to log event:", err);

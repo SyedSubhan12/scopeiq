@@ -49,7 +49,7 @@ deliverableRouter.get("/:id", async (c) => {
 deliverableRouter.get("/:id/revisions", async (c) => {
   const workspaceId = c.get("workspaceId");
   const id = c.req.param("id");
-  const revisions = await deliverableRevisionRepository.listByDeliverable(id);
+  const revisions = await deliverableRevisionRepository.listByDeliverable(workspaceId, id);
   return c.json({ data: revisions });
 });
 

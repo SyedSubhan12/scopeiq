@@ -2,6 +2,7 @@ import {
   db,
   briefTemplates,
   briefTemplateVersions,
+  writeAuditLog,
   eq,
   and,
   isNull,
@@ -79,8 +80,19 @@ export const briefTemplateRepository = {
   },
 
   async create(data: NewBriefTemplate) {
-    const [template] = await db.insert(briefTemplates).values(data).returning();
-    return template!;
+    return db.transaction(async (trx) => {
+      const [template] = await trx.insert(briefTemplates).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId: data.workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "brief_template",
+        entityId: template!.id,
+        action: "create",
+        metadata: { name: data.name },
+      });
+      return template!;
+    });
   },
 
   async clearDefault(workspaceId: string, excludeTemplateId?: string) {
@@ -187,8 +199,19 @@ export const briefTemplateRepository = {
   },
 
   async createVersion(data: NewBriefTemplateVersion) {
-    const [version] = await db.insert(briefTemplateVersions).values(data).returning();
-    return version!;
+    return db.transaction(async (trx) => {
+      const [version] = await trx.insert(briefTemplateVersions).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId: data.workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "brief_template_version",
+        entityId: version!.id,
+        action: "create",
+        metadata: { templateId: data.templateId, versionNumber: data.versionNumber },
+      });
+      return version!;
+    });
   },
 
   async softDelete(workspaceId: string, templateId: string) {

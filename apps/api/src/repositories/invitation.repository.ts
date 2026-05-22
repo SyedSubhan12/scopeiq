@@ -1,4 +1,4 @@
-import { db, invitations, eq, and, isNull, gt } from "@novabots/db";
+import { db, invitations, writeAuditLog, eq, and, isNull, gt } from "@novabots/db";
 import type { NewInvitation } from "@novabots/db";
 
 export const invitationRepository = {
@@ -26,8 +26,19 @@ export const invitationRepository = {
   },
 
   async create(data: NewInvitation) {
-    const [invitation] = await db.insert(invitations).values(data).returning();
-    return invitation!;
+    return db.transaction(async (trx) => {
+      const [invitation] = await trx.insert(invitations).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId: data.workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "invitation",
+        entityId: invitation!.id,
+        action: "create",
+        metadata: { email: data.email },
+      });
+      return invitation!;
+    });
   },
 
   async markAccepted(token: string) {

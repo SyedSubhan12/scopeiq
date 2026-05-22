@@ -7,7 +7,7 @@ import {
   Filter, Plus, ChevronRight, AlertCircle
 } from "lucide-react";
 import { Card, Badge, Button, Skeleton } from "@novabots/ui";
-import { useChangeOrders } from "@/hooks/change-orders";
+import { useChangeOrders, type ChangeOrder } from "@/hooks/change-orders";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@novabots/ui";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -15,15 +15,16 @@ import { EmptyState } from "@/components/shared/EmptyState";
 interface ChangeOrderListProps {
   projectId?: string;
   onCreate?: () => void;
-  onEdit?: (co: any) => void;
+  onEdit?: (co: ChangeOrder) => void;
 }
 
 type StatusFilter = "all" | "draft" | "sent" | "accepted" | "declined" | "expired";
+type BadgeStatus = "approved" | "in_review" | "pending" | "flagged" | "draft" | "active" | "paused" | "completed" | "archived";
 
 const STATUS_CONFIG: Record<string, {
   icon: React.ElementType;
   color: string;
-  badgeStatus: string;
+  badgeStatus: BadgeStatus;
   label: string;
 }> = {
   draft: { icon: FileSignature, color: "text-[rgb(var(--text-muted))]", badgeStatus: "draft", label: "Draft" },
@@ -50,16 +51,16 @@ export function ChangeOrderList({ projectId, onCreate, onEdit }: ChangeOrderList
   const { data, isLoading } = useChangeOrders(projectId);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  const cos: any[] = data?.data ?? [];
+  const cos: ChangeOrder[] = data?.data ?? [];
 
   const filtered = useMemo(() => {
     if (statusFilter === "all") return cos;
-    return cos.filter((c: any) => c.status === statusFilter);
+    return cos.filter((c) => c.status === statusFilter);
   }, [cos, statusFilter]);
 
   const acceptedValue = cos
-    .filter((c: any) => c.status === "accepted")
-    .reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+    .filter((c) => c.status === "accepted")
+    .reduce((sum: number, c) => sum + (Number(c.amount) || 0), 0);
 
   if (isLoading) {
     return (
@@ -103,7 +104,7 @@ export function ChangeOrderList({ projectId, onCreate, onEdit }: ChangeOrderList
         {STATUS_OPTIONS.map((opt) => {
           const count = opt.value === "all"
             ? cos.length
-            : cos.filter((c: any) => c.status === opt.value).length;
+            : cos.filter((c) => c.status === opt.value).length;
           if (count === 0 && opt.value !== "all") return null;
           return (
             <button
@@ -151,10 +152,10 @@ export function ChangeOrderList({ projectId, onCreate, onEdit }: ChangeOrderList
       ) : (
         <AnimatePresence initial={false}>
           <div className="space-y-2">
-            {filtered.map((co: any) => {
+            {filtered.map((co) => {
               const cfg = getCOStatusConfig(co.status)!;
               const StatusIcon = cfg.icon;
-              const badgeStatus = cfg.badgeStatus as any;
+              const badgeStatus = cfg.badgeStatus;
               const statusLabel = cfg.label;
               const iconColor = cfg.color;
 

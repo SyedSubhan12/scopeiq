@@ -1,15 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
+import type { RateCardItem } from "@novabots/db";
 
 export function getRateCardQueryOptions() {
   return {
     queryKey: ["rate-card"],
-    queryFn: () => fetchWithAuth("/v1/rate-card") as Promise<{ data: any }>,
+    queryFn: () => fetchWithAuth("/v1/rate-card") as Promise<{ data: RateCardItem[] }>,
   };
 }
 
 export function useRateCard() {
-  return useQuery<{ data: any }>(getRateCardQueryOptions());
+  return useQuery<{ data: RateCardItem[] }>(getRateCardQueryOptions());
 }
 
 export function useCreateRateCardItem() {

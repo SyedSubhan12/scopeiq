@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWithAuth } from "@/lib/api";
+import type { Project } from "@novabots/db";
 
 type ProjectsOptions = {
   status?: string | undefined;
@@ -18,18 +19,18 @@ export function getProjectsQueryOptions(options?: ProjectsOptions) {
 
   return {
     queryKey: ["projects", options],
-    queryFn: () => fetchWithAuth(`/v1/projects${qs ? `?${qs}` : ""}`) as Promise<{ data: any[] }>,
+    queryFn: () => fetchWithAuth(`/v1/projects${qs ? `?${qs}` : ""}`) as Promise<{ data: Project[] }>,
   };
 }
 
 export function useProjects(options?: ProjectsOptions) {
-  return useQuery<{ data: any[] }>(getProjectsQueryOptions(options));
+  return useQuery<{ data: Project[] }>(getProjectsQueryOptions(options));
 }
 
 export function useProject(id: string) {
-  return useQuery<{ data: any }>({
+  return useQuery<{ data: Project }>({
     queryKey: ["project", id],
-    queryFn: () => fetchWithAuth(`/v1/projects/${id}`) as Promise<{ data: any }>,
+    queryFn: () => fetchWithAuth(`/v1/projects/${id}`) as Promise<{ data: Project }>,
     enabled: !!id,
   });
 }

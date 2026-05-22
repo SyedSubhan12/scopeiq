@@ -1,4 +1,4 @@
-import { db, briefEmbeds, eq, and, isNull } from "@novabots/db";
+import { db, briefEmbeds, writeAuditLog, eq, and, isNull } from "@novabots/db";
 import type { NewBriefEmbed } from "@novabots/db";
 
 export const briefEmbedRepository = {
@@ -29,25 +29,60 @@ export const briefEmbedRepository = {
   },
 
   async create(data: NewBriefEmbed) {
-    const [row] = await db.insert(briefEmbeds).values(data).returning();
-    return row!;
+    return db.transaction(async (trx) => {
+      const [row] = await trx.insert(briefEmbeds).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId: data.workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "brief_embed",
+        entityId: row!.id,
+        action: "create",
+        metadata: { token: data.token },
+      });
+      return row!;
+    });
   },
 
   async update(workspaceId: string, id: string, data: Partial<NewBriefEmbed>) {
-    const [row] = await db
-      .update(briefEmbeds)
-      .set({ ...data, updatedAt: new Date() })
-      .where(and(eq(briefEmbeds.id, id), eq(briefEmbeds.workspaceId, workspaceId), isNull(briefEmbeds.deletedAt)))
-      .returning();
-    return row ?? null;
+    return db.transaction(async (trx) => {
+      const [row] = await trx
+        .update(briefEmbeds)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(briefEmbeds.id, id), eq(briefEmbeds.workspaceId, workspaceId), isNull(briefEmbeds.deletedAt)))
+        .returning();
+      if (row) {
+        await writeAuditLog(trx, {
+          workspaceId,
+          actorId: null,
+          actorType: "system",
+          entityType: "brief_embed",
+          entityId: id,
+          action: "update",
+        });
+      }
+      return row ?? null;
+    });
   },
 
   async softDelete(workspaceId: string, id: string) {
-    const [row] = await db
-      .update(briefEmbeds)
-      .set({ deletedAt: new Date(), updatedAt: new Date(), isActive: false })
-      .where(and(eq(briefEmbeds.id, id), eq(briefEmbeds.workspaceId, workspaceId), isNull(briefEmbeds.deletedAt)))
-      .returning();
-    return row ?? null;
+    return db.transaction(async (trx) => {
+      const [row] = await trx
+        .update(briefEmbeds)
+        .set({ deletedAt: new Date(), updatedAt: new Date(), isActive: false })
+        .where(and(eq(briefEmbeds.id, id), eq(briefEmbeds.workspaceId, workspaceId), isNull(briefEmbeds.deletedAt)))
+        .returning();
+      if (row) {
+        await writeAuditLog(trx, {
+          workspaceId,
+          actorId: null,
+          actorType: "system",
+          entityType: "brief_embed",
+          entityId: id,
+          action: "delete",
+        });
+      }
+      return row ?? null;
+    });
   },
 };

@@ -1,4 +1,4 @@
-import { db, workspaces, eq, and, isNull } from "@novabots/db";
+import { db, workspaces, writeAuditLog, eq, and, isNull } from "@novabots/db";
 
 export const workspaceRepository = {
   async getById(workspaceId: string) {
@@ -20,8 +20,19 @@ export const workspaceRepository = {
   },
 
   async create(data: typeof workspaces.$inferInsert) {
-    const [inserted] = await db.insert(workspaces).values(data).returning();
-    return inserted ?? null;
+    return db.transaction(async (trx) => {
+      const [inserted] = await trx.insert(workspaces).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId: inserted!.id,
+        actorId: null,
+        actorType: "system",
+        entityType: "workspace",
+        entityId: inserted!.id,
+        action: "create",
+        metadata: { name: data.name },
+      });
+      return inserted ?? null;
+    });
   },
 
   async getByIdWithDomain(workspaceId: string) {

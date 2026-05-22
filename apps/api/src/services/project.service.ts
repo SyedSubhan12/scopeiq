@@ -214,7 +214,15 @@ export const projectService = {
     return deliverableService.list(workspaceId, { projectId });
   },
 
-  async createProjectDeliverable(workspaceId: string, projectId: string, actorId: string, data: any) {
+  async createProjectDeliverable(workspaceId: string, projectId: string, actorId: string, data: {
+    name: string;
+    description?: string | undefined;
+    type?: string | undefined;
+    externalUrl?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+    maxRevisions?: number | undefined;
+    dueDate?: string | undefined;
+  }) {
     const project = await this.getProject(workspaceId, projectId);
     return deliverableService.create(workspaceId, actorId, { ...data, projectId });
   },

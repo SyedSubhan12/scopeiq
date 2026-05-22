@@ -13,8 +13,8 @@ export function ScopeGuardTab({ projectId }: { projectId: string }) {
     const [showSOWInput, setShowSOWInput] = useState(false);
 
     const flags = data?.data ?? [];
-    const pendingFlags = flags.filter((f: any) => f.status === "pending");
-    const resolvedFlags = flags.filter((f: any) => ["resolved", "change_order_sent", "dismissed"].includes(f.status));
+    const pendingFlags = flags.filter((f) => f.status === "pending");
+    const resolvedFlags = flags.filter((f) => ["resolved", "change_order_sent", "dismissed"].includes(f.status));
 
     if (isLoading) {
         return (
@@ -43,7 +43,7 @@ export function ScopeGuardTab({ projectId }: { projectId: string }) {
                 </h3>
                 <div className="grid gap-4">
                     {pendingFlags.length > 0 ? (
-                        pendingFlags.map((flag: any) => (
+                        pendingFlags.map((flag) => (
                             <FlagCard key={flag.id} flag={flag} projectId={projectId} />
                         ))
                     ) : (
@@ -63,7 +63,7 @@ export function ScopeGuardTab({ projectId }: { projectId: string }) {
                         RESOLVED / PROCESSED
                     </h3>
                     <div className="grid gap-3">
-                        {resolvedFlags.map((flag: any) => (
+                        {resolvedFlags.map((flag) => (
                             <Card key={flag.id} className="border-[rgb(var(--border-subtle))] bg-[rgb(var(--surface-subtle))] py-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export function ScopeGuardTab({ projectId }: { projectId: string }) {
                                         <p className="text-sm font-medium text-[rgb(var(--text-primary))]">{flag.title}</p>
                                     </div>
                                     <p className="text-xs text-[rgb(var(--text-muted))]">
-                                        {formatDistanceToNow(new Date(flag.updatedAt), { addSuffix: true })}
+                                        {flag.updatedAt ? formatDistanceToNow(new Date(flag.updatedAt), { addSuffix: true }) : ""}
                                     </p>
                                 </div>
                             </Card>
@@ -169,7 +169,7 @@ function SOWUploadCard({ projectId, onClose }: { projectId: string; onClose: () 
     );
 }
 
-function FlagCard({ flag, projectId }: { flag: any; projectId: string }) {
+function FlagCard({ flag, projectId }: { flag: ScopeFlag; projectId: string }) {
     const updateFlag = useUpdateScopeFlag(flag.id);
     const createCO = useCreateChangeOrder();
     const [isUpdating, setIsUpdating] = useState(false);
@@ -190,7 +190,7 @@ function FlagCard({ flag, projectId }: { flag: any; projectId: string }) {
             await createCO.mutateAsync({
                 projectId,
                 scopeFlagId: flag.id,
-                title: flag.title,
+                title: flag.title ?? "",
                 description: flag.description ?? undefined,
             });
             await updateFlag.mutateAsync({ status: "change_order_sent" });
@@ -217,16 +217,16 @@ function FlagCard({ flag, projectId }: { flag: any; projectId: string }) {
                         {flag.description || "This request falls outside the original scope agreed upon in the project brief."}
                     </p>
 
-                    {flag.source === "ai_audit" && flag.metadata && (
+                    {flag.aiReasoning && flag.metadata && (
                         <div className="mt-4 rounded-lg border border-primary-light/20 bg-primary-light/10 p-3">
                             <div className="mb-1.5 flex items-center gap-2">
                                 <span className="text-[10px] font-bold uppercase tracking-tighter text-primary">AI Insight</span>
                                 <Badge status="active" className="origin-left scale-75">
-                                    {Math.round((flag.metadata.confidence || 0) * 100)}% Confidence
+                                    {Math.round(((flag.metadata.confidence as number) || 0) * 100)}% Confidence
                                 </Badge>
                             </div>
                             <p className="text-xs leading-relaxed text-[rgb(var(--text-secondary))]">
-                                {flag.metadata.reasoning || "Identified as a potential scope deviation based on project clauses."}
+                                {(flag.metadata.reasoning as string) || "Identified as a potential scope deviation based on project clauses."}
                             </p>
                         </div>
                     )}

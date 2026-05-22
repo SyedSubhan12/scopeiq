@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { portalAuthMiddleware } from "../middleware/portal-auth.js";
 import { db, projects, workspaces, clients, deliverables, briefs, briefFields, briefAttachments, changeOrders, eq, and, isNull, asc, desc } from "@novabots/db";
+import type { BriefField, BriefAttachment } from "@novabots/db";
 import { NotFoundError, ValidationError } from "@novabots/types";
 import { analyticsService } from "../services/analytics.service.js";
 import { briefService } from "../services/brief.service.js";
@@ -188,9 +189,9 @@ portalSessionRouter.get("", async (c) => {
     .orderBy(desc(briefs.updatedAt))
     .limit(1);
 
-  let fields: any[] = [];
+  let fields: BriefField[] = [];
   let templateFields: Array<Record<string, unknown>> = [];
-  let attachments: any[] = [];
+  let attachments: BriefAttachment[] = [];
   let activeBriefBranding: {
     logoUrl: string | null;
     accentColor: string;

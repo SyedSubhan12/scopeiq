@@ -242,7 +242,7 @@ async function syncAttachmentFieldValue(
     return;
   }
 
-  await briefRepository.createFields([
+  await briefRepository.createFields(workspaceId, [
     {
       briefId,
       fieldKey: field.key,
@@ -534,6 +534,7 @@ export const briefService = {
     });
 
     const items = await briefClarificationRepository.createItems(
+      workspaceId,
       data.items.map((item, index) => ({
         requestId: request.id,
         fieldKey: item.fieldKey,
@@ -695,7 +696,7 @@ export const briefService = {
       sortOrder: index,
     }));
 
-    await briefRepository.createFields(fieldRecords);
+    await briefRepository.createFields(workspaceId, fieldRecords);
 
     // Dispatch scoring job
     await dispatchScoreBriefJob(brief.id);
@@ -789,7 +790,7 @@ export const briefService = {
         continue;
       }
 
-      await briefRepository.createFields([
+      await briefRepository.createFields(workspaceId, [
         {
           briefId,
           fieldKey: field.key,
@@ -895,7 +896,7 @@ export const briefService = {
       if (existingField) {
         await briefRepository.updateFieldValue(briefId, field.key, fieldPayload);
       } else {
-        await briefRepository.createFields([
+        await briefRepository.createFields(workspaceId, [
           {
             briefId,
             fieldKey: field.key,
@@ -979,7 +980,7 @@ export const briefService = {
       if (existingField) {
         await briefRepository.updateFieldValue(briefId, field.key, fieldPayload);
       } else {
-        await briefRepository.createFields([
+        await briefRepository.createFields(workspaceId, [
           {
             briefId,
             fieldKey: field.key,

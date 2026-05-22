@@ -1,4 +1,4 @@
-import { db, marketplaceInstalls, eq, and } from "@novabots/db";
+import { db, marketplaceInstalls, writeAuditLog, eq, and } from "@novabots/db";
 import type { NewMarketplaceInstall } from "@novabots/db";
 
 export interface MarketplaceTemplate {
@@ -270,7 +270,18 @@ export const marketplaceRepository = {
   },
 
   async createInstall(data: NewMarketplaceInstall) {
-    const [install] = await db.insert(marketplaceInstalls).values(data).returning();
-    return install!;
+    return db.transaction(async (trx) => {
+      const [install] = await trx.insert(marketplaceInstalls).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId: data.workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "marketplace_install",
+        entityId: install!.id,
+        action: "create",
+        metadata: { slug: data.slug },
+      });
+      return install!;
+    });
   },
 };

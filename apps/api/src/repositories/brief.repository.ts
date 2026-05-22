@@ -1,4 +1,4 @@
-import { db, briefs, briefFields, briefVersions, eq, and, isNull, desc, asc, sql } from "@novabots/db";
+import { db, briefs, briefFields, briefVersions, writeAuditLog, eq, and, isNull, desc, asc, sql } from "@novabots/db";
 import type { NewBrief, NewBriefField, NewBriefVersion } from "@novabots/db";
 
 export const briefRepository = {
@@ -55,8 +55,19 @@ export const briefRepository = {
   },
 
   async create(data: NewBrief) {
-    const [brief] = await db.insert(briefs).values(data).returning();
-    return brief!;
+    return db.transaction(async (trx) => {
+      const [brief] = await trx.insert(briefs).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId: data.workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "brief",
+        entityId: brief!.id,
+        action: "create",
+        metadata: { projectId: data.projectId },
+      });
+      return brief!;
+    });
   },
 
   async update(workspaceId: string, briefId: string, data: Partial<NewBrief>) {
@@ -74,9 +85,22 @@ export const briefRepository = {
     return updated ?? null;
   },
 
-  async createFields(fields: NewBriefField[]) {
+  async createFields(workspaceId: string, fields: NewBriefField[]) {
     if (fields.length === 0) return [];
-    return db.insert(briefFields).values(fields).returning();
+    return db.transaction(async (trx) => {
+      const inserted = await trx.insert(briefFields).values(fields).returning();
+      const briefId = inserted[0]!.briefId;
+      await writeAuditLog(trx, {
+        workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "brief_field",
+        entityId: briefId,
+        action: "create",
+        metadata: { briefId, count: inserted.length },
+      });
+      return inserted;
+    });
   },
 
   async updateFieldValue(
@@ -140,8 +164,19 @@ export const briefRepository = {
   },
 
   async createVersion(data: NewBriefVersion) {
-    const [version] = await db.insert(briefVersions).values(data).returning();
-    return version!;
+    return db.transaction(async (trx) => {
+      const [version] = await trx.insert(briefVersions).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId: data.workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "brief_version",
+        entityId: version!.id,
+        action: "create",
+        metadata: { briefId: data.briefId, versionNumber: data.versionNumber },
+      });
+      return version!;
+    });
   },
 
   async updateVersion(workspaceId: string, versionId: string, data: Partial<NewBriefVersion>) {

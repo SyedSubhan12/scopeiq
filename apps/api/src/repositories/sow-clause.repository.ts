@@ -1,4 +1,4 @@
-import { db, sowClauses, statementsOfWork, projects, eq, and, isNull, desc, asc, sql } from "@novabots/db";
+import { db, sowClauses, statementsOfWork, projects, writeAuditLog, eq, and, isNull, desc, asc, sql } from "@novabots/db";
 import type { NewSowClause } from "@novabots/db";
 import type { ClauseType } from "@novabots/db";
 
@@ -84,100 +84,191 @@ export const sowClauseRepository = {
       .orderBy(desc(sowClauses.sortOrder));
   },
 
-  async create(data: NewSowClause) {
-    const [clause] = await db
-      .insert(sowClauses)
-      .values(data)
-      .returning();
-    return clause!;
+  async create(workspaceId: string, data: NewSowClause) {
+    return db.transaction(async (trx) => {
+      const [sow] = await trx
+        .select({ id: statementsOfWork.id })
+        .from(statementsOfWork)
+        .where(
+          and(
+            eq(statementsOfWork.id, data.sowId),
+            eq(statementsOfWork.workspaceId, workspaceId),
+            isNull(statementsOfWork.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!sow) return null;
+
+      const [clause] = await trx
+        .insert(sowClauses)
+        .values(data)
+        .returning();
+      await writeAuditLog(trx, {
+        workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "sow_clause",
+        entityId: clause!.id,
+        action: "create",
+        metadata: { sowId: data.sowId, clauseType: data.clauseType },
+      });
+      return clause!;
+    });
   },
 
-  async createMany(data: NewSowClause[]) {
+  async createMany(workspaceId: string, data: NewSowClause[]) {
     if (data.length === 0) return [];
-    const inserted = await db.insert(sowClauses).values(data).returning();
-    return inserted;
+    return db.transaction(async (trx) => {
+      const sowId = data[0]!.sowId;
+      const [sow] = await trx
+        .select({ id: statementsOfWork.id })
+        .from(statementsOfWork)
+        .where(
+          and(
+            eq(statementsOfWork.id, sowId),
+            eq(statementsOfWork.workspaceId, workspaceId),
+            isNull(statementsOfWork.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!sow) return [];
+
+      const inserted = await trx.insert(sowClauses).values(data).returning();
+      await writeAuditLog(trx, {
+        workspaceId,
+        actorId: null,
+        actorType: "system",
+        entityType: "sow_clause",
+        entityId: sowId,
+        action: "create",
+        metadata: { sowId, count: inserted.length },
+      });
+      return inserted;
+    });
   },
 
   async update(workspaceId: string, clauseId: string, data: Partial<NewSowClause>) {
-    const [clause] = await db
-      .select({ sowId: sowClauses.sowId })
-      .from(sowClauses)
-      .where(eq(sowClauses.id, clauseId))
-      .limit(1);
+    return db.transaction(async (trx) => {
+      const [clause] = await trx
+        .select({ sowId: sowClauses.sowId })
+        .from(sowClauses)
+        .where(eq(sowClauses.id, clauseId))
+        .limit(1);
 
-    if (!clause) return null;
+      if (!clause) return null;
 
-    const [sow] = await db
-      .select({ id: statementsOfWork.id })
-      .from(statementsOfWork)
-      .where(
-        and(
-          eq(statementsOfWork.id, clause.sowId),
-          eq(statementsOfWork.workspaceId, workspaceId),
-          isNull(statementsOfWork.deletedAt),
-        ),
-      )
-      .limit(1);
+      const [sow] = await trx
+        .select({ id: statementsOfWork.id })
+        .from(statementsOfWork)
+        .where(
+          and(
+            eq(statementsOfWork.id, clause.sowId),
+            eq(statementsOfWork.workspaceId, workspaceId),
+            isNull(statementsOfWork.deletedAt),
+          ),
+        )
+        .limit(1);
 
-    if (!sow) return null;
+      if (!sow) return null;
 
-    const [updated] = await db
-      .update(sowClauses)
-      .set(data)
-      .where(eq(sowClauses.id, clauseId))
-      .returning();
-    return updated ?? null;
+      const [updated] = await trx
+        .update(sowClauses)
+        .set(data)
+        .where(eq(sowClauses.id, clauseId))
+        .returning();
+      if (updated) {
+        await writeAuditLog(trx, {
+          workspaceId,
+          actorId: null,
+          actorType: "system",
+          entityType: "sow_clause",
+          entityId: clauseId,
+          action: "update",
+          metadata: { sowId: clause.sowId },
+        });
+      }
+      return updated ?? null;
+    });
   },
 
   async delete(workspaceId: string, clauseId: string) {
-    const [clause] = await db
-      .select({ sowId: sowClauses.sowId })
-      .from(sowClauses)
-      .where(eq(sowClauses.id, clauseId))
-      .limit(1);
+    return db.transaction(async (trx) => {
+      const [clause] = await trx
+        .select({ sowId: sowClauses.sowId })
+        .from(sowClauses)
+        .where(eq(sowClauses.id, clauseId))
+        .limit(1);
 
-    if (!clause) return null;
+      if (!clause) return null;
 
-    const [sow] = await db
-      .select({ id: statementsOfWork.id })
-      .from(statementsOfWork)
-      .where(
-        and(
-          eq(statementsOfWork.id, clause.sowId),
-          eq(statementsOfWork.workspaceId, workspaceId),
-          isNull(statementsOfWork.deletedAt),
-        ),
-      )
-      .limit(1);
+      const [sow] = await trx
+        .select({ id: statementsOfWork.id })
+        .from(statementsOfWork)
+        .where(
+          and(
+            eq(statementsOfWork.id, clause.sowId),
+            eq(statementsOfWork.workspaceId, workspaceId),
+            isNull(statementsOfWork.deletedAt),
+          ),
+        )
+        .limit(1);
 
-    if (!sow) return null;
+      if (!sow) return null;
 
-    const [deleted] = await db
-      .delete(sowClauses)
-      .where(eq(sowClauses.id, clauseId))
-      .returning();
-    return deleted ?? null;
+      const [deleted] = await trx
+        .delete(sowClauses)
+        .where(eq(sowClauses.id, clauseId))
+        .returning();
+      if (deleted) {
+        await writeAuditLog(trx, {
+          workspaceId,
+          actorId: null,
+          actorType: "system",
+          entityType: "sow_clause",
+          entityId: clauseId,
+          action: "delete",
+          metadata: { sowId: clause.sowId },
+        });
+      }
+      return deleted ?? null;
+    });
   },
 
   async deleteBySowId(workspaceId: string, sowId: string) {
-    const [sow] = await db
-      .select({ id: statementsOfWork.id })
-      .from(statementsOfWork)
-      .where(
-        and(
-          eq(statementsOfWork.id, sowId),
-          eq(statementsOfWork.workspaceId, workspaceId),
-          isNull(statementsOfWork.deletedAt),
-        ),
-      )
-      .limit(1);
+    return db.transaction(async (trx) => {
+      const [sow] = await trx
+        .select({ id: statementsOfWork.id })
+        .from(statementsOfWork)
+        .where(
+          and(
+            eq(statementsOfWork.id, sowId),
+            eq(statementsOfWork.workspaceId, workspaceId),
+            isNull(statementsOfWork.deletedAt),
+          ),
+        )
+        .limit(1);
 
-    if (!sow) return [];
+      if (!sow) return [];
 
-    return db
-      .delete(sowClauses)
-      .where(eq(sowClauses.sowId, sowId))
-      .returning();
+      const deleted = await trx
+        .delete(sowClauses)
+        .where(eq(sowClauses.sowId, sowId))
+        .returning();
+      if (deleted.length > 0) {
+        await writeAuditLog(trx, {
+          workspaceId,
+          actorId: null,
+          actorType: "system",
+          entityType: "sow_clause",
+          entityId: sowId,
+          action: "delete",
+          metadata: { sowId, count: deleted.length },
+        });
+      }
+      return deleted;
+    });
   },
 
   /**

@@ -40,7 +40,8 @@ portalDeliverableRouter.get("/:id", async (c) => {
 
 portalDeliverableRouter.get("/:id/revisions", async (c) => {
   const id = c.req.param("id");
-  const revisions = await deliverableRevisionRepository.listByDeliverable(id);
+  const workspaceId = c.get("portalWorkspaceId");
+  const revisions = await deliverableRevisionRepository.listByDeliverable(workspaceId, id);
   return c.json({ data: revisions });
 });
 
